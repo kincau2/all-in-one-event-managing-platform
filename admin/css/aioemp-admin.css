@@ -1,0 +1,520 @@
+/**
+ * AIOEMP Admin — SPA shell styles.
+ *
+ * Design reference : Star Admin 2 Pro (vertical-boxed)
+ * Layout           : Full-screen overlay — hides WP admin chrome
+ *
+ * Palette (Star Admin 2 Pro)
+ * --sa-primary      : #4B49AC   (indigo)
+ * --sa-primary-lt   : #7978E9   (lighter indigo)
+ * --sa-info         : #248AFD   (blue)
+ * --sa-success      : #3AC47D   (green)
+ * --sa-warning      : #FFC100   (amber)
+ * --sa-danger       : #F5365C   (red)
+ * --sa-body-bg      : #F2EDF3   (light grey-purple)
+ * --sa-sidebar-bg   : #FFFFFF
+ * --sa-sidebar-txt  : #737F8B
+ * --sa-sidebar-act  : #4B49AC
+ * --sa-card-bg      : #FFFFFF
+ * --sa-text         : #343A40
+ * --sa-muted        : #6C757D
+ *
+ * @package AIOEMP
+ * @since   0.1.0
+ */
+
+/* ===================================================================
+   CSS Custom Properties
+   =================================================================== */
+:root {
+    --sa-primary:       #4B49AC;
+    --sa-primary-lt:    #7978E9;
+    --sa-info:          #248AFD;
+    --sa-success:       #3AC47D;
+    --sa-warning:       #FFC100;
+    --sa-danger:        #F5365C;
+    --sa-body-bg:       #F2EDF3;
+    --sa-sidebar-bg:    #FFFFFF;
+    --sa-sidebar-w:     240px;
+    --sa-sidebar-txt:   #737F8B;
+    --sa-sidebar-act:   #4B49AC;
+    --sa-topbar-h:      60px;
+    --sa-card-bg:       #FFFFFF;
+    --sa-text:          #343A40;
+    --sa-muted:         #6C757D;
+    --sa-border:        #E8E8E8;
+    --sa-font:          "Ubuntu", -apple-system, BlinkMacSystemFont, "Segoe UI",
+                        Roboto, "Helvetica Neue", Arial, sans-serif;
+    --sa-radius:        6px;
+    --sa-shadow:        0 0 10px rgba(0, 0, 0, .05);
+    --sa-shadow-lg:     0 2px 12px rgba(0, 0, 0, .08);
+}
+
+/* ===================================================================
+   1. Full-screen overlay — covers WP admin bar + sidebar
+   =================================================================== */
+.aioemp-app {
+    position: fixed;
+    inset: 0;                        /* top:0 right:0 bottom:0 left:0 */
+    z-index: 99999;                  /* above WP admin bar (9990) */
+    display: flex;
+    background: var(--sa-body-bg);
+    font-family: var(--sa-font);
+    color: var(--sa-text);
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+/* Hide WP chrome that peeks through (belt-and-suspenders) */
+body.aioemp-active #wpadminbar,
+body.aioemp-active #adminmenumain,
+body.aioemp-active #adminmenuback,
+body.aioemp-active #adminmenuwrap {
+    display: none !important;
+}
+body.aioemp-active #wpcontent,
+body.aioemp-active #wpbody-content {
+    margin-left: 0 !important;
+    padding-left: 0 !important;
+}
+body.aioemp-active {
+    overflow: hidden;    /* prevent double scrollbars */
+}
+
+/* ===================================================================
+   2. Sidebar
+   =================================================================== */
+.aioemp-sidebar {
+    width: var(--sa-sidebar-w);
+    min-width: var(--sa-sidebar-w);
+    background: var(--sa-sidebar-bg);
+    border-right: 1px solid var(--sa-border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Brand / logo */
+.aioemp-sidebar__brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: var(--sa-topbar-h);
+    padding: 0 20px;
+    border-bottom: 1px solid var(--sa-border);
+    flex-shrink: 0;
+}
+
+.aioemp-sidebar__brand-icon {
+    width: 32px;
+    height: 32px;
+    background: var(--sa-primary);
+    border-radius: var(--sa-radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 16px;
+    flex-shrink: 0;
+}
+
+.aioemp-sidebar__brand-text {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--sa-text);
+    white-space: nowrap;
+}
+
+/* Section labels */
+.aioemp-sidebar__section {
+    padding: 20px 20px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: var(--sa-muted);
+}
+
+/* Nav menu */
+.aioemp-sidebar__nav {
+    flex: 1;
+    padding: 8px 0;
+}
+
+.aioemp-sidebar__menu {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.aioemp-sidebar__menu li {
+    margin: 0;
+}
+
+.aioemp-nav-link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 20px;
+    color: var(--sa-sidebar-txt);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 400;
+    border-left: 3px solid transparent;
+    transition: all .15s ease;
+}
+
+.aioemp-nav-link:hover,
+.aioemp-nav-link:focus {
+    color: var(--sa-sidebar-act);
+    background: rgba(75, 73, 172, .06);
+}
+
+.aioemp-nav-link.is-active {
+    color: var(--sa-sidebar-act);
+    border-left-color: var(--sa-sidebar-act);
+    background: rgba(75, 73, 172, .08);
+    font-weight: 500;
+}
+
+.aioemp-nav-link .dashicons {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+    line-height: 18px;
+}
+
+/* ===================================================================
+   3. Body (topbar + content)
+   =================================================================== */
+.aioemp-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;                    /* prevent flex blowout */
+    overflow: hidden;
+}
+
+/* ------- Top bar ------- */
+.aioemp-topbar {
+    height: var(--sa-topbar-h);
+    min-height: var(--sa-topbar-h);
+    background: var(--sa-card-bg);
+    border-bottom: 1px solid var(--sa-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    box-shadow: var(--sa-shadow);
+    z-index: 1;
+}
+
+.aioemp-topbar__left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.aioemp-topbar__title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--sa-text);
+    margin: 0;
+}
+
+.aioemp-topbar__right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.aioemp-topbar__user {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--sa-muted);
+}
+
+.aioemp-topbar__avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--sa-primary-lt);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.aioemp-topbar__btn-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    background: transparent;
+    border: 1px solid var(--sa-border);
+    border-radius: var(--sa-radius);
+    color: var(--sa-muted);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all .15s ease;
+    text-decoration: none;
+}
+
+.aioemp-topbar__btn-back:hover {
+    border-color: var(--sa-primary);
+    color: var(--sa-primary);
+}
+
+/* ------- Main content ------- */
+.aioemp-content {
+    flex: 1;
+    padding: 24px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* ===================================================================
+   4. Utility card component (reusable)
+   =================================================================== */
+.aioemp-card {
+    background: var(--sa-card-bg);
+    border-radius: var(--sa-radius);
+    box-shadow: var(--sa-shadow);
+    padding: 20px 24px;
+    margin-bottom: 20px;
+}
+
+.aioemp-card__title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--sa-text);
+    margin: 0 0 16px;
+}
+
+/* ===================================================================
+   5. Buttons (Star Admin style)
+   =================================================================== */
+.aioemp-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 18px;
+    font-size: 13px;
+    font-weight: 500;
+    border-radius: var(--sa-radius);
+    border: none;
+    cursor: pointer;
+    transition: opacity .15s;
+    text-decoration: none;
+    line-height: 1.4;
+}
+
+.aioemp-btn:hover { opacity: .85; }
+
+.aioemp-btn--primary   { background: var(--sa-primary);  color: #fff; }
+.aioemp-btn--info      { background: var(--sa-info);     color: #fff; }
+.aioemp-btn--success   { background: var(--sa-success);  color: #fff; }
+.aioemp-btn--warning   { background: var(--sa-warning);  color: #fff; }
+.aioemp-btn--danger    { background: var(--sa-danger);   color: #fff; }
+.aioemp-btn--outline   { background: transparent; border: 1px solid var(--sa-border); color: var(--sa-text); }
+
+/* ===================================================================
+   6. Tables (Star Admin compact style)
+   =================================================================== */
+.aioemp-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.aioemp-table th {
+    text-align: left;
+    font-weight: 600;
+    color: var(--sa-muted);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: .3px;
+    padding: 10px 12px;
+    border-bottom: 2px solid var(--sa-border);
+}
+
+.aioemp-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--sa-border);
+    vertical-align: middle;
+}
+
+.aioemp-table tr:last-child td {
+    border-bottom: none;
+}
+
+/* ===================================================================
+   7. Status badges
+   =================================================================== */
+.aioemp-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 20px;
+    text-transform: capitalize;
+}
+
+.aioemp-badge--draft     { background: #eee; color: var(--sa-muted); }
+.aioemp-badge--published { background: rgba(58,196,125,.15); color: var(--sa-success); }
+.aioemp-badge--closed    { background: rgba(245,54,92,.12); color: var(--sa-danger); }
+
+/* ===================================================================
+   8. Responsive (≤ 782px — WP mobile breakpoint)
+   =================================================================== */
+@media (max-width: 782px) {
+    .aioemp-sidebar {
+        position: absolute;
+        left: -260px;
+        top: 0;
+        bottom: 0;
+        z-index: 10;
+        box-shadow: var(--sa-shadow-lg);
+        transition: left .25s ease;
+    }
+
+    .aioemp-sidebar.is-open {
+        left: 0;
+    }
+
+    .aioemp-topbar__toggle {
+        display: inline-flex;
+    }
+}
+
+@media (min-width: 783px) {
+    .aioemp-topbar__toggle {
+        display: none;
+    }
+}
+
+/* ===================================================================
+   9. Form elements (Settings, future forms)
+   =================================================================== */
+.aioemp-label {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--sa-text);
+}
+
+.aioemp-input,
+.aioemp-select {
+    display: block;
+    width: 100%;
+    padding: 8px 12px;
+    font-size: 13px;
+    color: var(--sa-text);
+    background: #fff;
+    border: 1px solid var(--sa-border);
+    border-radius: var(--sa-radius);
+    transition: border-color .15s;
+    box-sizing: border-box;
+}
+
+.aioemp-input:focus,
+.aioemp-select:focus {
+    outline: none;
+    border-color: var(--sa-primary);
+    box-shadow: 0 0 0 2px rgba(75, 73, 172, .15);
+}
+
+.aioemp-help {
+    margin: 4px 0 0;
+    font-size: 12px;
+    color: var(--sa-muted);
+}
+
+.aioemp-form-group {
+    margin-bottom: 16px;
+}
+
+.aioemp-form-row {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.aioemp-form-group--half {
+    flex: 1 1 200px;
+}
+
+/* ===================================================================
+   10. Settings page specifics
+   =================================================================== */
+.aioemp-settings {
+    max-width: 760px;
+}
+
+/* Logo preview */
+.aioemp-logo-preview {
+    margin-bottom: 12px;
+    width: 200px;
+    height: 80px;
+    border: 1px dashed var(--sa-border);
+    border-radius: var(--sa-radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #fafafa;
+    overflow: hidden;
+}
+
+.aioemp-logo-preview__img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.aioemp-logo-preview__placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    color: var(--sa-muted);
+    font-size: 12px;
+}
+
+.aioemp-logo-preview__placeholder .dashicons {
+    font-size: 24px;
+    width: 24px;
+    height: 24px;
+}
+
+.aioemp-logo-actions {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+/* Save bar */
+.aioemp-settings__actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding-top: 8px;
+}
+
+.aioemp-settings__status {
+    font-size: 13px;
+    color: var(--sa-muted);
+}
+
+.aioemp-settings__status--ok {
+    color: var(--sa-success);
+}
+
+.aioemp-settings__status--error {
+    color: var(--sa-danger);
+}

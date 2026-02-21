@@ -12,3 +12,6 @@ seatmap-editor/dist/
 
 # Playwright MCP temp files
 .playwright-mcp/
+
+# Deploy script (contains server credentials)
+deploy.sh

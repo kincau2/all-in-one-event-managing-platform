@@ -9,3 +9,6 @@ seatmap-editor/dist/
 
 # AI agent notes (contains credentials)
 .ai-agent-notes.md
+
+# Playwright MCP temp files
+.playwright-mcp/

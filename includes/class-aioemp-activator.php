@@ -32,8 +32,14 @@ class AIOEMP_Activator {
      * We store a DB version in wp_options so that future plugin updates
      * can run migrations when the schema changes.
      */
-    private static function create_tables(): void {
+    public static function create_tables(): void {
         global $wpdb;
+
+        $prefix = $wpdb->prefix . 'aioemp_';
+
+        // Always check for missing columns regardless of version.
+        // This fixes cases where dbDelta silently fails to add columns.
+        self::run_migrations( $wpdb, $prefix );
 
         $installed_version = get_option( 'aioemp_db_version', '0' );
 
@@ -222,6 +228,39 @@ class AIOEMP_Activator {
             dbDelta( $query );
         }
 
+        /*--------------------------------------------------------------
+         * Explicit migrations for columns dbDelta may miss on existing tables.
+         * dbDelta can fail to ADD columns with NOT NULL DEFAULT to tables
+         * that already have rows.
+         *------------------------------------------------------------*/
+        self::run_migrations( $wpdb, $prefix );
+
         update_option( 'aioemp_db_version', AIOEMP_DB_VERSION );
+    }
+
+    /**
+     * Run explicit ALTER TABLE migrations for schema changes
+     * that dbDelta may not handle reliably.
+     */
+    private static function run_migrations( $wpdb, string $prefix ): void {
+        $table = $prefix . 'seatmap';
+
+        // Skip if table doesn't exist yet (fresh install — dbDelta will create it).
+        $exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) );
+        if ( ! $exists ) {
+            return;
+        }
+
+        // v1.1.0 — add status column.
+        $col = $wpdb->get_results( "SHOW COLUMNS FROM `{$table}` LIKE 'status'" );
+        if ( empty( $col ) ) {
+            $wpdb->query( "ALTER TABLE `{$table}` ADD COLUMN `status` varchar(32) NOT NULL DEFAULT 'draft' AFTER `title`" );
+        }
+
+        // v1.1.0 — add updated_at_gmt column.
+        $col = $wpdb->get_results( "SHOW COLUMNS FROM `{$table}` LIKE 'updated_at_gmt'" );
+        if ( empty( $col ) ) {
+            $wpdb->query( "ALTER TABLE `{$table}` ADD COLUMN `updated_at_gmt` datetime DEFAULT NULL AFTER `lock_updated_at_gmt`" );
+        }
     }
 }

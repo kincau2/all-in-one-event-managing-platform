@@ -57,5 +57,9 @@ function aioemp(): AIOEMP_Loader {
     return AIOEMP_Loader::get_instance();
 }
 
+// Auto-upgrade DB schema when plugin code is updated (no reactivation needed).
+// Uses plugins_loaded so it fires on ALL requests including REST API.
+add_action( 'plugins_loaded', array( 'AIOEMP_Activator', 'create_tables' ) );
+
 // Kick off.
 aioemp()->run();

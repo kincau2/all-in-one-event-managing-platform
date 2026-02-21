@@ -15,7 +15,7 @@ interface Props {
   seats: CompiledSeat[];
 }
 
-const SEAT_RADIUS = 8;
+const DEFAULT_SEAT_RADIUS = 8;
 const SEAT_FILL = '#4B49AC';
 const SEAT_STROKE = '#3a389a';
 
@@ -35,8 +35,9 @@ export const SeatDots: React.FC<Props> = React.memo(({ seats }) => {
         ctx.beginPath();
         for (let i = 0; i < seatData.length; i++) {
           const s = seatData[i];
-          ctx.moveTo(s.x + SEAT_RADIUS, s.y);
-          ctx.arc(s.x, s.y, SEAT_RADIUS, 0, Math.PI * 2, false);
+          const r = s.radius ?? DEFAULT_SEAT_RADIUS;
+          ctx.moveTo(s.x + r, s.y);
+          ctx.arc(s.x, s.y, r, 0, Math.PI * 2, false);
         }
         ctx.closePath();
         ctx.fillStrokeShape(shape);

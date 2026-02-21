@@ -338,6 +338,8 @@ declare const SeatBlockArcSchema: z.ZodObject<{
     rowCount: z.ZodNumber;
     startRadius: z.ZodNumber;
     radiusStep: z.ZodNumber;
+    /** Horizontal / vertical radius ratio. 1 = circle; >1 = wider ellipse; <1 = taller ellipse. */
+    radiusRatio: z.ZodDefault<z.ZodNumber>;
     startAngleDeg: z.ZodNumber;
     endAngleDeg: z.ZodNumber;
     seatsPerRow: z.ZodUnion<[z.ZodObject<{
@@ -398,6 +400,7 @@ declare const SeatBlockArcSchema: z.ZodObject<{
     rowCount: number;
     startRadius: number;
     radiusStep: number;
+    radiusRatio: number;
     startAngleDeg: number;
     endAngleDeg: number;
     seatsPerRow: {
@@ -441,6 +444,7 @@ declare const SeatBlockArcSchema: z.ZodObject<{
         gapAngleDeg?: number | undefined;
     }[] | undefined;
     section?: string | undefined;
+    radiusRatio?: number | undefined;
 }>;
 declare const SeatBlockWedgeSchema: z.ZodObject<{
     type: z.ZodLiteral<"seatBlockWedge">;
@@ -798,6 +802,8 @@ declare const PrimitiveSchema: z.ZodDiscriminatedUnion<"type", [z.ZodObject<{
     rowCount: z.ZodNumber;
     startRadius: z.ZodNumber;
     radiusStep: z.ZodNumber;
+    /** Horizontal / vertical radius ratio. 1 = circle; >1 = wider ellipse; <1 = taller ellipse. */
+    radiusRatio: z.ZodDefault<z.ZodNumber>;
     startAngleDeg: z.ZodNumber;
     endAngleDeg: z.ZodNumber;
     seatsPerRow: z.ZodUnion<[z.ZodObject<{
@@ -858,6 +864,7 @@ declare const PrimitiveSchema: z.ZodDiscriminatedUnion<"type", [z.ZodObject<{
     rowCount: number;
     startRadius: number;
     radiusStep: number;
+    radiusRatio: number;
     startAngleDeg: number;
     endAngleDeg: number;
     seatsPerRow: {
@@ -901,6 +908,7 @@ declare const PrimitiveSchema: z.ZodDiscriminatedUnion<"type", [z.ZodObject<{
         gapAngleDeg?: number | undefined;
     }[] | undefined;
     section?: string | undefined;
+    radiusRatio?: number | undefined;
 }>, z.ZodObject<{
     type: z.ZodLiteral<"seatBlockWedge">;
     center: z.ZodObject<{
@@ -1005,6 +1013,7 @@ declare const CompiledSeatSchema: z.ZodObject<{
     number: z.ZodOptional<z.ZodNumber>;
     x: z.ZodNumber;
     y: z.ZodNumber;
+    radius: z.ZodOptional<z.ZodNumber>;
     rotation: z.ZodOptional<z.ZodNumber>;
     meta: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodAny>>;
 }, "strip", z.ZodTypeAny, {
@@ -1016,6 +1025,7 @@ declare const CompiledSeatSchema: z.ZodObject<{
     rotation?: number | undefined;
     section?: string | undefined;
     row?: string | undefined;
+    radius?: number | undefined;
     meta?: Record<string, any> | undefined;
 }, {
     x: number;
@@ -1026,6 +1036,7 @@ declare const CompiledSeatSchema: z.ZodObject<{
     rotation?: number | undefined;
     section?: string | undefined;
     row?: string | undefined;
+    radius?: number | undefined;
     meta?: Record<string, any> | undefined;
 }>;
 declare const BoundsSchema: z.ZodObject<{
@@ -1053,6 +1064,7 @@ declare const CompiledSchema: z.ZodObject<{
         number: z.ZodOptional<z.ZodNumber>;
         x: z.ZodNumber;
         y: z.ZodNumber;
+        radius: z.ZodOptional<z.ZodNumber>;
         rotation: z.ZodOptional<z.ZodNumber>;
         meta: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodAny>>;
     }, "strip", z.ZodTypeAny, {
@@ -1064,6 +1076,7 @@ declare const CompiledSchema: z.ZodObject<{
         rotation?: number | undefined;
         section?: string | undefined;
         row?: string | undefined;
+        radius?: number | undefined;
         meta?: Record<string, any> | undefined;
     }, {
         x: number;
@@ -1074,6 +1087,7 @@ declare const CompiledSchema: z.ZodObject<{
         rotation?: number | undefined;
         section?: string | undefined;
         row?: string | undefined;
+        radius?: number | undefined;
         meta?: Record<string, any> | undefined;
     }>, "many">;
     bounds: z.ZodObject<{
@@ -1102,6 +1116,7 @@ declare const CompiledSchema: z.ZodObject<{
         rotation?: number | undefined;
         section?: string | undefined;
         row?: string | undefined;
+        radius?: number | undefined;
         meta?: Record<string, any> | undefined;
     }[];
     bounds: {
@@ -1120,6 +1135,7 @@ declare const CompiledSchema: z.ZodObject<{
         rotation?: number | undefined;
         section?: string | undefined;
         row?: string | undefined;
+        radius?: number | undefined;
         meta?: Record<string, any> | undefined;
     }[];
     bounds: {
@@ -1418,6 +1434,8 @@ declare const LayoutSchema: z.ZodObject<{
         rowCount: z.ZodNumber;
         startRadius: z.ZodNumber;
         radiusStep: z.ZodNumber;
+        /** Horizontal / vertical radius ratio. 1 = circle; >1 = wider ellipse; <1 = taller ellipse. */
+        radiusRatio: z.ZodDefault<z.ZodNumber>;
         startAngleDeg: z.ZodNumber;
         endAngleDeg: z.ZodNumber;
         seatsPerRow: z.ZodUnion<[z.ZodObject<{
@@ -1478,6 +1496,7 @@ declare const LayoutSchema: z.ZodObject<{
         rowCount: number;
         startRadius: number;
         radiusStep: number;
+        radiusRatio: number;
         startAngleDeg: number;
         endAngleDeg: number;
         seatsPerRow: {
@@ -1521,6 +1540,7 @@ declare const LayoutSchema: z.ZodObject<{
             gapAngleDeg?: number | undefined;
         }[] | undefined;
         section?: string | undefined;
+        radiusRatio?: number | undefined;
     }>, z.ZodObject<{
         type: z.ZodLiteral<"seatBlockWedge">;
         center: z.ZodObject<{
@@ -1626,6 +1646,7 @@ declare const LayoutSchema: z.ZodObject<{
             number: z.ZodOptional<z.ZodNumber>;
             x: z.ZodNumber;
             y: z.ZodNumber;
+            radius: z.ZodOptional<z.ZodNumber>;
             rotation: z.ZodOptional<z.ZodNumber>;
             meta: z.ZodOptional<z.ZodRecord<z.ZodString, z.ZodAny>>;
         }, "strip", z.ZodTypeAny, {
@@ -1637,6 +1658,7 @@ declare const LayoutSchema: z.ZodObject<{
             rotation?: number | undefined;
             section?: string | undefined;
             row?: string | undefined;
+            radius?: number | undefined;
             meta?: Record<string, any> | undefined;
         }, {
             x: number;
@@ -1647,6 +1669,7 @@ declare const LayoutSchema: z.ZodObject<{
             rotation?: number | undefined;
             section?: string | undefined;
             row?: string | undefined;
+            radius?: number | undefined;
             meta?: Record<string, any> | undefined;
         }>, "many">;
         bounds: z.ZodObject<{
@@ -1675,6 +1698,7 @@ declare const LayoutSchema: z.ZodObject<{
             rotation?: number | undefined;
             section?: string | undefined;
             row?: string | undefined;
+            radius?: number | undefined;
             meta?: Record<string, any> | undefined;
         }[];
         bounds: {
@@ -1693,6 +1717,7 @@ declare const LayoutSchema: z.ZodObject<{
             rotation?: number | undefined;
             section?: string | undefined;
             row?: string | undefined;
+            radius?: number | undefined;
             meta?: Record<string, any> | undefined;
         }[];
         bounds: {
@@ -1792,6 +1817,7 @@ declare const LayoutSchema: z.ZodObject<{
         rowCount: number;
         startRadius: number;
         radiusStep: number;
+        radiusRatio: number;
         startAngleDeg: number;
         endAngleDeg: number;
         seatsPerRow: {
@@ -1841,6 +1867,7 @@ declare const LayoutSchema: z.ZodObject<{
             rotation?: number | undefined;
             section?: string | undefined;
             row?: string | undefined;
+            radius?: number | undefined;
             meta?: Record<string, any> | undefined;
         }[];
         bounds: {
@@ -1952,6 +1979,7 @@ declare const LayoutSchema: z.ZodObject<{
             gapAngleDeg?: number | undefined;
         }[] | undefined;
         section?: string | undefined;
+        radiusRatio?: number | undefined;
     } | {
         type: "seatBlockWedge";
         id: string;
@@ -1989,6 +2017,7 @@ declare const LayoutSchema: z.ZodObject<{
             rotation?: number | undefined;
             section?: string | undefined;
             row?: string | undefined;
+            radius?: number | undefined;
             meta?: Record<string, any> | undefined;
         }[];
         bounds: {

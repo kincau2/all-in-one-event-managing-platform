@@ -29,6 +29,13 @@ function useDebouncedCallback<T extends (...args: any[]) => void>(
 
 /* ── Shared field components ── */
 
+/**
+ * Local-state wrapper: keep a local copy of `value` so the input responds
+ * instantly, while the debounced `onChange` pushes to the store.
+ * When the *external* value changes (e.g. undo/ another field triggers
+ * recompile) we sync back.
+ */
+
 interface NumFieldProps {
   label: string;
   value: number;
@@ -47,21 +54,42 @@ const NumField: React.FC<NumFieldProps> = ({
   max,
   step = 1,
   disabled,
-}) => (
-  <label className="sme-field">
-    <span className="sme-field__label">{label}</span>
-    <input
-      className="sme-field__input"
-      type="number"
-      value={value}
-      min={min}
-      max={max}
-      step={step}
-      disabled={disabled}
-      onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
-    />
-  </label>
-);
+}) => {
+  const [local, setLocal] = useState<string>(String(value));
+  const externalRef = useRef(value);
+
+  // Sync local state when external value changes (undo, recompile, etc.)
+  useEffect(() => {
+    if (value !== externalRef.current) {
+      externalRef.current = value;
+      setLocal(String(value));
+    }
+  }, [value]);
+
+  return (
+    <label className="sme-field">
+      <span className="sme-field__label">{label}</span>
+      <input
+        className="sme-field__input"
+        type="number"
+        value={local}
+        min={min}
+        max={max}
+        step={step}
+        disabled={disabled}
+        onChange={(e) => {
+          const raw = e.target.value;
+          setLocal(raw);
+          const parsed = parseFloat(raw);
+          if (!isNaN(parsed)) {
+            externalRef.current = parsed;
+            onChange(parsed);
+          }
+        }}
+      />
+    </label>
+  );
+};
 
 interface TextFieldProps {
   label: string;
@@ -75,18 +103,35 @@ const TextField: React.FC<TextFieldProps> = ({
   value,
   onChange,
   disabled,
-}) => (
-  <label className="sme-field">
-    <span className="sme-field__label">{label}</span>
-    <input
-      className="sme-field__input"
-      type="text"
-      value={value}
-      disabled={disabled}
-      onChange={(e) => onChange(e.target.value)}
-    />
-  </label>
-);
+}) => {
+  const [local, setLocal] = useState(value);
+  const externalRef = useRef(value);
+
+  useEffect(() => {
+    if (value !== externalRef.current) {
+      externalRef.current = value;
+      setLocal(value);
+    }
+  }, [value]);
+
+  return (
+    <label className="sme-field">
+      <span className="sme-field__label">{label}</span>
+      <input
+        className="sme-field__input"
+        type="text"
+        value={local}
+        disabled={disabled}
+        onChange={(e) => {
+          const v = e.target.value;
+          setLocal(v);
+          externalRef.current = v;
+          onChange(v);
+        }}
+      />
+    </label>
+  );
+};
 
 interface SelectFieldProps {
   label: string;
@@ -254,6 +299,8 @@ const ArcInspector: React.FC<InspectorProps> = ({ primitive: p, onUpdate, disabl
         onChange={(v) => onUpdate({ startRadius: v } as any)} />
       <NumField label="Radius Step" value={prim.radiusStep} min={10} disabled={disabled}
         onChange={(v) => onUpdate({ radiusStep: v } as any)} />
+      <NumField label="Radius Ratio" value={prim.radiusRatio ?? 1} min={0.1} max={5} step={0.1} disabled={disabled}
+        onChange={(v) => onUpdate({ radiusRatio: v } as any)} />
       <NumField label="Start Angle" value={prim.startAngleDeg} min={-360} max={360} step={5} disabled={disabled}
         onChange={(v) => onUpdate({ startAngleDeg: v } as any)} />
       <NumField label="End Angle" value={prim.endAngleDeg} min={-360} max={360} step={5} disabled={disabled}

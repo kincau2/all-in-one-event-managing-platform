@@ -8,7 +8,7 @@
  */
 
 import React, { useCallback } from 'react';
-import { Rect, Text, Group, Circle } from 'react-konva';
+import { Rect, Text, Group, Circle, Ellipse } from 'react-konva';
 import type { Primitive } from '@aioemp/seatmap-core';
 import { useEditorStore } from '../store';
 
@@ -147,15 +147,22 @@ export const PrimitiveRenderer: React.FC<Props> = ({ primitive, isSelected }) =>
     case 'seatBlockWedge': {
       const cx = ('center' in primitive ? primitive.center.x : 0) + tx;
       const cy = ('center' in primitive ? primitive.center.y : 0) + ty;
-      const r = primitive.type === 'seatBlockArc'
+      const outerRadius = primitive.type === 'seatBlockArc'
         ? primitive.startRadius + primitive.rowCount * primitive.radiusStep
         : primitive.outerRadius;
+      // For arcs, apply radiusRatio for ellipse outline.
+      const ratio = primitive.type === 'seatBlockArc'
+        ? ((primitive as any).radiusRatio ?? 1)
+        : 1;
+      const radiusX = outerRadius * ratio;
+      const radiusY = outerRadius;
       return (
         <Group>
-          <Circle
+          <Ellipse
             x={cx}
             y={cy}
-            radius={r}
+            radiusX={radiusX}
+            radiusY={radiusY}
             fill="transparent"
             stroke={isSelected ? SELECTION_STROKE : '#4B49AC44'}
             strokeWidth={isSelected ? 2 : 1}

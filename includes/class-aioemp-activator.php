@@ -142,13 +142,16 @@ class AIOEMP_Activator {
         $sql[] = "CREATE TABLE {$prefix}seatmap (
             id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
             title varchar(255) NOT NULL,
+            status varchar(32) NOT NULL DEFAULT 'draft',
             layout longtext NOT NULL,
             lock_user_id bigint(20) unsigned DEFAULT NULL,
             lock_token char(36) DEFAULT NULL,
             lock_expires_at_gmt datetime DEFAULT NULL,
             lock_updated_at_gmt datetime DEFAULT NULL,
+            updated_at_gmt datetime DEFAULT NULL,
             created_at_gmt datetime NOT NULL,
             PRIMARY KEY  (id),
+            KEY idx_seatmap_status (status),
             KEY idx_seatmap_lock (lock_expires_at_gmt)
         ) $charset_collate;";
 

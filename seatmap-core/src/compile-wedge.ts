@@ -98,6 +98,7 @@ export function compileWedge(
         number: seatNumber,
         x: round2(x),
         y: round2(y),
+        radius: primitive.seatRadius,
         rotation: round2(angleDeg + 90), // tangent direction
         meta: { primitiveId: id, logicalRow: r, logicalSeat: s },
       });

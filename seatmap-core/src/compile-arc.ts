@@ -64,6 +64,7 @@ export function compileArc(
     rowCount,
     startRadius,
     radiusStep,
+    radiusRatio = 1,
     startAngleDeg,
     endAngleDeg,
     seatsPerRow,
@@ -75,14 +76,20 @@ export function compileArc(
   const seats: CompiledSeat[] = [];
 
   for (let r = 0; r < rowCount; r++) {
-    const radius = startRadius + r * radiusStep;
+    const baseRadius = startRadius + r * radiusStep;
+    // Ellipse radii: radiusX = horizontal, radiusY = vertical.
+    // radiusRatio > 1 → wider ellipse; radiusRatio < 1 → taller ellipse.
+    const radiusX = baseRadius * radiusRatio;
+    const radiusY = baseRadius;
     const n = getSeatsPerRow(seatsPerRow, r);
     if (n <= 0) continue;
 
     const rowLabelStr = generateRowLabel('A', r, 'asc');
 
     /* ── Resolve aisle gap angles for this radius ── */
-    const gaps = resolveGaps(aisleGaps, radius);
+    // Use the average radius for gap angle conversion (approximation for ellipses).
+    const avgRadius = (radiusX + radiusY) / 2;
+    const gaps = resolveGaps(aisleGaps, avgRadius);
     const totalGapAngle = gaps.reduce((s, g) => s + g.angleDeg, 0);
 
     /* ── Usable angle & step ── */
@@ -106,8 +113,9 @@ export function compileArc(
       const angleDeg = baseAngle + accGap;
       const angleRad = degToRad(angleDeg);
 
-      let x = center.x + radius * Math.cos(angleRad);
-      let y = center.y + radius * Math.sin(angleRad);
+      // Ellipse: x uses radiusX, y uses radiusY.
+      let x = center.x + radiusX * Math.cos(angleRad);
+      let y = center.y + radiusY * Math.sin(angleRad);
 
       /* ── Apply rotation around center ── */
       if (transform?.rotation) {
@@ -135,6 +143,7 @@ export function compileArc(
         number: seatNumber,
         x: round2(x),
         y: round2(y),
+        radius: primitive.seatRadius,
         rotation: round2(angleDeg + 90), // tangent direction
         meta: { primitiveId: id, logicalRow: r, logicalSeat: s },
       });

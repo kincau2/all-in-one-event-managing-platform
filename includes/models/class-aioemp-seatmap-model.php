@@ -25,7 +25,9 @@ class AIOEMP_Seatmap_Model extends AIOEMP_Model {
     public function create( array $data ) {
         $defaults = array(
             'layout'         => '{}',
+            'status'         => 'draft',
             'created_at_gmt' => $this->now_gmt(),
+            'updated_at_gmt' => $this->now_gmt(),
         );
         $data = wp_parse_args( $data, $defaults );
 
@@ -41,6 +43,10 @@ class AIOEMP_Seatmap_Model extends AIOEMP_Model {
      * @return bool
      */
     public function update( int $id, array $data ): bool {
+        // Auto-set updated_at_gmt on every update.
+        if ( ! isset( $data['updated_at_gmt'] ) ) {
+            $data['updated_at_gmt'] = $this->now_gmt();
+        }
         $result = $this->db->update( $this->table, $data, array( 'id' => $id ) );
         return false !== $result;
     }
@@ -83,7 +89,7 @@ class AIOEMP_Seatmap_Model extends AIOEMP_Model {
         $page     = max( 1, (int) $args['page'] );
         $offset   = ( $page - 1 ) * $per_page;
 
-        $query = "SELECT id, title, lock_user_id, lock_expires_at_gmt, created_at_gmt FROM {$this->table} WHERE {$where_clause} ORDER BY created_at_gmt DESC LIMIT %d OFFSET %d";
+        $query = "SELECT id, title, status, lock_user_id, lock_expires_at_gmt, updated_at_gmt, created_at_gmt FROM {$this->table} WHERE {$where_clause} ORDER BY created_at_gmt DESC LIMIT %d OFFSET %d";
         $query_values = array_merge( $values, array( $per_page, $offset ) );
         $items = $this->db->get_results(
             $this->db->prepare( $query, ...$query_values )

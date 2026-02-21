@@ -43,6 +43,7 @@ function createDefaultArc() {
     rowCount: 5,
     startRadius: 200,
     radiusStep: 35,
+    radiusRatio: 1,
     startAngleDeg: -60,
     endAngleDeg: 60,
     seatsPerRow: { start: 18, delta: 2 },

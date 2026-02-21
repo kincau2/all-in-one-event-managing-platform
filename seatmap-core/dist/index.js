@@ -74,6 +74,8 @@ var SeatBlockArcSchema = z.object({
   rowCount: z.number().int().positive(),
   startRadius: z.number().positive(),
   radiusStep: z.number().positive(),
+  /** Horizontal / vertical radius ratio. 1 = circle; >1 = wider ellipse; <1 = taller ellipse. */
+  radiusRatio: z.number().positive().default(1),
   startAngleDeg: z.number(),
   endAngleDeg: z.number(),
   seatsPerRow: SeatsPerRowSchema,
@@ -110,6 +112,7 @@ var CompiledSeatSchema = z.object({
   number: z.number().int().positive().optional(),
   x: z.number(),
   y: z.number(),
+  radius: z.number().positive().optional(),
   rotation: z.number().optional(),
   meta: z.record(z.any()).optional()
 });
@@ -242,6 +245,7 @@ function compileGrid(primitive, keyMap) {
         number: seatNumber,
         x: round2(x),
         y: round2(y),
+        radius: primitive.seatRadius,
         meta: { primitiveId: id, logicalRow: r, logicalSeat: c }
       });
     }
@@ -266,6 +270,7 @@ function compileArc(primitive, keyMap) {
     rowCount,
     startRadius,
     radiusStep,
+    radiusRatio = 1,
     startAngleDeg,
     endAngleDeg,
     seatsPerRow,
@@ -275,11 +280,14 @@ function compileArc(primitive, keyMap) {
   } = primitive;
   const seats = [];
   for (let r = 0; r < rowCount; r++) {
-    const radius = startRadius + r * radiusStep;
+    const baseRadius = startRadius + r * radiusStep;
+    const radiusX = baseRadius * radiusRatio;
+    const radiusY = baseRadius;
     const n = getSeatsPerRow(seatsPerRow, r);
     if (n <= 0) continue;
     const rowLabelStr = generateRowLabel("A", r, "asc");
-    const gaps = resolveGaps(aisleGaps, radius);
+    const avgRadius = (radiusX + radiusY) / 2;
+    const gaps = resolveGaps(aisleGaps, avgRadius);
     const totalGapAngle = gaps.reduce((s, g) => s + g.angleDeg, 0);
     const totalAngle = endAngleDeg - startAngleDeg;
     const usableAngle = totalAngle - totalGapAngle;
@@ -289,8 +297,8 @@ function compileArc(primitive, keyMap) {
       const accGap = gaps.filter((g) => g.afterSeatIndex < s).reduce((sum, g) => sum + g.angleDeg, 0);
       const angleDeg = baseAngle + accGap;
       const angleRad = degToRad(angleDeg);
-      let x = center.x + radius * Math.cos(angleRad);
-      let y = center.y + radius * Math.sin(angleRad);
+      let x = center.x + radiusX * Math.cos(angleRad);
+      let y = center.y + radiusY * Math.sin(angleRad);
       if (transform?.rotation) {
         const rotated = rotatePoint(x, y, center.x, center.y, transform.rotation);
         x = rotated.x;
@@ -310,6 +318,7 @@ function compileArc(primitive, keyMap) {
         number: seatNumber,
         x: round2(x),
         y: round2(y),
+        radius: primitive.seatRadius,
         rotation: round2(angleDeg + 90),
         // tangent direction
         meta: { primitiveId: id, logicalRow: r, logicalSeat: s }
@@ -364,6 +373,7 @@ function compileWedge(primitive, keyMap) {
         number: seatNumber,
         x: round2(x),
         y: round2(y),
+        radius: primitive.seatRadius,
         rotation: round2(angleDeg + 90),
         // tangent direction
         meta: { primitiveId: id, logicalRow: r, logicalSeat: s }

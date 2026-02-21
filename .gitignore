@@ -1,0 +1,11 @@
+# Dependencies
+node_modules/
+seatmap-core/node_modules/
+seatmap-editor/node_modules/
+
+# Build output (rebuild with npm run build)
+seatmap-core/dist/
+seatmap-editor/dist/
+
+# AI agent notes (contains credentials)
+.ai-agent-notes.md

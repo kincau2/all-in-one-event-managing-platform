@@ -46,11 +46,12 @@
                 '</tr></thead><tbody>';
 
         rows.forEach(function (r) {
-            var date = r.updated_at ? new Date(r.updated_at).toLocaleDateString() : '—';
+            var dateStr = r.updated_at_gmt || r.created_at_gmt;
+            var date = dateStr ? new Date(dateStr + 'Z').toLocaleDateString() : '—';
             html +=
                 '<tr data-id="' + r.id + '">' +
                     '<td class="sme-cell-name">' + esc(r.title || r.name || '') + '</td>' +
-                    '<td><span class="aioemp-badge aioemp-badge--' + r.status + '">' + r.status + '</span></td>' +
+                    '<td><span class="aioemp-badge aioemp-badge--' + (r.status || 'draft') + '">' + (r.status || 'draft') + '</span></td>' +
                     '<td>' + date + '</td>' +
                     '<td>' +
                         '<button class="aioemp-btn aioemp-btn--xs aioemp-btn--primary sme-act-edit" title="Edit layout">' +
@@ -184,8 +185,16 @@
         if ($mount && window.aioemp_seatmap_editor) {
             window.aioemp_seatmap_editor.unmount($mount);
         }
-        // Navigate back to seatmaps list
-        location.hash = '#seatmaps';
+
+        // Always re-render the seatmaps list directly instead of relying on
+        // hashchange (which won't fire if hash is already #seatmaps).
+        var $content = $('#aioemp-content');
+        $content.empty();
+        $('#aioemp-page-title').text('Seatmaps');
+        render($content);
+
+        // Update the URL hash without triggering another navigate.
+        history.replaceState(null, '', '#seatmaps');
     }
 
     /* ── Route handler ── */

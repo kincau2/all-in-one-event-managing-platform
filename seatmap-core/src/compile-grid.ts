@@ -79,6 +79,7 @@ export function compileGrid(
         number: seatNumber,
         x: round2(x),
         y: round2(y),
+        radius: primitive.seatRadius,
         meta: { primitiveId: id, logicalRow: r, logicalSeat: c },
       });
     }

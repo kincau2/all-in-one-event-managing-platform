@@ -108,6 +108,8 @@ export const SeatBlockArcSchema = z.object({
   rowCount: z.number().int().positive(),
   startRadius: z.number().positive(),
   radiusStep: z.number().positive(),
+  /** Horizontal / vertical radius ratio. 1 = circle; >1 = wider ellipse; <1 = taller ellipse. */
+  radiusRatio: z.number().positive().default(1),
   startAngleDeg: z.number(),
   endAngleDeg: z.number(),
   seatsPerRow: SeatsPerRowSchema,
@@ -155,6 +157,7 @@ export const CompiledSeatSchema = z.object({
   number: z.number().int().positive().optional(),
   x: z.number(),
   y: z.number(),
+  radius: z.number().positive().optional(),
   rotation: z.number().optional(),
   meta: z.record(z.any()).optional(),
 });

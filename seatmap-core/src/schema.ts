@@ -23,6 +23,7 @@ export const TransformSchema = z.object({
 });
 
 export const RowLabelSchema = z.object({
+  mode: z.enum(['alpha', 'numeric']).default('alpha'),
   start: z.string().min(1).default('A'),
   direction: z.enum(['asc', 'desc']).default('asc'),
 });
@@ -94,10 +95,11 @@ export const SeatBlockGridSchema = z.object({
   cols: z.number().int().positive(),
   seatSpacingX: z.number().positive(),
   seatSpacingY: z.number().positive(),
-  seatRadius: z.number().positive().default(10),
-  rowLabel: RowLabelSchema.default({ start: 'A', direction: 'asc' }),
+  seatRadius: z.number().positive().optional(),
+  rowLabel: RowLabelSchema.default({ mode: 'alpha', start: 'A', direction: 'asc' }),
   numbering: z.enum(['L2R', 'R2L']).default('L2R'),
   aisleGaps: z.array(GridAisleGapSchema).default([]),
+  excludedSeats: z.array(z.tuple([z.number().int(), z.number().int()])).default([]),
   section: z.string().default(''),
 });
 
@@ -113,8 +115,11 @@ export const SeatBlockArcSchema = z.object({
   startAngleDeg: z.number(),
   endAngleDeg: z.number(),
   seatsPerRow: SeatsPerRowSchema,
-  seatRadius: z.number().positive().default(10),
+  seatRadius: z.number().positive().optional(),
+  rowLabel: RowLabelSchema.default({ mode: 'alpha', start: 'A', direction: 'asc' }),
+  numbering: z.enum(['L2R', 'R2L']).default('L2R'),
   aisleGaps: z.array(ArcAisleGapSchema).default([]),
+  excludedSeats: z.array(z.tuple([z.number().int(), z.number().int()])).default([]),
   section: z.string().default(''),
 });
 
@@ -128,7 +133,10 @@ export const SeatBlockWedgeSchema = z.object({
   endAngleDeg: z.number(),
   rowCount: z.number().int().positive(),
   seatsPerRow: SeatsPerRowSchema,
-  seatRadius: z.number().positive().default(10),
+  seatRadius: z.number().positive().optional(),
+  rowLabel: RowLabelSchema.default({ mode: 'alpha', start: 'A', direction: 'asc' }),
+  numbering: z.enum(['L2R', 'R2L']).default('L2R'),
+  excludedSeats: z.array(z.tuple([z.number().int(), z.number().int()])).default([]),
   section: z.string().default(''),
 });
 
@@ -188,6 +196,7 @@ export const LayoutSchema = z.object({
   schemaVersion: z.literal(1),
   title: z.string().default(''),
   canvas: CanvasSchema,
+  seatRadius: z.number().positive().default(10),
   primitives: z.array(PrimitiveSchema),
   compiled: CompiledSchema.default({
     seats: [],

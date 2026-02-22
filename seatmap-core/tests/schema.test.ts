@@ -112,7 +112,7 @@ describe('SeatBlockGridSchema', () => {
       expect(result.data.origin).toEqual({ x: 0, y: 0 });
       expect(result.data.numbering).toBe('L2R');
       expect(result.data.aisleGaps).toEqual([]);
-      expect(result.data.rowLabel).toEqual({ start: 'A', direction: 'asc' });
+      expect(result.data.rowLabel).toEqual({ mode: 'alpha', start: 'A', direction: 'asc' });
     }
   });
 

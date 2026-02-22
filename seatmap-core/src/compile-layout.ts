@@ -35,17 +35,18 @@ export function compileLayout(
     : new Map();
 
   const allSeats: CompiledSeat[] = [];
+  const globalSeatRadius = layout.seatRadius ?? 10;
 
   for (const primitive of layout.primitives) {
     switch (primitive.type) {
       case 'seatBlockGrid':
-        allSeats.push(...compileGrid(primitive, keyMap));
+        allSeats.push(...compileGrid(primitive, keyMap, globalSeatRadius));
         break;
       case 'seatBlockArc':
-        allSeats.push(...compileArc(primitive, keyMap));
+        allSeats.push(...compileArc(primitive, keyMap, globalSeatRadius));
         break;
       case 'seatBlockWedge':
-        allSeats.push(...compileWedge(primitive, keyMap));
+        allSeats.push(...compileWedge(primitive, keyMap, globalSeatRadius));
         break;
       // stage, label, obstacle — decorative, produce no seats
     }

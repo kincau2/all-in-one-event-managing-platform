@@ -17,6 +17,7 @@ import { generateRowLabel, generateUUID, rotatePoint, round2 } from './utils.js'
 export function compileGrid(
   primitive: SeatBlockGrid,
   keyMap: SeatKeyMap,
+  globalSeatRadius: number = 10,
 ): CompiledSeat[] {
   const {
     id,
@@ -28,10 +29,12 @@ export function compileGrid(
     rowLabel,
     numbering,
     aisleGaps,
+    excludedSeats,
     section,
     transform,
   } = primitive;
 
+  const seatRadius = primitive.seatRadius ?? globalSeatRadius;
   const seats: CompiledSeat[] = [];
 
   for (let r = 0; r < rows; r++) {
@@ -39,9 +42,13 @@ export function compileGrid(
       rowLabel.start,
       r,
       rowLabel.direction,
+      rowLabel.mode ?? 'alpha',
     );
 
     for (let c = 0; c < cols; c++) {
+      /* ── Skip excluded seats ── */
+      if (excludedSeats?.some(([er, ec]) => er === r && ec === c)) continue;
+
       /* ── Position in local coordinate space ── */
 
       // Sum aisle gaps whose afterCol index is before this column
@@ -79,7 +86,7 @@ export function compileGrid(
         number: seatNumber,
         x: round2(x),
         y: round2(y),
-        radius: primitive.seatRadius,
+        radius: seatRadius,
         meta: { primitiveId: id, logicalRow: r, logicalSeat: c },
       });
     }

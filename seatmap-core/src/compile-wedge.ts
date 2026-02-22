@@ -31,6 +31,7 @@ import {
 export function compileWedge(
   primitive: SeatBlockWedge,
   keyMap: SeatKeyMap,
+  globalSeatRadius: number = 10,
 ): CompiledSeat[] {
   const {
     id,
@@ -41,10 +42,14 @@ export function compileWedge(
     endAngleDeg,
     rowCount,
     seatsPerRow,
+    excludedSeats,
     section,
     transform,
   } = primitive;
 
+  const seatRadius = primitive.seatRadius ?? globalSeatRadius;
+  const rowLabel = primitive.rowLabel ?? { mode: 'alpha' as const, start: 'A', direction: 'asc' as const };
+  const numbering = primitive.numbering ?? 'L2R';
   const seats: CompiledSeat[] = [];
   const totalAngle = endAngleDeg - startAngleDeg;
 
@@ -58,9 +63,17 @@ export function compileWedge(
     const n = getSeatsPerRow(seatsPerRow, r);
     if (n <= 0) continue;
 
-    const rowLabelStr = generateRowLabel('A', r, 'asc');
+    const rowLabelStr = generateRowLabel(
+      rowLabel.start,
+      r,
+      rowLabel.direction,
+      rowLabel.mode ?? 'alpha',
+    );
 
     for (let s = 0; s < n; s++) {
+      /* ── Skip excluded seats ── */
+      if (excludedSeats?.some(([er, ec]) => er === r && ec === s)) continue;
+
       /* ── Distribute seats evenly along the wedge arc ── */
       const angleDeg =
         n === 1
@@ -84,7 +97,7 @@ export function compileWedge(
       y += transform?.y ?? 0;
 
       /* ── Label / key ── */
-      const seatNumber = s + 1;
+      const seatNumber = numbering === 'R2L' ? n - s : s + 1;
       const label = `${rowLabelStr}-${String(seatNumber).padStart(2, '0')}`;
 
       const logicalKey = `${id}:${r}:${s}`;
@@ -98,7 +111,7 @@ export function compileWedge(
         number: seatNumber,
         x: round2(x),
         y: round2(y),
-        radius: primitive.seatRadius,
+        radius: seatRadius,
         rotation: round2(angleDeg + 90), // tangent direction
         meta: { primitiveId: id, logicalRow: r, logicalSeat: s },
       });

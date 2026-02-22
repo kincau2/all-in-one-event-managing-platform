@@ -25,7 +25,8 @@ import {
 /* ── Types ── */
 
 export type Tool =
-  | 'select'
+  | 'blockSelect'
+  | 'seatSelect'
   | 'addGrid'
   | 'addArc'
   | 'addWedge'
@@ -43,6 +44,7 @@ export interface EditorState {
 
   /* ── Selection ── */
   selectedIds: string[];
+  selectedSeatKeys: string[];
 
   /* ── Tool ── */
   activeTool: Tool;
@@ -78,6 +80,13 @@ export interface EditorState {
 
   setSelectedIds: (ids: string[]) => void;
   clearSelection: () => void;
+  setSelectedSeatKeys: (keys: string[]) => void;
+  toggleSeatExclusion: (primitiveId: string, logicalRow: number, logicalSeat: number) => void;
+  removeSelectedSeats: () => void;
+  movePrimitivesBy: (ids: string[], dx: number, dy: number) => void;
+
+  updateCanvas: (patch: Partial<Layout['canvas']>) => void;
+  updateLayoutSeatRadius: (radius: number) => void;
 
   setActiveTool: (tool: Tool) => void;
 
@@ -101,12 +110,13 @@ const DEFAULT_LAYOUT: Layout = {
   schemaVersion: 1 as const,
   title: '',
   canvas: { w: 1600, h: 900, unit: 'px' },
+  seatRadius: 10,
   primitives: [],
   compiled: {
     seats: [],
     bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
   },
-};
+} as Layout;
 
 /* ── Max undo depth ── */
 const MAX_UNDO = 50;
@@ -120,7 +130,8 @@ export const useEditorStore = create<EditorState>()(
     layout: DEFAULT_LAYOUT,
     compiledSeats: [],
     selectedIds: [],
-    activeTool: 'select',
+    selectedSeatKeys: [],
+    activeTool: 'blockSelect',
     undoStack: [],
     redoStack: [],
     stageX: 0,
@@ -164,7 +175,7 @@ export const useEditorStore = create<EditorState>()(
       set((s) => {
         s.layout.primitives.push(primitive as any);
         s.selectedIds = [primitive.id];
-        s.activeTool = 'select';
+        s.activeTool = 'blockSelect';
         s.isDirty = true;
       });
       get().recompile();
@@ -233,7 +244,98 @@ export const useEditorStore = create<EditorState>()(
       set((s) => { s.selectedIds = ids; });
     },
     clearSelection() {
-      set((s) => { s.selectedIds = []; });
+      set((s) => { s.selectedIds = []; s.selectedSeatKeys = []; });
+    },
+    setSelectedSeatKeys(keys) {
+      set((s) => { s.selectedSeatKeys = keys; });
+    },
+    toggleSeatExclusion(primitiveId, logicalRow, logicalSeat) {
+      const state = get();
+      state.pushSnapshot();
+      set((s) => {
+        const idx = s.layout.primitives.findIndex((p: Primitive) => p.id === primitiveId);
+        if (idx === -1) return;
+        const prim = s.layout.primitives[idx] as any;
+        if (!prim.excludedSeats) prim.excludedSeats = [];
+        const existing = prim.excludedSeats.findIndex(
+          (e: [number, number]) => e[0] === logicalRow && e[1] === logicalSeat,
+        );
+        if (existing >= 0) {
+          prim.excludedSeats.splice(existing, 1);
+        } else {
+          prim.excludedSeats.push([logicalRow, logicalSeat]);
+        }
+        s.isDirty = true;
+      });
+      get().recompile();
+    },
+    removeSelectedSeats() {
+      const state = get();
+      if (state.selectedSeatKeys.length === 0) return;
+      state.pushSnapshot();
+      set((s) => {
+        for (const seatKey of s.selectedSeatKeys) {
+          const seat = s.compiledSeats.find((cs: CompiledSeat) => cs.seat_key === seatKey);
+          if (!seat) continue;
+          const primId = (seat.meta as any)?.primitiveId;
+          if (!primId) continue;
+          const primIdx = s.layout.primitives.findIndex((p: Primitive) => p.id === primId);
+          if (primIdx === -1) continue;
+          const prim = s.layout.primitives[primIdx] as any;
+          if (!prim.excludedSeats) prim.excludedSeats = [];
+          const logicalRow = (seat.meta as any)?.logicalRow;
+          const logicalSeat = (seat.meta as any)?.logicalSeat;
+          if (logicalRow !== undefined && logicalSeat !== undefined) {
+            const already = prim.excludedSeats.some(
+              ([r, c]: [number, number]) => r === logicalRow && c === logicalSeat,
+            );
+            if (!already) prim.excludedSeats.push([logicalRow, logicalSeat]);
+          }
+        }
+        s.selectedSeatKeys = [];
+        s.isDirty = true;
+      });
+      get().recompile();
+    },
+    movePrimitivesBy(ids, dx, dy) {
+      set((s) => {
+        for (const id of ids) {
+          const idx = s.layout.primitives.findIndex((p: Primitive) => p.id === id);
+          if (idx === -1) continue;
+          const prim = s.layout.primitives[idx] as any;
+          if (prim.origin) {
+            prim.origin.x += dx;
+            prim.origin.y += dy;
+          } else if (prim.center) {
+            prim.center.x += dx;
+            prim.center.y += dy;
+          } else if (prim.transform) {
+            prim.transform.x = (prim.transform.x || 0) + dx;
+            prim.transform.y = (prim.transform.y || 0) + dy;
+          }
+        }
+        s.isDirty = true;
+      });
+      get().recompile();
+    },
+
+    /* ── Canvas / Layout ── */
+    updateCanvas(patch) {
+      const state = get();
+      state.pushSnapshot();
+      set((s) => {
+        Object.assign(s.layout.canvas, patch);
+        s.isDirty = true;
+      });
+    },
+    updateLayoutSeatRadius(radius) {
+      const state = get();
+      state.pushSnapshot();
+      set((s) => {
+        (s.layout as any).seatRadius = radius;
+        s.isDirty = true;
+      });
+      get().recompile();
     },
 
     /* ── Tool ── */

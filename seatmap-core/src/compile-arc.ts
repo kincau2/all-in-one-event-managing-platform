@@ -57,6 +57,7 @@ function resolveGaps(
 export function compileArc(
   primitive: SeatBlockArc,
   keyMap: SeatKeyMap,
+  globalSeatRadius: number = 10,
 ): CompiledSeat[] {
   const {
     id,
@@ -69,22 +70,29 @@ export function compileArc(
     endAngleDeg,
     seatsPerRow,
     aisleGaps,
+    excludedSeats,
     section,
     transform,
   } = primitive;
 
+  const seatRadius = primitive.seatRadius ?? globalSeatRadius;
+  const rowLabel = primitive.rowLabel ?? { mode: 'alpha' as const, start: 'A', direction: 'asc' as const };
+  const numbering = primitive.numbering ?? 'L2R';
   const seats: CompiledSeat[] = [];
 
   for (let r = 0; r < rowCount; r++) {
     const baseRadius = startRadius + r * radiusStep;
-    // Ellipse radii: radiusX = horizontal, radiusY = vertical.
-    // radiusRatio > 1 → wider ellipse; radiusRatio < 1 → taller ellipse.
     const radiusX = baseRadius * radiusRatio;
     const radiusY = baseRadius;
     const n = getSeatsPerRow(seatsPerRow, r);
     if (n <= 0) continue;
 
-    const rowLabelStr = generateRowLabel('A', r, 'asc');
+    const rowLabelStr = generateRowLabel(
+      rowLabel.start,
+      r,
+      rowLabel.direction,
+      rowLabel.mode ?? 'alpha',
+    );
 
     /* ── Resolve aisle gap angles for this radius ── */
     // Use the average radius for gap angle conversion (approximation for ellipses).
@@ -99,6 +107,9 @@ export function compileArc(
     const step = n > 1 ? usableAngle / (n - 1) : 0;
 
     for (let s = 0; s < n; s++) {
+      /* ── Skip excluded seats ── */
+      if (excludedSeats?.some(([er, ec]) => er === r && ec === s)) continue;
+
       /* base angle for this seat */
       const baseAngle =
         n === 1
@@ -129,7 +140,7 @@ export function compileArc(
       y += transform?.y ?? 0;
 
       /* ── Label / key ── */
-      const seatNumber = s + 1;
+      const seatNumber = numbering === 'R2L' ? n - s : s + 1;
       const label = `${rowLabelStr}-${String(seatNumber).padStart(2, '0')}`;
 
       const logicalKey = `${id}:${r}:${s}`;
@@ -143,7 +154,7 @@ export function compileArc(
         number: seatNumber,
         x: round2(x),
         y: round2(y),
-        radius: primitive.seatRadius,
+        radius: seatRadius,
         rotation: round2(angleDeg + 90), // tangent direction
         meta: { primitiveId: id, logicalRow: r, logicalSeat: s },
       });

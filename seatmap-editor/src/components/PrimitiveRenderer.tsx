@@ -1,16 +1,16 @@
 /**
  * @aioemp/seatmap-editor — Primitive Renderer
  *
- * Renders a single primitive as a Konva shape.
- * Non-seat primitives (stage, label, obstacle) are visual-only.
- * Seat-block primitives are rendered as a bounding outline.
- * Click on a primitive to select it.
+ * Pure visual renderer for a single primitive.
+ * No event handlers — all interaction is handled by EditorCanvas.
+ * Each shape gets attrs.primitiveId for hit-test identification.
+ * Arc/Wedge: draws only the seated sector (not a full circle).
  */
 
-import React, { useCallback } from 'react';
-import { Rect, Text, Group, Circle, Ellipse } from 'react-konva';
+import React from 'react';
+import { Rect, Text, Group, Circle, Shape } from 'react-konva';
 import type { Primitive } from '@aioemp/seatmap-core';
-import { useEditorStore } from '../store';
+import type Konva from 'konva';
 
 interface Props {
   primitive: Primitive;
@@ -19,36 +19,50 @@ interface Props {
 
 const SELECTION_STROKE = '#4B49AC';
 const SELECTION_DASH = [6, 3];
+const OUTLINE_COLOR = '#4B49AC44';
+const OUTLINE_DASH = [4, 4];
+
+/** Draw an ellipse arc sector as a closed path (ring between inner and outer radius). */
+function drawSectorPath(
+  c: any,
+  cx: number,
+  cy: number,
+  outerRx: number,
+  outerRy: number,
+  innerRx: number,
+  innerRy: number,
+  startRad: number,
+  endRad: number,
+) {
+  const steps = 48;
+  c.beginPath();
+  // Outer arc (start → end)
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const angle = startRad + (endRad - startRad) * t;
+    const x = cx + outerRx * Math.cos(angle);
+    const y = cy + outerRy * Math.sin(angle);
+    if (i === 0) c.moveTo(x, y);
+    else c.lineTo(x, y);
+  }
+  // Inner arc (end → start, reverse)
+  for (let i = steps; i >= 0; i--) {
+    const t = i / steps;
+    const angle = startRad + (endRad - startRad) * t;
+    const x = cx + innerRx * Math.cos(angle);
+    const y = cy + innerRy * Math.sin(angle);
+    c.lineTo(x, y);
+  }
+  c.closePath();
+}
 
 export const PrimitiveRenderer: React.FC<Props> = ({ primitive, isSelected }) => {
-  const setSelectedIds = useEditorStore((s) => s.setSelectedIds);
-  const updatePrimitive = useEditorStore((s) => s.updatePrimitive);
-
-  const handleClick = useCallback(
-    (e: any) => {
-      e.cancelBubble = true; // prevent stage click from deselecting
-      setSelectedIds([primitive.id]);
-    },
-    [primitive.id, setSelectedIds],
-  );
-
-  const handleDragEnd = useCallback(
-    (e: any) => {
-      const node = e.target;
-      updatePrimitive(primitive.id, {
-        transform: {
-          x: Math.round(node.x()),
-          y: Math.round(node.y()),
-          rotation: primitive.transform?.rotation ?? 0,
-        },
-      } as any);
-    },
-    [primitive.id, primitive.transform, updatePrimitive],
-  );
-
   const tx = primitive.transform?.x ?? 0;
   const ty = primitive.transform?.y ?? 0;
   const rotation = primitive.transform?.rotation ?? 0;
+  const stroke = isSelected ? SELECTION_STROKE : OUTLINE_COLOR;
+  const sw = isSelected ? 2 : 1;
+  const dash = isSelected ? SELECTION_DASH : OUTLINE_DASH;
 
   switch (primitive.type) {
     case 'stage':
@@ -61,13 +75,10 @@ export const PrimitiveRenderer: React.FC<Props> = ({ primitive, isSelected }) =>
           rotation={rotation}
           fill="#e0e0e0"
           stroke={isSelected ? SELECTION_STROKE : '#999'}
-          strokeWidth={isSelected ? 2 : 1}
+          strokeWidth={sw}
           dash={isSelected ? SELECTION_DASH : undefined}
-          draggable
-          onClick={handleClick}
-          onTap={handleClick}
-          onDragEnd={handleDragEnd}
           cornerRadius={4}
+          attrs={{ primitiveId: primitive.id }}
         />
       );
 
@@ -81,10 +92,7 @@ export const PrimitiveRenderer: React.FC<Props> = ({ primitive, isSelected }) =>
           fill={isSelected ? SELECTION_STROKE : '#333'}
           fontStyle={isSelected ? 'bold' : 'normal'}
           rotation={rotation}
-          draggable
-          onClick={handleClick}
-          onTap={handleClick}
-          onDragEnd={handleDragEnd}
+          attrs={{ primitiveId: primitive.id }}
         />
       );
 
@@ -98,13 +106,10 @@ export const PrimitiveRenderer: React.FC<Props> = ({ primitive, isSelected }) =>
           rotation={rotation}
           fill="#ffcccc"
           stroke={isSelected ? SELECTION_STROKE : '#cc5555'}
-          strokeWidth={isSelected ? 2 : 1}
+          strokeWidth={sw}
           dash={isSelected ? SELECTION_DASH : undefined}
-          draggable
-          onClick={handleClick}
-          onTap={handleClick}
-          onDragEnd={handleDragEnd}
           cornerRadius={2}
+          attrs={{ primitiveId: primitive.id }}
         />
       );
 
@@ -121,77 +126,66 @@ export const PrimitiveRenderer: React.FC<Props> = ({ primitive, isSelected }) =>
           height={h}
           rotation={rotation}
           fill="transparent"
-          stroke={isSelected ? SELECTION_STROKE : '#4B49AC44'}
-          strokeWidth={isSelected ? 2 : 1}
-          dash={isSelected ? SELECTION_DASH : [4, 4]}
-          draggable
-          onClick={handleClick}
-          onTap={handleClick}
-          onDragEnd={(e) => {
-            const node = e.target;
-            const newX = Math.round(node.x()) - primitive.origin.x;
-            const newY = Math.round(node.y()) - primitive.origin.y;
-            updatePrimitive(primitive.id, {
-              transform: {
-                x: newX,
-                y: newY,
-                rotation: primitive.transform?.rotation ?? 0,
-              },
-            } as any);
-          }}
+          stroke={stroke}
+          strokeWidth={sw}
+          dash={dash}
+          attrs={{ primitiveId: primitive.id }}
         />
       );
     }
 
-    case 'seatBlockArc':
-    case 'seatBlockWedge': {
-      const cx = ('center' in primitive ? primitive.center.x : 0) + tx;
-      const cy = ('center' in primitive ? primitive.center.y : 0) + ty;
-      const outerRadius = primitive.type === 'seatBlockArc'
-        ? primitive.startRadius + primitive.rowCount * primitive.radiusStep
-        : primitive.outerRadius;
-      // For arcs, apply radiusRatio for ellipse outline.
-      const ratio = primitive.type === 'seatBlockArc'
-        ? ((primitive as any).radiusRatio ?? 1)
-        : 1;
-      const radiusX = outerRadius * ratio;
-      const radiusY = outerRadius;
+    case 'seatBlockArc': {
+      const cx = primitive.center.x + tx;
+      const cy = primitive.center.y + ty;
+      const ratio = (primitive as any).radiusRatio ?? 1;
+      const innerR = primitive.startRadius;
+      const outerR = primitive.startRadius + primitive.rowCount * primitive.radiusStep;
+      const startRad = (primitive.startAngleDeg * Math.PI) / 180;
+      const endRad = (primitive.endAngleDeg * Math.PI) / 180;
       return (
-        <Group>
-          <Ellipse
-            x={cx}
-            y={cy}
-            radiusX={radiusX}
-            radiusY={radiusY}
-            fill="transparent"
-            stroke={isSelected ? SELECTION_STROKE : '#4B49AC44'}
-            strokeWidth={isSelected ? 2 : 1}
-            dash={isSelected ? SELECTION_DASH : [4, 4]}
-            draggable
-            onClick={handleClick}
-            onTap={handleClick}
-            onDragEnd={(e) => {
-              const node = e.target;
-              const centerX = 'center' in primitive ? primitive.center.x : 0;
-              const centerY = 'center' in primitive ? primitive.center.y : 0;
-              const newX = Math.round(node.x()) - centerX;
-              const newY = Math.round(node.y()) - centerY;
-              updatePrimitive(primitive.id, {
-                transform: {
-                  x: newX,
-                  y: newY,
-                  rotation: primitive.transform?.rotation ?? 0,
-                },
-              } as any);
+        <Group attrs={{ primitiveId: primitive.id }}>
+          <Shape
+            sceneFunc={(ctx: Konva.Context, shape: Konva.Shape) => {
+              const c = ctx as any;
+              drawSectorPath(
+                c, cx, cy,
+                outerR * ratio, outerR,
+                innerR * ratio, innerR,
+                startRad, endRad,
+              );
+              ctx.fillStrokeShape(shape);
             }}
+            fill="transparent"
+            stroke={stroke}
+            strokeWidth={sw}
+            dash={dash}
           />
-          {/* Center dot */}
-          <Circle
-            x={cx}
-            y={cy}
-            radius={4}
-            fill={isSelected ? SELECTION_STROKE : '#4B49AC'}
+          <Circle x={cx} y={cy} radius={3} fill={isSelected ? SELECTION_STROKE : '#4B49AC'} />
+        </Group>
+      );
+    }
+
+    case 'seatBlockWedge': {
+      const cx = primitive.center.x + tx;
+      const cy = primitive.center.y + ty;
+      const innerR = primitive.innerRadius;
+      const outerR = primitive.outerRadius;
+      const startRad = (primitive.startAngleDeg * Math.PI) / 180;
+      const endRad = (primitive.endAngleDeg * Math.PI) / 180;
+      return (
+        <Group attrs={{ primitiveId: primitive.id }}>
+          <Shape
+            sceneFunc={(ctx: Konva.Context, shape: Konva.Shape) => {
+              const c = ctx as any;
+              drawSectorPath(c, cx, cy, outerR, outerR, innerR, innerR, startRad, endRad);
+              ctx.fillStrokeShape(shape);
+            }}
+            fill="transparent"
+            stroke={stroke}
+            strokeWidth={sw}
+            dash={dash}
           />
+          <Circle x={cx} y={cy} radius={3} fill={isSelected ? SELECTION_STROKE : '#4B49AC'} />
         </Group>
       );
     }

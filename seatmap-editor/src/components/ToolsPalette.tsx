@@ -137,8 +137,8 @@ export const ToolsPalette: React.FC = () => {
       <div className="sme-tools-group">
         <div className="sme-tools-group__label">Tools</div>
         <button
-          className={btnClass('select')}
-          onClick={() => setTool('select')}
+          className={btnClass('blockSelect')}
+          onClick={() => setTool('blockSelect')}
           title="Select (V)"
           disabled={isLocked}
         >

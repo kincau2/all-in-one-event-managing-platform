@@ -64,15 +64,22 @@ export function indexToLabel(index: number): string {
 /**
  * Generate row label for a given row index.
  *
- * @param start  - Starting label (e.g. 'A')
+ * @param start  - Starting label (e.g. 'A' for alpha, '1' for numeric)
  * @param rowIdx - 0-based row index
  * @param dir    - 'asc' (A→B→C) or 'desc' (Z→Y→X)
+ * @param mode   - 'alpha' (A,B,C…) or 'numeric' (1,2,3…)
  */
 export function generateRowLabel(
   start: string,
   rowIdx: number,
   dir: 'asc' | 'desc',
+  mode: 'alpha' | 'numeric' = 'alpha',
 ): string {
+  if (mode === 'numeric') {
+    const startNum = parseInt(start, 10) || 1;
+    const num = dir === 'asc' ? startNum + rowIdx : startNum - rowIdx;
+    return String(num);
+  }
   const base = labelToIndex(start);
   const idx = dir === 'asc' ? base + rowIdx : base - rowIdx;
   if (idx < 0) return String(idx); // safety fallback

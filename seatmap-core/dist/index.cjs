@@ -69,6 +69,7 @@ var TransformSchema = import_zod.z.object({
   rotation: import_zod.z.number().default(0)
 });
 var RowLabelSchema = import_zod.z.object({
+  mode: import_zod.z.enum(["alpha", "numeric"]).default("alpha"),
   start: import_zod.z.string().min(1).default("A"),
   direction: import_zod.z.enum(["asc", "desc"]).default("asc")
 });
@@ -120,10 +121,11 @@ var SeatBlockGridSchema = import_zod.z.object({
   cols: import_zod.z.number().int().positive(),
   seatSpacingX: import_zod.z.number().positive(),
   seatSpacingY: import_zod.z.number().positive(),
-  seatRadius: import_zod.z.number().positive().default(10),
-  rowLabel: RowLabelSchema.default({ start: "A", direction: "asc" }),
+  seatRadius: import_zod.z.number().positive().optional(),
+  rowLabel: RowLabelSchema.default({ mode: "alpha", start: "A", direction: "asc" }),
   numbering: import_zod.z.enum(["L2R", "R2L"]).default("L2R"),
   aisleGaps: import_zod.z.array(GridAisleGapSchema).default([]),
+  excludedSeats: import_zod.z.array(import_zod.z.tuple([import_zod.z.number().int(), import_zod.z.number().int()])).default([]),
   section: import_zod.z.string().default("")
 });
 var SeatBlockArcSchema = import_zod.z.object({
@@ -138,8 +140,11 @@ var SeatBlockArcSchema = import_zod.z.object({
   startAngleDeg: import_zod.z.number(),
   endAngleDeg: import_zod.z.number(),
   seatsPerRow: SeatsPerRowSchema,
-  seatRadius: import_zod.z.number().positive().default(10),
+  seatRadius: import_zod.z.number().positive().optional(),
+  rowLabel: RowLabelSchema.default({ mode: "alpha", start: "A", direction: "asc" }),
+  numbering: import_zod.z.enum(["L2R", "R2L"]).default("L2R"),
   aisleGaps: import_zod.z.array(ArcAisleGapSchema).default([]),
+  excludedSeats: import_zod.z.array(import_zod.z.tuple([import_zod.z.number().int(), import_zod.z.number().int()])).default([]),
   section: import_zod.z.string().default("")
 });
 var SeatBlockWedgeSchema = import_zod.z.object({
@@ -152,7 +157,10 @@ var SeatBlockWedgeSchema = import_zod.z.object({
   endAngleDeg: import_zod.z.number(),
   rowCount: import_zod.z.number().int().positive(),
   seatsPerRow: SeatsPerRowSchema,
-  seatRadius: import_zod.z.number().positive().default(10),
+  seatRadius: import_zod.z.number().positive().optional(),
+  rowLabel: RowLabelSchema.default({ mode: "alpha", start: "A", direction: "asc" }),
+  numbering: import_zod.z.enum(["L2R", "R2L"]).default("L2R"),
+  excludedSeats: import_zod.z.array(import_zod.z.tuple([import_zod.z.number().int(), import_zod.z.number().int()])).default([]),
   section: import_zod.z.string().default("")
 });
 var PrimitiveSchema = import_zod.z.discriminatedUnion("type", [
@@ -194,6 +202,7 @@ var LayoutSchema = import_zod.z.object({
   schemaVersion: import_zod.z.literal(1),
   title: import_zod.z.string().default(""),
   canvas: CanvasSchema,
+  seatRadius: import_zod.z.number().positive().default(10),
   primitives: import_zod.z.array(PrimitiveSchema),
   compiled: CompiledSchema.default({
     seats: [],
@@ -233,7 +242,12 @@ function indexToLabel(index) {
   }
   return label;
 }
-function generateRowLabel(start, rowIdx, dir) {
+function generateRowLabel(start, rowIdx, dir, mode = "alpha") {
+  if (mode === "numeric") {
+    const startNum = parseInt(start, 10) || 1;
+    const num = dir === "asc" ? startNum + rowIdx : startNum - rowIdx;
+    return String(num);
+  }
   const base = labelToIndex(start);
   const idx = dir === "asc" ? base + rowIdx : base - rowIdx;
   if (idx < 0) return String(idx);
@@ -260,7 +274,7 @@ function round2(n) {
 }
 
 // src/compile-grid.ts
-function compileGrid(primitive, keyMap) {
+function compileGrid(primitive, keyMap, globalSeatRadius = 10) {
   const {
     id,
     origin,
@@ -271,17 +285,21 @@ function compileGrid(primitive, keyMap) {
     rowLabel,
     numbering,
     aisleGaps,
+    excludedSeats,
     section,
     transform
   } = primitive;
+  const seatRadius = primitive.seatRadius ?? globalSeatRadius;
   const seats = [];
   for (let r = 0; r < rows; r++) {
     const rowLabelStr = generateRowLabel(
       rowLabel.start,
       r,
-      rowLabel.direction
+      rowLabel.direction,
+      rowLabel.mode ?? "alpha"
     );
     for (let c = 0; c < cols; c++) {
+      if (excludedSeats?.some(([er, ec]) => er === r && ec === c)) continue;
       const gapSum = aisleGaps.filter((g) => g.afterCol < c).reduce((sum, g) => sum + g.gapPx, 0);
       let x = origin.x + c * seatSpacingX + gapSum;
       let y = origin.y + r * seatSpacingY;
@@ -304,7 +322,7 @@ function compileGrid(primitive, keyMap) {
         number: seatNumber,
         x: round2(x),
         y: round2(y),
-        radius: primitive.seatRadius,
+        radius: seatRadius,
         meta: { primitiveId: id, logicalRow: r, logicalSeat: c }
       });
     }
@@ -322,7 +340,7 @@ function resolveGaps(aisleGaps, radius) {
     return { afterSeatIndex: g.afterSeatIndex, angleDeg: angleDeg ?? 0 };
   });
 }
-function compileArc(primitive, keyMap) {
+function compileArc(primitive, keyMap, globalSeatRadius = 10) {
   const {
     id,
     center,
@@ -334,9 +352,13 @@ function compileArc(primitive, keyMap) {
     endAngleDeg,
     seatsPerRow,
     aisleGaps,
+    excludedSeats,
     section,
     transform
   } = primitive;
+  const seatRadius = primitive.seatRadius ?? globalSeatRadius;
+  const rowLabel = primitive.rowLabel ?? { mode: "alpha", start: "A", direction: "asc" };
+  const numbering = primitive.numbering ?? "L2R";
   const seats = [];
   for (let r = 0; r < rowCount; r++) {
     const baseRadius = startRadius + r * radiusStep;
@@ -344,7 +366,12 @@ function compileArc(primitive, keyMap) {
     const radiusY = baseRadius;
     const n = getSeatsPerRow(seatsPerRow, r);
     if (n <= 0) continue;
-    const rowLabelStr = generateRowLabel("A", r, "asc");
+    const rowLabelStr = generateRowLabel(
+      rowLabel.start,
+      r,
+      rowLabel.direction,
+      rowLabel.mode ?? "alpha"
+    );
     const avgRadius = (radiusX + radiusY) / 2;
     const gaps = resolveGaps(aisleGaps, avgRadius);
     const totalGapAngle = gaps.reduce((s, g) => s + g.angleDeg, 0);
@@ -352,6 +379,7 @@ function compileArc(primitive, keyMap) {
     const usableAngle = totalAngle - totalGapAngle;
     const step = n > 1 ? usableAngle / (n - 1) : 0;
     for (let s = 0; s < n; s++) {
+      if (excludedSeats?.some(([er, ec]) => er === r && ec === s)) continue;
       const baseAngle = n === 1 ? startAngleDeg + totalAngle / 2 : startAngleDeg + s * step;
       const accGap = gaps.filter((g) => g.afterSeatIndex < s).reduce((sum, g) => sum + g.angleDeg, 0);
       const angleDeg = baseAngle + accGap;
@@ -365,7 +393,7 @@ function compileArc(primitive, keyMap) {
       }
       x += transform?.x ?? 0;
       y += transform?.y ?? 0;
-      const seatNumber = s + 1;
+      const seatNumber = numbering === "R2L" ? n - s : s + 1;
       const label = `${rowLabelStr}-${String(seatNumber).padStart(2, "0")}`;
       const logicalKey = `${id}:${r}:${s}`;
       const seat_key = keyMap.get(logicalKey) ?? generateUUID();
@@ -377,7 +405,7 @@ function compileArc(primitive, keyMap) {
         number: seatNumber,
         x: round2(x),
         y: round2(y),
-        radius: primitive.seatRadius,
+        radius: seatRadius,
         rotation: round2(angleDeg + 90),
         // tangent direction
         meta: { primitiveId: id, logicalRow: r, logicalSeat: s }
@@ -388,7 +416,7 @@ function compileArc(primitive, keyMap) {
 }
 
 // src/compile-wedge.ts
-function compileWedge(primitive, keyMap) {
+function compileWedge(primitive, keyMap, globalSeatRadius = 10) {
   const {
     id,
     center,
@@ -398,17 +426,27 @@ function compileWedge(primitive, keyMap) {
     endAngleDeg,
     rowCount,
     seatsPerRow,
+    excludedSeats,
     section,
     transform
   } = primitive;
+  const seatRadius = primitive.seatRadius ?? globalSeatRadius;
+  const rowLabel = primitive.rowLabel ?? { mode: "alpha", start: "A", direction: "asc" };
+  const numbering = primitive.numbering ?? "L2R";
   const seats = [];
   const totalAngle = endAngleDeg - startAngleDeg;
   for (let r = 0; r < rowCount; r++) {
     const radius = rowCount === 1 ? (innerRadius + outerRadius) / 2 : innerRadius + r * ((outerRadius - innerRadius) / (rowCount - 1));
     const n = getSeatsPerRow(seatsPerRow, r);
     if (n <= 0) continue;
-    const rowLabelStr = generateRowLabel("A", r, "asc");
+    const rowLabelStr = generateRowLabel(
+      rowLabel.start,
+      r,
+      rowLabel.direction,
+      rowLabel.mode ?? "alpha"
+    );
     for (let s = 0; s < n; s++) {
+      if (excludedSeats?.some(([er, ec]) => er === r && ec === s)) continue;
       const angleDeg = n === 1 ? startAngleDeg + totalAngle / 2 : startAngleDeg + s * (totalAngle / (n - 1));
       const angleRad = degToRad(angleDeg);
       let x = center.x + radius * Math.cos(angleRad);
@@ -420,7 +458,7 @@ function compileWedge(primitive, keyMap) {
       }
       x += transform?.x ?? 0;
       y += transform?.y ?? 0;
-      const seatNumber = s + 1;
+      const seatNumber = numbering === "R2L" ? n - s : s + 1;
       const label = `${rowLabelStr}-${String(seatNumber).padStart(2, "0")}`;
       const logicalKey = `${id}:${r}:${s}`;
       const seat_key = keyMap.get(logicalKey) ?? generateUUID();
@@ -432,7 +470,7 @@ function compileWedge(primitive, keyMap) {
         number: seatNumber,
         x: round2(x),
         y: round2(y),
-        radius: primitive.seatRadius,
+        radius: seatRadius,
         rotation: round2(angleDeg + 90),
         // tangent direction
         meta: { primitiveId: id, logicalRow: r, logicalSeat: s }
@@ -462,16 +500,17 @@ function resolveKey(keyMap, primitiveId, logicalRow, logicalSeat) {
 function compileLayout(layout, existingLayout) {
   const keyMap = existingLayout?.compiled?.seats ? buildSeatKeyMap(existingLayout.compiled.seats) : /* @__PURE__ */ new Map();
   const allSeats = [];
+  const globalSeatRadius = layout.seatRadius ?? 10;
   for (const primitive of layout.primitives) {
     switch (primitive.type) {
       case "seatBlockGrid":
-        allSeats.push(...compileGrid(primitive, keyMap));
+        allSeats.push(...compileGrid(primitive, keyMap, globalSeatRadius));
         break;
       case "seatBlockArc":
-        allSeats.push(...compileArc(primitive, keyMap));
+        allSeats.push(...compileArc(primitive, keyMap, globalSeatRadius));
         break;
       case "seatBlockWedge":
-        allSeats.push(...compileWedge(primitive, keyMap));
+        allSeats.push(...compileWedge(primitive, keyMap, globalSeatRadius));
         break;
     }
   }

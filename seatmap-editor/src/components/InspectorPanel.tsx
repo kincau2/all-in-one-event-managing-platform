@@ -253,14 +253,20 @@ const GridInspector: React.FC<InspectorProps> = ({ primitive: p, onUpdate, disab
         onChange={(v) => onUpdate({ seatSpacingX: v } as any)} />
       <NumField label="Seat Spacing Y" value={prim.seatSpacingY} min={10} disabled={disabled}
         onChange={(v) => onUpdate({ seatSpacingY: v } as any)} />
-      <NumField label="Seat Radius" value={prim.seatRadius} min={2} max={30} disabled={disabled}
-        onChange={(v) => onUpdate({ seatRadius: v } as any)} />
       <SelectField label="Numbering" value={prim.numbering} disabled={disabled}
         options={[
           { value: 'L2R', label: 'Left → Right' },
           { value: 'R2L', label: 'Right ← Left' },
         ]}
         onChange={(v) => onUpdate({ numbering: v } as any)} />
+      <SelectField label="Row Label Mode" value={prim.rowLabel?.mode ?? 'alpha'} disabled={disabled}
+        options={[
+          { value: 'alpha', label: 'Alphabetic (A, B, C…)' },
+          { value: 'numeric', label: 'Numeric (1, 2, 3…)' },
+        ]}
+        onChange={(v) =>
+          onUpdate({ rowLabel: { ...prim.rowLabel, mode: v } } as any)
+        } />
       <TextField label="Row Start" value={prim.rowLabel?.start ?? 'A'} disabled={disabled}
         onChange={(v) =>
           onUpdate({ rowLabel: { ...prim.rowLabel, start: v || 'A' } } as any)
@@ -313,8 +319,32 @@ const ArcInspector: React.FC<InspectorProps> = ({ primitive: p, onUpdate, disabl
             onChange={(v) => onUpdate({ seatsPerRow: { ...(spr as any), delta: v } } as any)} />
         </>
       )}
-      <NumField label="Seat Radius" value={prim.seatRadius} min={2} max={30} disabled={disabled}
-        onChange={(v) => onUpdate({ seatRadius: v } as any)} />
+      <SelectField label="Numbering" value={(prim as any).numbering ?? 'L2R'} disabled={disabled}
+        options={[
+          { value: 'L2R', label: 'Left → Right' },
+          { value: 'R2L', label: 'Right ← Left' },
+        ]}
+        onChange={(v) => onUpdate({ numbering: v } as any)} />
+      <SelectField label="Row Label Mode" value={(prim as any).rowLabel?.mode ?? 'alpha'} disabled={disabled}
+        options={[
+          { value: 'alpha', label: 'Alphabetic (A, B, C…)' },
+          { value: 'numeric', label: 'Numeric (1, 2, 3…)' },
+        ]}
+        onChange={(v) =>
+          onUpdate({ rowLabel: { ...(prim as any).rowLabel, mode: v } } as any)
+        } />
+      <TextField label="Row Start" value={(prim as any).rowLabel?.start ?? 'A'} disabled={disabled}
+        onChange={(v) =>
+          onUpdate({ rowLabel: { ...(prim as any).rowLabel, start: v || 'A' } } as any)
+        } />
+      <SelectField label="Row Direction" value={(prim as any).rowLabel?.direction ?? 'asc'} disabled={disabled}
+        options={[
+          { value: 'asc', label: 'A → B → C' },
+          { value: 'desc', label: 'C → B → A' },
+        ]}
+        onChange={(v) =>
+          onUpdate({ rowLabel: { ...(prim as any).rowLabel, direction: v } } as any)
+        } />
     </>
   );
 };
@@ -351,8 +381,32 @@ const WedgeInspector: React.FC<InspectorProps> = ({ primitive: p, onUpdate, disa
             onChange={(v) => onUpdate({ seatsPerRow: { ...(spr as any), delta: v } } as any)} />
         </>
       )}
-      <NumField label="Seat Radius" value={prim.seatRadius} min={2} max={30} disabled={disabled}
-        onChange={(v) => onUpdate({ seatRadius: v } as any)} />
+      <SelectField label="Numbering" value={(prim as any).numbering ?? 'L2R'} disabled={disabled}
+        options={[
+          { value: 'L2R', label: 'Left → Right' },
+          { value: 'R2L', label: 'Right ← Left' },
+        ]}
+        onChange={(v) => onUpdate({ numbering: v } as any)} />
+      <SelectField label="Row Label Mode" value={(prim as any).rowLabel?.mode ?? 'alpha'} disabled={disabled}
+        options={[
+          { value: 'alpha', label: 'Alphabetic (A, B, C…)' },
+          { value: 'numeric', label: 'Numeric (1, 2, 3…)' },
+        ]}
+        onChange={(v) =>
+          onUpdate({ rowLabel: { ...(prim as any).rowLabel, mode: v } } as any)
+        } />
+      <TextField label="Row Start" value={(prim as any).rowLabel?.start ?? 'A'} disabled={disabled}
+        onChange={(v) =>
+          onUpdate({ rowLabel: { ...(prim as any).rowLabel, start: v || 'A' } } as any)
+        } />
+      <SelectField label="Row Direction" value={(prim as any).rowLabel?.direction ?? 'asc'} disabled={disabled}
+        options={[
+          { value: 'asc', label: 'A → B → C' },
+          { value: 'desc', label: 'C → B → A' },
+        ]}
+        onChange={(v) =>
+          onUpdate({ rowLabel: { ...(prim as any).rowLabel, direction: v } } as any)
+        } />
     </>
   );
 };
@@ -393,6 +447,10 @@ export const InspectorPanel: React.FC = () => {
   if (selected.length === 0) {
     const totalSeats = compiledSeats.length;
     const primCount = primitives.length;
+    const canvas = useEditorStore.getState().layout.canvas;
+    const globalSeatRadius = (useEditorStore.getState().layout as any).seatRadius ?? 10;
+    const updateCanvas = useEditorStore.getState().updateCanvas;
+    const updateLayoutSeatRadius = useEditorStore.getState().updateLayoutSeatRadius;
     return (
       <div className="sme-inspector">
         <div className="sme-inspector__header">Layout Overview</div>
@@ -405,6 +463,12 @@ export const InspectorPanel: React.FC = () => {
             <span>Total Seats</span>
             <strong>{totalSeats}</strong>
           </div>
+          <NumField label="Canvas Width" value={canvas.w} min={200} max={10000} disabled={isLocked}
+            onChange={(v) => updateCanvas({ w: v })} />
+          <NumField label="Canvas Height" value={canvas.h} min={200} max={10000} disabled={isLocked}
+            onChange={(v) => updateCanvas({ h: v })} />
+          <NumField label="Seat Radius (global)" value={globalSeatRadius} min={2} max={30} disabled={isLocked}
+            onChange={(v) => updateLayoutSeatRadius(v)} />
         </div>
       </div>
     );

@@ -13,6 +13,7 @@
 import type { SeatBlockGrid, CompiledSeat } from './types.js';
 import type { SeatKeyMap } from './seat-key.js';
 import { generateRowLabel, generateUUID, rotatePoint, round2 } from './utils.js';
+import { gridPivotOffset } from './pivot.js';
 
 export function compileGrid(
   primitive: SeatBlockGrid,
@@ -38,6 +39,11 @@ export function compileGrid(
   const startNum = (primitive as any).startSeatNumber ?? 1;
   const seats: CompiledSeat[] = [];
 
+  /* ── Rotation pivot = center of dotted area ── */
+  const pivot = gridPivotOffset(cols, rows, seatSpacingX, seatSpacingY);
+  const pivotCx = origin.x + pivot.x;
+  const pivotCy = origin.y + pivot.y;
+
   for (let r = 0; r < rows; r++) {
     const rowLabelStr = generateRowLabel(
       rowLabel.start,
@@ -60,9 +66,9 @@ export function compileGrid(
       let x = origin.x + c * seatSpacingX + gapSum;
       let y = origin.y + r * seatSpacingY;
 
-      /* ── Apply rotation around origin ── */
+      /* ── Apply rotation around pivot (center of dotted area) ── */
       if (transform?.rotation) {
-        const rotated = rotatePoint(x, y, origin.x, origin.y, transform.rotation);
+        const rotated = rotatePoint(x, y, pivotCx, pivotCy, transform.rotation);
         x = rotated.x;
         y = rotated.y;
       }

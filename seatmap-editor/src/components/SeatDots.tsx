@@ -22,20 +22,23 @@ const SELECTED_FILL = '#ff6d00';
 const SELECTED_STROKE = '#e65100';
 const EXCLUDED_FILL = '#e0e0e0';
 const EXCLUDED_STROKE = '#999';
-const TEXT_COLOR = '#ffffff';
-const ROW_LABEL_COLOR = '#666666';
+
+const FONT_FAMILY = '-apple-system, sans-serif';
 
 /**
  * Render all seats with seat numbers + row labels using a single
  * Konva Shape with custom sceneFunc for performance.
  */
 export const SeatDots: React.FC<Props> = React.memo(({ seats, selectedSeatKeys }) => {
-  // Read layout-level seat styling
-  const lay = useEditorStore.getState().layout as any;
-  const seatFill = lay.seatFill ?? LAYOUT_STYLE_DEFAULTS.seatFill;
-  const seatStroke = lay.seatStroke ?? LAYOUT_STYLE_DEFAULTS.seatStroke;
-  const seatFont = lay.seatFont ?? LAYOUT_STYLE_DEFAULTS.seatFont;
-  const seatFontWeight = lay.seatFontWeight ?? LAYOUT_STYLE_DEFAULTS.seatFontWeight;
+  // Reactive selectors — re-renders SeatDots when any of these change
+  const seatFill = useEditorStore((s) => (s.layout as any).seatFill ?? LAYOUT_STYLE_DEFAULTS.seatFill);
+  const seatStroke = useEditorStore((s) => (s.layout as any).seatStroke ?? LAYOUT_STYLE_DEFAULTS.seatStroke);
+  const seatFontWeight = useEditorStore((s) => (s.layout as any).seatFontWeight ?? LAYOUT_STYLE_DEFAULTS.seatFontWeight);
+  const seatFontColor = useEditorStore((s) => (s.layout as any).seatFontColor ?? LAYOUT_STYLE_DEFAULTS.seatFontColor);
+  const seatFontSize = useEditorStore((s) => (s.layout as any).seatFontSize ?? LAYOUT_STYLE_DEFAULTS.seatFontSize);
+  const rowFontColor = useEditorStore((s) => (s.layout as any).rowFontColor ?? LAYOUT_STYLE_DEFAULTS.rowFontColor);
+  const rowFontSize = useEditorStore((s) => (s.layout as any).rowFontSize ?? LAYOUT_STYLE_DEFAULTS.rowFontSize);
+  const rowFontWeight = useEditorStore((s) => (s.layout as any).rowFontWeight ?? LAYOUT_STYLE_DEFAULTS.rowFontWeight);
 
   // Group seats by row label for row label rendering
   const { normalSeats, excluded, selected, rowLabels } = useMemo(() => {
@@ -76,6 +79,10 @@ export const SeatDots: React.FC<Props> = React.memo(({ seats, selectedSeatKeys }
 
   if (seats.length === 0) return null;
 
+  /** Compute font size for a seat: use explicit seatFontSize when > 0, else auto-scale. */
+  const calcFontSize = (r: number) =>
+    seatFontSize > 0 ? seatFontSize : Math.max(6, Math.min(r * 1.1, 14));
+
   return (
     <>
       {/* Normal seats with numbers */}
@@ -93,15 +100,14 @@ export const SeatDots: React.FC<Props> = React.memo(({ seats, selectedSeatKeys }
           ctx.closePath();
           ctx.fillStrokeShape(shape);
 
-          // Draw seat numbers as white text inside circles
-          c.fillStyle = TEXT_COLOR;
+          // Draw seat numbers
+          c.fillStyle = seatFontColor;
           c.textAlign = 'center';
           c.textBaseline = 'middle';
           for (const s of normalSeats) {
             const r = s.radius ?? 8;
-            // Scale font to fit inside circle
-            const fontSize = Math.max(6, Math.min(r * 1.1, 14));
-            c.font = `${seatFontWeight} ${fontSize}px ${seatFont}`;
+            const fontSize = calcFontSize(r);
+            c.font = `${seatFontWeight} ${fontSize}px ${FONT_FAMILY}`;
             c.fillText(String(s.number ?? ''), s.x, s.y);
           }
         }}
@@ -158,13 +164,13 @@ export const SeatDots: React.FC<Props> = React.memo(({ seats, selectedSeatKeys }
             ctx.fillStrokeShape(shape);
 
             // Draw seat numbers
-            c.fillStyle = TEXT_COLOR;
+            c.fillStyle = seatFontColor;
             c.textAlign = 'center';
             c.textBaseline = 'middle';
             for (const s of selected) {
               const r = s.radius ?? 8;
-              const fontSize = Math.max(6, Math.min(r * 1.1, 14));
-              c.font = `${seatFontWeight} ${fontSize}px ${seatFont}`;
+              const fontSize = calcFontSize(r);
+              c.font = `${seatFontWeight} ${fontSize}px ${FONT_FAMILY}`;
               c.fillText(String(s.number ?? ''), s.x, s.y);
             }
           }}
@@ -178,10 +184,10 @@ export const SeatDots: React.FC<Props> = React.memo(({ seats, selectedSeatKeys }
       <Shape
         sceneFunc={(ctx: Konva.Context) => {
           const c = ctx as any;
-          c.fillStyle = ROW_LABEL_COLOR;
+          c.fillStyle = rowFontColor;
           c.textAlign = 'right';
           c.textBaseline = 'middle';
-          c.font = 'bold 11px -apple-system, sans-serif';
+          c.font = `${rowFontWeight} ${rowFontSize}px ${FONT_FAMILY}`;
           for (const rl of rowLabels) {
             c.fillText(rl.label, rl.x - rl.r - 6, rl.y);
           }

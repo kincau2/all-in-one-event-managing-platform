@@ -13,12 +13,39 @@
  */
 
 import React, { useRef, useCallback, useEffect, useMemo, useState } from 'react';
-import { Stage, Layer, Rect, Text } from 'react-konva';
+import { Stage, Layer, Rect, Text, Image as KonvaImage } from 'react-konva';
 import type Konva from 'konva';
 import { useEditorStore } from '../store';
-import { generateUUID } from '@aioemp/seatmap-core';
+import {
+  generateUUID,
+  gridPivotOffset,
+  arcPivotOffset,
+  GRID_PAD,
+  GRID_LBL_W,
+  ARC_PAD,
+  ARC_LBL_ANG,
+} from '@aioemp/seatmap-core';
 import { PrimitiveRenderer } from './PrimitiveRenderer';
 import { SeatDots } from './SeatDots';
+import { LAYOUT_STYLE_DEFAULTS } from '../layoutDefaults';
+
+/**
+ * Load an image URL into an HTMLImageElement.
+ * Returns null while loading or if the URL is empty.
+ */
+function useImage(url: string): HTMLImageElement | null {
+  const [image, setImage] = useState<HTMLImageElement | null>(null);
+  useEffect(() => {
+    if (!url) { setImage(null); return; }
+    const img = new window.Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => setImage(img);
+    img.onerror = () => setImage(null);
+    img.src = url;
+    return () => { img.onload = null; img.onerror = null; };
+  }, [url]);
+  return image;
+}
 
 const MIN_SCALE = 0.1;
 const MAX_SCALE = 5;
@@ -82,9 +109,14 @@ function getRotationCenter(p: any): { x: number; y: number } {
   const tx = p.transform?.x ?? 0;
   const ty = p.transform?.y ?? 0;
   if (p.type === 'seatBlockGrid') {
-    return { x: p.origin.x + tx, y: p.origin.y + ty };
+    const pivot = gridPivotOffset(p.cols, p.rows, p.seatSpacingX, p.seatSpacingY);
+    return { x: p.origin.x + tx + pivot.x, y: p.origin.y + ty + pivot.y };
   }
-  if (p.type === 'seatBlockArc' || p.type === 'seatBlockWedge') {
+  if (p.type === 'seatBlockArc') {
+    const pivot = arcPivotOffset(p.startRadius, p.rowCount, p.radiusStep, p.radiusRatio ?? 1, p.startAngleDeg, p.endAngleDeg);
+    return { x: (p.center?.x ?? 0) + tx + pivot.x, y: (p.center?.y ?? 0) + ty + pivot.y };
+  }
+  if (p.type === 'seatBlockWedge') {
     return { x: (p.center?.x ?? 0) + tx, y: (p.center?.y ?? 0) + ty };
   }
   return { x: tx, y: ty };
@@ -308,7 +340,13 @@ export const EditorCanvas: React.FC<{ width: number; height: number }> = ({
         const currentAngle =
           (Math.atan2(world.y - center.y, world.x - center.x) * 180) / Math.PI;
         const delta = currentAngle - rotateStartAngleRef.current;
-        const newRotation = Math.round((rotateInitialRotRef.current + delta) * 10) / 10;
+        let newRotation = rotateInitialRotRef.current + delta;
+        if (e.evt.shiftKey) {
+          // Photoshop-like: snap to nearest 45° multiple
+          newRotation = Math.round(newRotation / 45) * 45;
+        } else {
+          newRotation = Math.round(newRotation * 10) / 10;
+        }
         useEditorStore.getState().rotatePrimitive(rotatePrimIdRef.current, newRotation);
         return;
       }
@@ -565,6 +603,11 @@ export const EditorCanvas: React.FC<{ width: number; height: number }> = ({
     }
   }, [activeTool]);
 
+  /* ── Background color & image from layout ── */
+  const bgColor = (layout as any).bgColor ?? LAYOUT_STYLE_DEFAULTS.bgColor;
+  const bgImageUrl: string = (layout as any).bgImage ?? LAYOUT_STYLE_DEFAULTS.bgImage;
+  const bgImg = useImage(bgImageUrl);
+
   return (
     <Stage
       ref={stageRef}
@@ -587,12 +630,21 @@ export const EditorCanvas: React.FC<{ width: number; height: number }> = ({
           y={0}
           width={layout.canvas.w}
           height={layout.canvas.h}
-          fill="#ffffff"
+          fill={bgColor}
           shadowColor="rgba(0,0,0,0.08)"
           shadowBlur={12}
           shadowOffsetX={2}
           shadowOffsetY={2}
         />
+        {bgImg && (
+          <KonvaImage
+            image={bgImg}
+            x={0}
+            y={0}
+            width={layout.canvas.w}
+            height={layout.canvas.h}
+          />
+        )}
         <Text
           x={4}
           y={layout.canvas.h + 8}
@@ -686,26 +738,27 @@ function primitiveBBox(p: any): DragRect {
     const oy = p.origin.y + ty;
     const seatW = (p.cols - 1) * p.seatSpacingX;
     const seatH = (p.rows - 1) * p.seatSpacingY;
-    const gPad = 16;
-    const lblW = 24;
-    const bb = { x: ox - gPad - lblW, y: oy - gPad, w: seatW + 2 * gPad + lblW, h: seatH + 2 * gPad };
-    return rot !== 0 ? rotatedAABB(bb, { x: ox, y: oy }, rot) : bb;
+    const bb = { x: ox - GRID_PAD - GRID_LBL_W, y: oy - GRID_PAD, w: seatW + 2 * GRID_PAD + GRID_LBL_W, h: seatH + 2 * GRID_PAD };
+    if (rot !== 0) {
+      const pivot = gridPivotOffset(p.cols, p.rows, p.seatSpacingX, p.seatSpacingY);
+      return rotatedAABB(bb, { x: ox + pivot.x, y: oy + pivot.y }, rot);
+    }
+    return bb;
   }
   if (p.type === 'seatBlockArc') {
     const cx = (p.center?.x ?? 0) + tx;
     const cy = (p.center?.y ?? 0) + ty;
     const ratio = p.radiusRatio ?? 1;
-    const pad = 16;
-    const lblAng = 28;
     const innerBase = p.startRadius ?? 200;
     const outerBase = innerBase + ((p.rowCount ?? 1) - 1) * (p.radiusStep ?? 38);
-    const outerRx = outerBase * ratio + pad;
-    const outerRy = outerBase + pad;
-    const innerRx = Math.max(0, innerBase * ratio - pad);
-    const innerRy = Math.max(0, innerBase - pad);
-    const angPad = outerBase > 0 ? (pad + lblAng) / outerBase : 0;
+    const outerRx = outerBase * ratio + ARC_PAD;
+    const outerRy = outerBase + ARC_PAD;
+    const innerRx = Math.max(0, innerBase * ratio - ARC_PAD);
+    const innerRy = Math.max(0, innerBase - ARC_PAD);
+    const angPad = outerBase > 0 ? (ARC_PAD + ARC_LBL_ANG) / outerBase : 0;
     const aStartRad = ((p.startAngleDeg ?? 0) * Math.PI) / 180 - angPad;
     const aEndRad = ((p.endAngleDeg ?? 0) * Math.PI) / 180 + angPad;
+    const pivot = arcPivotOffset(p.startRadius ?? 200, p.rowCount ?? 1, p.radiusStep ?? 38, ratio, p.startAngleDeg ?? 0, p.endAngleDeg ?? 0);
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     const radRot = (rot * Math.PI) / 180;
     const cosR = Math.cos(radRot), sinR = Math.sin(radRot);
@@ -713,13 +766,13 @@ function primitiveBBox(p: any): DragRect {
       const a = aStartRad + ((aEndRad - aStartRad) * i) / 32;
       const cos = Math.cos(a), sin = Math.sin(a);
       for (const [rx, ry] of [[innerRx, innerRy], [outerRx, outerRy]] as const) {
-        let lx = rx * cos, ly = ry * sin;
+        let dlx = rx * cos - pivot.x, dly = ry * sin - pivot.y;
         if (rot !== 0) {
-          const rlx = lx * cosR - ly * sinR;
-          const rly = lx * sinR + ly * cosR;
-          lx = rlx; ly = rly;
+          const rlx = dlx * cosR - dly * sinR;
+          const rly = dlx * sinR + dly * cosR;
+          dlx = rlx; dly = rly;
         }
-        const sx = cx + lx, sy = cy + ly;
+        const sx = cx + pivot.x + dlx, sy = cy + pivot.y + dly;
         minX = Math.min(minX, sx); minY = Math.min(minY, sy);
         maxX = Math.max(maxX, sx); maxY = Math.max(maxY, sy);
       }

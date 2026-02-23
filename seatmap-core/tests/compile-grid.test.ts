@@ -173,13 +173,14 @@ describe('compileGrid', () => {
     });
     const seats = compileGrid(prim, EMPTY_MAP);
 
-    // Col 0 at origin → stays (0, 0)
-    expect(seats[0].x).toBeCloseTo(0, 1);
-    expect(seats[0].y).toBeCloseTo(0, 1);
+    // Pivot = center of dotted area = (3, 0) for this grid
+    // Col 0 at origin (0,0) → rotated 90° around (3,0) → (3, -3)
+    expect(seats[0].x).toBeCloseTo(3, 1);
+    expect(seats[0].y).toBeCloseTo(-3, 1);
 
-    // Col 1 at (30, 0) → rotated 90° around origin → (0, 30)
-    expect(seats[1].x).toBeCloseTo(0, 1);
-    expect(seats[1].y).toBeCloseTo(30, 1);
+    // Col 1 at (30, 0) → rotated 90° around (3,0) → (3, 27)
+    expect(seats[1].x).toBeCloseTo(3, 1);
+    expect(seats[1].y).toBeCloseTo(27, 1);
   });
 
   it('stores correct meta for key preservation', () => {

@@ -537,8 +537,12 @@ export const InspectorPanel: React.FC = () => {
     const globalSeatRadius = (lay as any).seatRadius ?? LAYOUT_STYLE_DEFAULTS.seatRadius;
     const seatFill = (lay as any).seatFill ?? LAYOUT_STYLE_DEFAULTS.seatFill;
     const seatStroke = (lay as any).seatStroke ?? LAYOUT_STYLE_DEFAULTS.seatStroke;
-    const seatFont = (lay as any).seatFont ?? LAYOUT_STYLE_DEFAULTS.seatFont;
     const seatFontWeight = (lay as any).seatFontWeight ?? LAYOUT_STYLE_DEFAULTS.seatFontWeight;
+    const seatFontColor = (lay as any).seatFontColor ?? LAYOUT_STYLE_DEFAULTS.seatFontColor;
+    const seatFontSize = (lay as any).seatFontSize ?? LAYOUT_STYLE_DEFAULTS.seatFontSize;
+    const rowFontColor = (lay as any).rowFontColor ?? LAYOUT_STYLE_DEFAULTS.rowFontColor;
+    const rowFontSize = (lay as any).rowFontSize ?? LAYOUT_STYLE_DEFAULTS.rowFontSize;
+    const rowFontWeight = (lay as any).rowFontWeight ?? LAYOUT_STYLE_DEFAULTS.rowFontWeight;
     const bgColor = (lay as any).bgColor ?? LAYOUT_STYLE_DEFAULTS.bgColor;
     const bgImage = (lay as any).bgImage ?? LAYOUT_STYLE_DEFAULTS.bgImage;
     const updateCanvas = useEditorStore.getState().updateCanvas;
@@ -559,23 +563,38 @@ export const InspectorPanel: React.FC = () => {
 
           {/* ── Seat Section ── */}
           <div className="sme-inspector__section-header">Seat</div>
-          <NumField label="Seat Radius" value={globalSeatRadius} min={2} max={30} disabled={isLocked}
+          <NumField label="Radius" value={globalSeatRadius} min={2} max={30} disabled={isLocked}
             onChange={(v) => updateLayoutSeatRadius(v)} />
-          <ColorField label="Circle Color" value={seatFill} disabled={isLocked}
+          <ColorField label="Fill Color" value={seatFill} disabled={isLocked}
             onChange={(v) => updateLayoutStyle({ seatFill: v })} />
           <ColorField label="Border Color" value={seatStroke} disabled={isLocked}
             onChange={(v) => updateLayoutStyle({ seatStroke: v })} />
-          <TextField label="Font Family" value={seatFont} disabled={isLocked}
-            onChange={(v) => updateLayoutStyle({ seatFont: v })} />
-          <SelectField label="Font Weight" value={seatFontWeight} disabled={isLocked}
+          <ColorField label="Number Color" value={seatFontColor} disabled={isLocked}
+            onChange={(v) => updateLayoutStyle({ seatFontColor: v })} />
+          <NumField label="Number Size" value={seatFontSize} min={0} max={30} disabled={isLocked}
+            onChange={(v) => updateLayoutStyle({ seatFontSize: v })} />
+          <SelectField label="Number Weight" value={seatFontWeight} disabled={isLocked}
             options={[
               { value: 'normal', label: 'Normal' },
               { value: 'bold', label: 'Bold' },
             ]}
             onChange={(v) => updateLayoutStyle({ seatFontWeight: v })} />
 
-          {/* ── Venue Section ── */}
-          <div className="sme-inspector__section-header">Venue</div>
+          {/* ── Row Section ── */}
+          <div className="sme-inspector__section-header">Row Label</div>
+          <ColorField label="Font Color" value={rowFontColor} disabled={isLocked}
+            onChange={(v) => updateLayoutStyle({ rowFontColor: v })} />
+          <NumField label="Font Size" value={rowFontSize} min={6} max={30} disabled={isLocked}
+            onChange={(v) => updateLayoutStyle({ rowFontSize: v })} />
+          <SelectField label="Font Weight" value={rowFontWeight} disabled={isLocked}
+            options={[
+              { value: 'normal', label: 'Normal' },
+              { value: 'bold', label: 'Bold' },
+            ]}
+            onChange={(v) => updateLayoutStyle({ rowFontWeight: v })} />
+
+          {/* ── Stage Section ── */}
+          <div className="sme-inspector__section-header">Stage</div>
           <NumField label="Canvas Width" value={canvas.w} min={200} max={10000} disabled={isLocked}
             onChange={(v) => updateCanvas({ w: v })} />
           <NumField label="Canvas Height" value={canvas.h} min={200} max={10000} disabled={isLocked}

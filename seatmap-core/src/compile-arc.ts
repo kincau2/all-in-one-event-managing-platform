@@ -25,6 +25,7 @@ import {
   rotatePoint,
   round2,
 } from './utils.js';
+import { arcPivotOffset } from './pivot.js';
 
 /* ── Helpers ── */
 
@@ -81,6 +82,11 @@ export function compileArc(
   const startNum = (primitive as any).startSeatNumber ?? 1;
   const seats: CompiledSeat[] = [];
 
+  /* ── Rotation pivot = center of dotted area ── */
+  const pivot = arcPivotOffset(startRadius, rowCount, radiusStep, radiusRatio, startAngleDeg, endAngleDeg);
+  const pivotCx = center.x + pivot.x;
+  const pivotCy = center.y + pivot.y;
+
   for (let r = 0; r < rowCount; r++) {
     const baseRadius = startRadius + r * radiusStep;
     const radiusX = baseRadius * radiusRatio;
@@ -129,9 +135,9 @@ export function compileArc(
       let x = center.x + radiusX * Math.cos(angleRad);
       let y = center.y + radiusY * Math.sin(angleRad);
 
-      /* ── Apply rotation around center ── */
+      /* ── Apply rotation around pivot (center of dotted area) ── */
       if (transform?.rotation) {
-        const rotated = rotatePoint(x, y, center.x, center.y, transform.rotation);
+        const rotated = rotatePoint(x, y, pivotCx, pivotCy, transform.rotation);
         x = rotated.x;
         y = rotated.y;
       }

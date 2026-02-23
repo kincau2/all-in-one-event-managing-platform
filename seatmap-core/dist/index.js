@@ -150,6 +150,11 @@ var LayoutSchema = z.object({
   seatStroke: z.string().default("#3a389a"),
   seatFont: z.string().default("-apple-system, sans-serif"),
   seatFontWeight: z.enum(["normal", "bold"]).default("bold"),
+  seatFontColor: z.string().default("#ffffff"),
+  seatFontSize: z.number().nonnegative().default(0),
+  rowFontColor: z.string().default("#666666"),
+  rowFontSize: z.number().positive().default(11),
+  rowFontWeight: z.enum(["normal", "bold"]).default("bold"),
   bgColor: z.string().default("#ffffff"),
   bgImage: z.string().default(""),
   primitives: z.array(PrimitiveSchema),
@@ -222,6 +227,45 @@ function round2(n) {
   return Math.round(n * 100) / 100;
 }
 
+// src/pivot.ts
+var GRID_PAD = 16;
+var GRID_LBL_W = 24;
+var ARC_PAD = 16;
+var ARC_LBL_ANG = 28;
+function gridPivotOffset(cols, rows, seatSpacingX, seatSpacingY) {
+  const seatW = (cols - 1) * seatSpacingX;
+  const seatH = (rows - 1) * seatSpacingY;
+  const lx = -GRID_PAD - GRID_LBL_W;
+  const ly = -GRID_PAD;
+  const rectW = seatW + 2 * GRID_PAD + GRID_LBL_W;
+  const rectH = seatH + 2 * GRID_PAD;
+  return { x: lx + rectW / 2, y: ly + rectH / 2 };
+}
+function arcPivotOffset(startRadius, rowCount, radiusStep, radiusRatio, startAngleDeg, endAngleDeg) {
+  const innerBase = startRadius;
+  const outerBase = innerBase + (rowCount - 1) * radiusStep;
+  const outerRx = outerBase * radiusRatio + ARC_PAD;
+  const outerRy = outerBase + ARC_PAD;
+  const innerRx = Math.max(0, innerBase * radiusRatio - ARC_PAD);
+  const innerRy = Math.max(0, innerBase - ARC_PAD);
+  const angPad = outerBase > 0 ? (ARC_PAD + ARC_LBL_ANG) / outerBase : 0;
+  const startRad = startAngleDeg * Math.PI / 180 - angPad;
+  const endRad = endAngleDeg * Math.PI / 180 + angPad;
+  let sMinX = 0, sMinY = 0, sMaxX = 0, sMaxY = 0;
+  for (let i = 0; i <= 32; i++) {
+    const a = startRad + (endRad - startRad) * i / 32;
+    const cos = Math.cos(a), sin = Math.sin(a);
+    for (const [rx, ry] of [[innerRx, innerRy], [outerRx, outerRy]]) {
+      const px = rx * cos, py = ry * sin;
+      sMinX = Math.min(sMinX, px);
+      sMinY = Math.min(sMinY, py);
+      sMaxX = Math.max(sMaxX, px);
+      sMaxY = Math.max(sMaxY, py);
+    }
+  }
+  return { x: (sMinX + sMaxX) / 2, y: (sMinY + sMaxY) / 2 };
+}
+
 // src/compile-grid.ts
 function compileGrid(primitive, keyMap, globalSeatRadius = 10) {
   const {
@@ -241,6 +285,9 @@ function compileGrid(primitive, keyMap, globalSeatRadius = 10) {
   const seatRadius = primitive.seatRadius ?? globalSeatRadius;
   const startNum = primitive.startSeatNumber ?? 1;
   const seats = [];
+  const pivot = gridPivotOffset(cols, rows, seatSpacingX, seatSpacingY);
+  const pivotCx = origin.x + pivot.x;
+  const pivotCy = origin.y + pivot.y;
   for (let r = 0; r < rows; r++) {
     const rowLabelStr = generateRowLabel(
       rowLabel.start,
@@ -254,7 +301,7 @@ function compileGrid(primitive, keyMap, globalSeatRadius = 10) {
       let x = origin.x + c * seatSpacingX + gapSum;
       let y = origin.y + r * seatSpacingY;
       if (transform?.rotation) {
-        const rotated = rotatePoint(x, y, origin.x, origin.y, transform.rotation);
+        const rotated = rotatePoint(x, y, pivotCx, pivotCy, transform.rotation);
         x = rotated.x;
         y = rotated.y;
       }
@@ -311,6 +358,9 @@ function compileArc(primitive, keyMap, globalSeatRadius = 10) {
   const numbering = primitive.numbering ?? "L2R";
   const startNum = primitive.startSeatNumber ?? 1;
   const seats = [];
+  const pivot = arcPivotOffset(startRadius, rowCount, radiusStep, radiusRatio, startAngleDeg, endAngleDeg);
+  const pivotCx = center.x + pivot.x;
+  const pivotCy = center.y + pivot.y;
   for (let r = 0; r < rowCount; r++) {
     const baseRadius = startRadius + r * radiusStep;
     const radiusX = baseRadius * radiusRatio;
@@ -338,7 +388,7 @@ function compileArc(primitive, keyMap, globalSeatRadius = 10) {
       let x = center.x + radiusX * Math.cos(angleRad);
       let y = center.y + radiusY * Math.sin(angleRad);
       if (transform?.rotation) {
-        const rotated = rotatePoint(x, y, center.x, center.y, transform.rotation);
+        const rotated = rotatePoint(x, y, pivotCx, pivotCy, transform.rotation);
         x = rotated.x;
         y = rotated.y;
       }
@@ -498,11 +548,15 @@ function computeBounds(seats) {
   };
 }
 export {
+  ARC_LBL_ANG,
+  ARC_PAD,
   ArcAisleGapSchema,
   BoundsSchema,
   CanvasSchema,
   CompiledSchema,
   CompiledSeatSchema,
+  GRID_LBL_W,
+  GRID_PAD,
   GridAisleGapSchema,
   LabelPrimitiveSchema,
   LayoutSchema,
@@ -516,6 +570,7 @@ export {
   SeatsPerRowSchema,
   StagePrimitiveSchema,
   TransformSchema,
+  arcPivotOffset,
   buildSeatKeyMap,
   compileArc,
   compileGrid,
@@ -526,6 +581,7 @@ export {
   generateRowLabel,
   generateUUID,
   getSeatsPerRow,
+  gridPivotOffset,
   indexToLabel,
   labelToIndex,
   rotatePoint,

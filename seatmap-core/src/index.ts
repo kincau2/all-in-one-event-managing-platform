@@ -62,6 +62,16 @@ export { compileWedge } from './compile-wedge.js';
 /* ── seat_key utilities ── */
 export { buildSeatKeyMap, type SeatKeyMap } from './seat-key.js';
 
+/* ── Rotation pivot ── */
+export {
+  gridPivotOffset,
+  arcPivotOffset,
+  GRID_PAD,
+  GRID_LBL_W,
+  ARC_PAD,
+  ARC_LBL_ANG,
+} from './pivot.js';
+
 /* ── General utilities ── */
 export {
   degToRad,

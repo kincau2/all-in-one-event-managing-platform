@@ -1326,6 +1326,11 @@ declare const LayoutSchema: z.ZodObject<{
     seatStroke: z.ZodDefault<z.ZodString>;
     seatFont: z.ZodDefault<z.ZodString>;
     seatFontWeight: z.ZodDefault<z.ZodEnum<["normal", "bold"]>>;
+    seatFontColor: z.ZodDefault<z.ZodString>;
+    seatFontSize: z.ZodDefault<z.ZodNumber>;
+    rowFontColor: z.ZodDefault<z.ZodString>;
+    rowFontSize: z.ZodDefault<z.ZodNumber>;
+    rowFontWeight: z.ZodDefault<z.ZodEnum<["normal", "bold"]>>;
     bgColor: z.ZodDefault<z.ZodString>;
     bgImage: z.ZodDefault<z.ZodString>;
     primitives: z.ZodArray<z.ZodDiscriminatedUnion<"type", [z.ZodObject<{
@@ -1966,6 +1971,11 @@ declare const LayoutSchema: z.ZodObject<{
     seatStroke: string;
     seatFont: string;
     seatFontWeight: "normal" | "bold";
+    seatFontColor: string;
+    seatFontSize: number;
+    rowFontColor: string;
+    rowFontSize: number;
+    rowFontWeight: "normal" | "bold";
     bgColor: string;
     bgImage: string;
     primitives: ({
@@ -2281,6 +2291,11 @@ declare const LayoutSchema: z.ZodObject<{
     seatStroke?: string | undefined;
     seatFont?: string | undefined;
     seatFontWeight?: "normal" | "bold" | undefined;
+    seatFontColor?: string | undefined;
+    seatFontSize?: number | undefined;
+    rowFontColor?: string | undefined;
+    rowFontSize?: number | undefined;
+    rowFontWeight?: "normal" | "bold" | undefined;
     bgColor?: string | undefined;
     bgImage?: string | undefined;
     compiled?: {
@@ -2427,6 +2442,39 @@ declare function compileArc(primitive: SeatBlockArc, keyMap: SeatKeyMap, globalS
 declare function compileWedge(primitive: SeatBlockWedge, keyMap: SeatKeyMap, globalSeatRadius?: number): CompiledSeat[];
 
 /**
+ * @aioemp/seatmap-core — Rotation pivot helpers
+ *
+ * Compute the rotation pivot (center of the visual dotted area)
+ * for grid and arc seat blocks.
+ * Shared by the compiler and the editor renderer to ensure
+ * compiled seat positions match the Konva visual.
+ */
+/** Pixel padding around the seat area in a grid block. */
+declare const GRID_PAD = 16;
+/** Row-label column width (left side of grid dotted area). */
+declare const GRID_LBL_W = 24;
+/** Radial pixel padding around an arc/wedge sector. */
+declare const ARC_PAD = 16;
+/** Extra angular pixels for row labels in an arc block. */
+declare const ARC_LBL_ANG = 28;
+/**
+ * Rotation pivot offset for a grid block, in local coords relative to origin.
+ * Returns the center of the visual dotted rectangle.
+ */
+declare function gridPivotOffset(cols: number, rows: number, seatSpacingX: number, seatSpacingY: number): {
+    x: number;
+    y: number;
+};
+/**
+ * Rotation pivot offset for an arc block, in local coords relative to center.
+ * Returns the center of the visual dotted sector bounding box.
+ */
+declare function arcPivotOffset(startRadius: number, rowCount: number, radiusStep: number, radiusRatio: number, startAngleDeg: number, endAngleDeg: number): {
+    x: number;
+    y: number;
+};
+
+/**
  * @aioemp/seatmap-core — Utility helpers
  */
 
@@ -2474,4 +2522,4 @@ declare function generateUUID(): string;
 /** Round to 2 decimal places to avoid floating-point noise. */
 declare function round2(n: number): number;
 
-export { type ArcAisleGap, ArcAisleGapSchema, type Bounds, BoundsSchema, type Canvas, CanvasSchema, type CompileResult, type Compiled, CompiledSchema, type CompiledSeat, CompiledSeatSchema, type GridAisleGap, GridAisleGapSchema, type LabelPrimitive, LabelPrimitiveSchema, type Layout, type LayoutInput, LayoutSchema, type ObstaclePrimitive, ObstaclePrimitiveSchema, type Point, PointSchema, type Primitive, type PrimitiveInput, PrimitiveSchema, type RowLabel, RowLabelSchema, type SeatBlockArc, SeatBlockArcSchema, type SeatBlockGrid, SeatBlockGridSchema, type SeatBlockWedge, SeatBlockWedgeSchema, type SeatKeyMap, type SeatsPerRow, SeatsPerRowSchema, type StagePrimitive, StagePrimitiveSchema, type Transform, TransformSchema, buildSeatKeyMap, compileArc, compileGrid, compileLayout, compileWedge, computeBounds, degToRad, generateRowLabel, generateUUID, getSeatsPerRow, indexToLabel, labelToIndex, rotatePoint, round2, validateAndCompile };
+export { ARC_LBL_ANG, ARC_PAD, type ArcAisleGap, ArcAisleGapSchema, type Bounds, BoundsSchema, type Canvas, CanvasSchema, type CompileResult, type Compiled, CompiledSchema, type CompiledSeat, CompiledSeatSchema, GRID_LBL_W, GRID_PAD, type GridAisleGap, GridAisleGapSchema, type LabelPrimitive, LabelPrimitiveSchema, type Layout, type LayoutInput, LayoutSchema, type ObstaclePrimitive, ObstaclePrimitiveSchema, type Point, PointSchema, type Primitive, type PrimitiveInput, PrimitiveSchema, type RowLabel, RowLabelSchema, type SeatBlockArc, SeatBlockArcSchema, type SeatBlockGrid, SeatBlockGridSchema, type SeatBlockWedge, SeatBlockWedgeSchema, type SeatKeyMap, type SeatsPerRow, SeatsPerRowSchema, type StagePrimitive, StagePrimitiveSchema, type Transform, TransformSchema, arcPivotOffset, buildSeatKeyMap, compileArc, compileGrid, compileLayout, compileWedge, computeBounds, degToRad, generateRowLabel, generateUUID, getSeatsPerRow, gridPivotOffset, indexToLabel, labelToIndex, rotatePoint, round2, validateAndCompile };

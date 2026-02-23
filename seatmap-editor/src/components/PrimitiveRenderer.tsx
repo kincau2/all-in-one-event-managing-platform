@@ -10,6 +10,14 @@
 import React from 'react';
 import { Rect, Text, Group, Circle, Shape } from 'react-konva';
 import type { Primitive } from '@aioemp/seatmap-core';
+import {
+  gridPivotOffset,
+  arcPivotOffset,
+  GRID_PAD,
+  GRID_LBL_W,
+  ARC_PAD,
+  ARC_LBL_ANG,
+} from '@aioemp/seatmap-core';
 import type Konva from 'konva';
 
 interface Props {
@@ -120,15 +128,15 @@ export const PrimitiveRenderer: React.FC<Props> = ({ primitive, isSelected }) =>
       const gridSection = gp.section || '';
       const seatW = (gp.cols - 1) * gp.seatSpacingX;
       const seatH = (gp.rows - 1) * gp.seatSpacingY;
-      const gPad = 16;
-      const lblW = 24;
-      const rectW = seatW + 2 * gPad + lblW;
-      const rectH = seatH + 2 * gPad;
-      // Local coords relative to origin (rotation center)
-      const lx = -gPad - lblW;
-      const ly = -gPad;
+      const rectW = seatW + 2 * GRID_PAD + GRID_LBL_W;
+      const rectH = seatH + 2 * GRID_PAD;
+      const lx = -GRID_PAD - GRID_LBL_W;
+      const ly = -GRID_PAD;
+      const pivot = gridPivotOffset(gp.cols, gp.rows, gp.seatSpacingX, gp.seatSpacingY);
       return (
-        <Group x={ox} y={oy} rotation={rotation} attrs={{ primitiveId: primitive.id }}>
+        <Group x={ox + pivot.x} y={oy + pivot.y} rotation={rotation}
+          offsetX={pivot.x} offsetY={pivot.y}
+          attrs={{ primitiveId: primitive.id }}>
           {gridSection !== '' && (
             <Text x={lx} y={ly - 16} text={gridSection} fontSize={13}
               fill="#4B49AC" fontStyle="bold" />
@@ -167,13 +175,11 @@ export const PrimitiveRenderer: React.FC<Props> = ({ primitive, isSelected }) =>
       const ratio = ap.radiusRatio ?? 1;
       const innerBase = ap.startRadius;
       const outerBase = ap.startRadius + (ap.rowCount - 1) * ap.radiusStep;
-      const pad = 16;           // radial pixel padding
-      const lblAng = 28;        // extra angular pixels for row labels
-      const outerRx = outerBase * ratio + pad;
-      const outerRy = outerBase + pad;
-      const innerRx = Math.max(0, innerBase * ratio - pad);
-      const innerRy = Math.max(0, innerBase - pad);
-      const angPad = outerBase > 0 ? (pad + lblAng) / outerBase : 0;
+      const outerRx = outerBase * ratio + ARC_PAD;
+      const outerRy = outerBase + ARC_PAD;
+      const innerRx = Math.max(0, innerBase * ratio - ARC_PAD);
+      const innerRy = Math.max(0, innerBase - ARC_PAD);
+      const angPad = outerBase > 0 ? (ARC_PAD + ARC_LBL_ANG) / outerBase : 0;
       const startRad = (ap.startAngleDeg * Math.PI) / 180 - angPad;
       const endRad = (ap.endAngleDeg * Math.PI) / 180 + angPad;
       const arcSection = ap.section || '';
@@ -188,8 +194,11 @@ export const PrimitiveRenderer: React.FC<Props> = ({ primitive, isSelected }) =>
           sMaxX = Math.max(sMaxX, px); sMaxY = Math.max(sMaxY, py);
         }
       }
+      const arcPivot = arcPivotOffset(ap.startRadius, ap.rowCount, ap.radiusStep, ratio, ap.startAngleDeg, ap.endAngleDeg);
       return (
-        <Group x={cx} y={cy} rotation={rotation} attrs={{ primitiveId: primitive.id }}>
+        <Group x={cx + arcPivot.x} y={cy + arcPivot.y} rotation={rotation}
+          offsetX={arcPivot.x} offsetY={arcPivot.y}
+          attrs={{ primitiveId: primitive.id }}>
           {arcSection !== '' && (
             <Text x={sMinX} y={sMinY - 16} text={arcSection} fontSize={13}
               fill="#4B49AC" fontStyle="bold" />

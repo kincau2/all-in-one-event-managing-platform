@@ -21,7 +21,6 @@ export function useSave() {
   const seatmapId = useEditorStore((s) => s.seatmapId);
   const layout = useEditorStore((s) => s.layout);
   const isDirty = useEditorStore((s) => s.isDirty);
-  const lockToken = useEditorStore((s) => s.lockToken);
   const setSaveStatus = useEditorStore((s) => s.setSaveStatus);
   const markClean = useEditorStore((s) => s.markClean);
 
@@ -72,7 +71,7 @@ export function useSave() {
       savingRef.current = false;
       return { ok: false, error: err?.message || 'Network error' };
     }
-  }, [seatmapId, layout, lockToken, setSaveStatus, markClean]);
+  }, [seatmapId, layout, setSaveStatus, markClean]);
 
   /* Ctrl+S keyboard shortcut */
   useEffect(() => {

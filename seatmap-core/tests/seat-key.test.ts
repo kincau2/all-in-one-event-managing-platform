@@ -2,7 +2,7 @@
  * Tests — seat_key preservation
  */
 import { describe, it, expect } from 'vitest';
-import { buildSeatKeyMap, resolveKey } from '../src/seat-key.js';
+import { buildSeatKeyMap } from '../src/seat-key.js';
 import { compileGrid } from '../src/compile-grid.js';
 import { compileArc } from '../src/compile-arc.js';
 import { compileLayout } from '../src/compile-layout.js';
@@ -44,18 +44,6 @@ describe('buildSeatKeyMap', () => {
     ];
     const map = buildSeatKeyMap(seats);
     expect(map.size).toBe(0);
-  });
-});
-
-describe('resolveKey', () => {
-  it('returns existing key when found', () => {
-    const map: SeatKeyMap = new Map([['g1:0:0', 'my-key']]);
-    expect(resolveKey(map, 'g1', 0, 0)).toBe('my-key');
-  });
-
-  it('returns null when not found', () => {
-    const map: SeatKeyMap = new Map();
-    expect(resolveKey(map, 'g1', 0, 0)).toBeNull();
   });
 });
 

@@ -50,7 +50,6 @@ __export(index_exports, {
   getSeatsPerRow: () => getSeatsPerRow,
   indexToLabel: () => indexToLabel,
   labelToIndex: () => labelToIndex,
-  resolveKey: () => resolveKey,
   rotatePoint: () => rotatePoint,
   round2: () => round2,
   validateAndCompile: () => validateAndCompile
@@ -122,6 +121,7 @@ var SeatBlockGridSchema = import_zod.z.object({
   seatSpacingX: import_zod.z.number().positive(),
   seatSpacingY: import_zod.z.number().positive(),
   seatRadius: import_zod.z.number().positive().optional(),
+  startSeatNumber: import_zod.z.number().int().positive().default(1),
   rowLabel: RowLabelSchema.default({ mode: "alpha", start: "A", direction: "asc" }),
   numbering: import_zod.z.enum(["L2R", "R2L"]).default("L2R"),
   aisleGaps: import_zod.z.array(GridAisleGapSchema).default([]),
@@ -141,6 +141,7 @@ var SeatBlockArcSchema = import_zod.z.object({
   endAngleDeg: import_zod.z.number(),
   seatsPerRow: SeatsPerRowSchema,
   seatRadius: import_zod.z.number().positive().optional(),
+  startSeatNumber: import_zod.z.number().int().positive().default(1),
   rowLabel: RowLabelSchema.default({ mode: "alpha", start: "A", direction: "asc" }),
   numbering: import_zod.z.enum(["L2R", "R2L"]).default("L2R"),
   aisleGaps: import_zod.z.array(ArcAisleGapSchema).default([]),
@@ -203,6 +204,12 @@ var LayoutSchema = import_zod.z.object({
   title: import_zod.z.string().default(""),
   canvas: CanvasSchema,
   seatRadius: import_zod.z.number().positive().default(10),
+  seatFill: import_zod.z.string().default("#4B49AC"),
+  seatStroke: import_zod.z.string().default("#3a389a"),
+  seatFont: import_zod.z.string().default("-apple-system, sans-serif"),
+  seatFontWeight: import_zod.z.enum(["normal", "bold"]).default("bold"),
+  bgColor: import_zod.z.string().default("#ffffff"),
+  bgImage: import_zod.z.string().default(""),
   primitives: import_zod.z.array(PrimitiveSchema),
   compiled: CompiledSchema.default({
     seats: [],
@@ -290,6 +297,7 @@ function compileGrid(primitive, keyMap, globalSeatRadius = 10) {
     transform
   } = primitive;
   const seatRadius = primitive.seatRadius ?? globalSeatRadius;
+  const startNum = primitive.startSeatNumber ?? 1;
   const seats = [];
   for (let r = 0; r < rows; r++) {
     const rowLabelStr = generateRowLabel(
@@ -310,7 +318,7 @@ function compileGrid(primitive, keyMap, globalSeatRadius = 10) {
       }
       x += transform?.x ?? 0;
       y += transform?.y ?? 0;
-      const seatNumber = numbering === "R2L" ? cols - c : c + 1;
+      const seatNumber = numbering === "R2L" ? cols - c + (startNum - 1) : c + startNum;
       const label = `${rowLabelStr}-${String(seatNumber).padStart(2, "0")}`;
       const logicalKey = `${id}:${r}:${c}`;
       const seat_key = keyMap.get(logicalKey) ?? generateUUID();
@@ -359,6 +367,7 @@ function compileArc(primitive, keyMap, globalSeatRadius = 10) {
   const seatRadius = primitive.seatRadius ?? globalSeatRadius;
   const rowLabel = primitive.rowLabel ?? { mode: "alpha", start: "A", direction: "asc" };
   const numbering = primitive.numbering ?? "L2R";
+  const startNum = primitive.startSeatNumber ?? 1;
   const seats = [];
   for (let r = 0; r < rowCount; r++) {
     const baseRadius = startRadius + r * radiusStep;
@@ -393,7 +402,7 @@ function compileArc(primitive, keyMap, globalSeatRadius = 10) {
       }
       x += transform?.x ?? 0;
       y += transform?.y ?? 0;
-      const seatNumber = numbering === "R2L" ? n - s : s + 1;
+      const seatNumber = numbering === "R2L" ? n - s + (startNum - 1) : s + startNum;
       const label = `${rowLabelStr}-${String(seatNumber).padStart(2, "0")}`;
       const logicalKey = `${id}:${r}:${s}`;
       const seat_key = keyMap.get(logicalKey) ?? generateUUID();
@@ -492,9 +501,6 @@ function buildSeatKeyMap(existingSeats) {
   }
   return map;
 }
-function resolveKey(keyMap, primitiveId, logicalRow, logicalSeat) {
-  return keyMap.get(`${primitiveId}:${logicalRow}:${logicalSeat}`) ?? null;
-}
 
 // src/compile-layout.ts
 function compileLayout(layout, existingLayout) {
@@ -581,7 +587,6 @@ function computeBounds(seats) {
   getSeatsPerRow,
   indexToLabel,
   labelToIndex,
-  resolveKey,
   rotatePoint,
   round2,
   validateAndCompile

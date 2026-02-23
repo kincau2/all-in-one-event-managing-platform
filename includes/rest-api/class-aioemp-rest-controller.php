@@ -96,6 +96,55 @@ abstract class AIOEMP_REST_Controller {
     }
 
     /*--------------------------------------------------------------
+     * File-upload helpers
+     *------------------------------------------------------------*/
+
+    /**
+     * Allowed image MIME types for uploads.
+     */
+    protected const ALLOWED_IMAGE_MIMES = array(
+        'image/jpeg',
+        'image/png',
+        'image/gif',
+        'image/webp',
+        'image/svg+xml',
+    );
+
+    /**
+     * Validate that an uploaded file is an image within size limits.
+     *
+     * @param array  $file         Entry from $_FILES (e.g. $request->get_file_params()['key']).
+     * @param int    $max_bytes    Maximum allowed file size in bytes.
+     * @param array  $allowed_mimes Allowed MIME types (defaults to ALLOWED_IMAGE_MIMES).
+     * @return true|\WP_Error  True on success, WP_Error on failure.
+     */
+    protected function validate_image_upload( array $file, int $max_bytes = 5242880, ?array $allowed_mimes = null ) {
+        $allowed = $allowed_mimes ?? static::ALLOWED_IMAGE_MIMES;
+
+        $finfo = finfo_open( FILEINFO_MIME_TYPE );
+        $mime  = finfo_file( $finfo, $file['tmp_name'] );
+        finfo_close( $finfo );
+
+        if ( ! in_array( $mime, $allowed, true ) ) {
+            return $this->error(
+                'invalid_mime',
+                __( 'File must be an image (JPEG, PNG, GIF, WebP, or SVG).', 'aioemp' )
+            );
+        }
+
+        if ( $file['size'] > $max_bytes ) {
+            $mb = round( $max_bytes / ( 1024 * 1024 ) );
+            return $this->error(
+                'file_too_large',
+                /* translators: %d: maximum megabytes */
+                sprintf( __( 'File must be under %d MB.', 'aioemp' ), $mb )
+            );
+        }
+
+        return true;
+    }
+
+    /*--------------------------------------------------------------
      * Pagination helpers
      *------------------------------------------------------------*/
 

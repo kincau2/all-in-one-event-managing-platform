@@ -34,16 +34,3 @@ export function buildSeatKeyMap(existingSeats: CompiledSeat[]): SeatKeyMap {
 
   return map;
 }
-
-/**
- * Resolve a seat_key for a logical position.
- * Returns the existing key if found, otherwise `null` (caller generates new).
- */
-export function resolveKey(
-  keyMap: SeatKeyMap,
-  primitiveId: string,
-  logicalRow: number,
-  logicalSeat: number,
-): string | null {
-  return keyMap.get(`${primitiveId}:${logicalRow}:${logicalSeat}`) ?? null;
-}

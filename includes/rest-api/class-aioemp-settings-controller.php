@@ -107,20 +107,10 @@ class AIOEMP_Settings_Controller extends AIOEMP_REST_Controller {
 
         $file = $files['logo'];
 
-        // Validate MIME type — images only.
-        $allowed = array( 'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml' );
-        $finfo   = finfo_open( FILEINFO_MIME_TYPE );
-        $mime    = finfo_file( $finfo, $file['tmp_name'] );
-        finfo_close( $finfo );
-
-        if ( ! in_array( $mime, $allowed, true ) ) {
-            return $this->error( 'invalid_mime', __( 'File must be an image (JPEG, PNG, GIF, WebP, or SVG).', 'aioemp' ) );
-        }
-
-        // Validate file size — max 2 MB.
-        $max_size = 2 * 1024 * 1024;
-        if ( $file['size'] > $max_size ) {
-            return $this->error( 'file_too_large', __( 'Logo must be under 2 MB.', 'aioemp' ) );
+        // Validate MIME & size (max 2 MB).
+        $valid = $this->validate_image_upload( $file, 2 * 1024 * 1024 );
+        if ( is_wp_error( $valid ) ) {
+            return $valid;
         }
 
         // Use WordPress media handling.

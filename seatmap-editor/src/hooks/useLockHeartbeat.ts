@@ -57,9 +57,10 @@ export function useLockHeartbeat() {
     // Release on beforeunload
     const onBeforeUnload = () => {
       if (tokenRef.current && seatmapId) {
-        // Use sendBeacon for reliable delivery on page close
-        const url = `${window.aioemp.rest_url}aioemp/v1/lock/seatmap/${seatmapId}/release`;
-        const data = JSON.stringify({ lock_token: tokenRef.current });
+        // Use sendBeacon for reliable delivery on page close.
+        // rest_url already includes aioemp/v1/; append _wpnonce for cookie-less auth.
+        const url = `${window.aioemp.rest_url}lock/release?_wpnonce=${encodeURIComponent(window.aioemp.nonce)}`;
+        const data = JSON.stringify({ resource_type: 'seatmap', resource_id: seatmapId, lock_token: tokenRef.current });
         navigator.sendBeacon(url, new Blob([data], { type: 'application/json' }));
       }
     };

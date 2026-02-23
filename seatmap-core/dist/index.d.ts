@@ -229,6 +229,7 @@ declare const SeatBlockGridSchema: z.ZodObject<{
     seatSpacingX: z.ZodNumber;
     seatSpacingY: z.ZodNumber;
     seatRadius: z.ZodOptional<z.ZodNumber>;
+    startSeatNumber: z.ZodDefault<z.ZodNumber>;
     rowLabel: z.ZodDefault<z.ZodObject<{
         mode: z.ZodDefault<z.ZodEnum<["alpha", "numeric"]>>;
         start: z.ZodDefault<z.ZodString>;
@@ -282,6 +283,7 @@ declare const SeatBlockGridSchema: z.ZodObject<{
     cols: number;
     seatSpacingX: number;
     seatSpacingY: number;
+    startSeatNumber: number;
     rowLabel: {
         mode: "alpha" | "numeric";
         start: string;
@@ -321,6 +323,7 @@ declare const SeatBlockGridSchema: z.ZodObject<{
         y: number;
     } | undefined;
     seatRadius?: number | undefined;
+    startSeatNumber?: number | undefined;
     rowLabel?: {
         mode?: "alpha" | "numeric" | undefined;
         start?: string | undefined;
@@ -364,6 +367,7 @@ declare const SeatBlockArcSchema: z.ZodObject<{
         delta: number;
     }>, z.ZodArray<z.ZodNumber, "many">]>;
     seatRadius: z.ZodOptional<z.ZodNumber>;
+    startSeatNumber: z.ZodDefault<z.ZodNumber>;
     rowLabel: z.ZodDefault<z.ZodObject<{
         mode: z.ZodDefault<z.ZodEnum<["alpha", "numeric"]>>;
         start: z.ZodDefault<z.ZodString>;
@@ -412,6 +416,7 @@ declare const SeatBlockArcSchema: z.ZodObject<{
 }, "strip", z.ZodTypeAny, {
     type: "seatBlockArc";
     id: string;
+    startSeatNumber: number;
     rowLabel: {
         mode: "alpha" | "numeric";
         start: string;
@@ -471,6 +476,7 @@ declare const SeatBlockArcSchema: z.ZodObject<{
         rotation?: number | undefined;
     } | undefined;
     seatRadius?: number | undefined;
+    startSeatNumber?: number | undefined;
     rowLabel?: {
         mode?: "alpha" | "numeric" | undefined;
         start?: string | undefined;
@@ -760,6 +766,7 @@ declare const PrimitiveSchema: z.ZodDiscriminatedUnion<"type", [z.ZodObject<{
     seatSpacingX: z.ZodNumber;
     seatSpacingY: z.ZodNumber;
     seatRadius: z.ZodOptional<z.ZodNumber>;
+    startSeatNumber: z.ZodDefault<z.ZodNumber>;
     rowLabel: z.ZodDefault<z.ZodObject<{
         mode: z.ZodDefault<z.ZodEnum<["alpha", "numeric"]>>;
         start: z.ZodDefault<z.ZodString>;
@@ -813,6 +820,7 @@ declare const PrimitiveSchema: z.ZodDiscriminatedUnion<"type", [z.ZodObject<{
     cols: number;
     seatSpacingX: number;
     seatSpacingY: number;
+    startSeatNumber: number;
     rowLabel: {
         mode: "alpha" | "numeric";
         start: string;
@@ -852,6 +860,7 @@ declare const PrimitiveSchema: z.ZodDiscriminatedUnion<"type", [z.ZodObject<{
         y: number;
     } | undefined;
     seatRadius?: number | undefined;
+    startSeatNumber?: number | undefined;
     rowLabel?: {
         mode?: "alpha" | "numeric" | undefined;
         start?: string | undefined;
@@ -894,6 +903,7 @@ declare const PrimitiveSchema: z.ZodDiscriminatedUnion<"type", [z.ZodObject<{
         delta: number;
     }>, z.ZodArray<z.ZodNumber, "many">]>;
     seatRadius: z.ZodOptional<z.ZodNumber>;
+    startSeatNumber: z.ZodDefault<z.ZodNumber>;
     rowLabel: z.ZodDefault<z.ZodObject<{
         mode: z.ZodDefault<z.ZodEnum<["alpha", "numeric"]>>;
         start: z.ZodDefault<z.ZodString>;
@@ -942,6 +952,7 @@ declare const PrimitiveSchema: z.ZodDiscriminatedUnion<"type", [z.ZodObject<{
 }, "strip", z.ZodTypeAny, {
     type: "seatBlockArc";
     id: string;
+    startSeatNumber: number;
     rowLabel: {
         mode: "alpha" | "numeric";
         start: string;
@@ -1001,6 +1012,7 @@ declare const PrimitiveSchema: z.ZodDiscriminatedUnion<"type", [z.ZodObject<{
         rotation?: number | undefined;
     } | undefined;
     seatRadius?: number | undefined;
+    startSeatNumber?: number | undefined;
     rowLabel?: {
         mode?: "alpha" | "numeric" | undefined;
         start?: string | undefined;
@@ -1310,6 +1322,12 @@ declare const LayoutSchema: z.ZodObject<{
         unit?: string | undefined;
     }>;
     seatRadius: z.ZodDefault<z.ZodNumber>;
+    seatFill: z.ZodDefault<z.ZodString>;
+    seatStroke: z.ZodDefault<z.ZodString>;
+    seatFont: z.ZodDefault<z.ZodString>;
+    seatFontWeight: z.ZodDefault<z.ZodEnum<["normal", "bold"]>>;
+    bgColor: z.ZodDefault<z.ZodString>;
+    bgImage: z.ZodDefault<z.ZodString>;
     primitives: z.ZodArray<z.ZodDiscriminatedUnion<"type", [z.ZodObject<{
         type: z.ZodLiteral<"stage">;
         width: z.ZodNumber;
@@ -1459,6 +1477,7 @@ declare const LayoutSchema: z.ZodObject<{
         seatSpacingX: z.ZodNumber;
         seatSpacingY: z.ZodNumber;
         seatRadius: z.ZodOptional<z.ZodNumber>;
+        startSeatNumber: z.ZodDefault<z.ZodNumber>;
         rowLabel: z.ZodDefault<z.ZodObject<{
             mode: z.ZodDefault<z.ZodEnum<["alpha", "numeric"]>>;
             start: z.ZodDefault<z.ZodString>;
@@ -1512,6 +1531,7 @@ declare const LayoutSchema: z.ZodObject<{
         cols: number;
         seatSpacingX: number;
         seatSpacingY: number;
+        startSeatNumber: number;
         rowLabel: {
             mode: "alpha" | "numeric";
             start: string;
@@ -1551,6 +1571,7 @@ declare const LayoutSchema: z.ZodObject<{
             y: number;
         } | undefined;
         seatRadius?: number | undefined;
+        startSeatNumber?: number | undefined;
         rowLabel?: {
             mode?: "alpha" | "numeric" | undefined;
             start?: string | undefined;
@@ -1593,6 +1614,7 @@ declare const LayoutSchema: z.ZodObject<{
             delta: number;
         }>, z.ZodArray<z.ZodNumber, "many">]>;
         seatRadius: z.ZodOptional<z.ZodNumber>;
+        startSeatNumber: z.ZodDefault<z.ZodNumber>;
         rowLabel: z.ZodDefault<z.ZodObject<{
             mode: z.ZodDefault<z.ZodEnum<["alpha", "numeric"]>>;
             start: z.ZodDefault<z.ZodString>;
@@ -1641,6 +1663,7 @@ declare const LayoutSchema: z.ZodObject<{
     }, "strip", z.ZodTypeAny, {
         type: "seatBlockArc";
         id: string;
+        startSeatNumber: number;
         rowLabel: {
             mode: "alpha" | "numeric";
             start: string;
@@ -1700,6 +1723,7 @@ declare const LayoutSchema: z.ZodObject<{
             rotation?: number | undefined;
         } | undefined;
         seatRadius?: number | undefined;
+        startSeatNumber?: number | undefined;
         rowLabel?: {
             mode?: "alpha" | "numeric" | undefined;
             start?: string | undefined;
@@ -1938,6 +1962,12 @@ declare const LayoutSchema: z.ZodObject<{
         h: number;
         unit: string;
     };
+    seatFill: string;
+    seatStroke: string;
+    seatFont: string;
+    seatFontWeight: "normal" | "bold";
+    bgColor: string;
+    bgImage: string;
     primitives: ({
         type: "stage";
         width: number;
@@ -1985,6 +2015,7 @@ declare const LayoutSchema: z.ZodObject<{
         cols: number;
         seatSpacingX: number;
         seatSpacingY: number;
+        startSeatNumber: number;
         rowLabel: {
             mode: "alpha" | "numeric";
             start: string;
@@ -2008,6 +2039,7 @@ declare const LayoutSchema: z.ZodObject<{
     } | {
         type: "seatBlockArc";
         id: string;
+        startSeatNumber: number;
         rowLabel: {
             mode: "alpha" | "numeric";
             start: string;
@@ -2158,6 +2190,7 @@ declare const LayoutSchema: z.ZodObject<{
             y: number;
         } | undefined;
         seatRadius?: number | undefined;
+        startSeatNumber?: number | undefined;
         rowLabel?: {
             mode?: "alpha" | "numeric" | undefined;
             start?: string | undefined;
@@ -2194,6 +2227,7 @@ declare const LayoutSchema: z.ZodObject<{
             rotation?: number | undefined;
         } | undefined;
         seatRadius?: number | undefined;
+        startSeatNumber?: number | undefined;
         rowLabel?: {
             mode?: "alpha" | "numeric" | undefined;
             start?: string | undefined;
@@ -2243,6 +2277,12 @@ declare const LayoutSchema: z.ZodObject<{
     })[];
     seatRadius?: number | undefined;
     title?: string | undefined;
+    seatFill?: string | undefined;
+    seatStroke?: string | undefined;
+    seatFont?: string | undefined;
+    seatFontWeight?: "normal" | "bold" | undefined;
+    bgColor?: string | undefined;
+    bgImage?: string | undefined;
     compiled?: {
         seats: {
             x: number;
@@ -2331,11 +2371,6 @@ type SeatKeyMap = Map<string, string>;
  * (all compile functions in this library set those fields).
  */
 declare function buildSeatKeyMap(existingSeats: CompiledSeat[]): SeatKeyMap;
-/**
- * Resolve a seat_key for a logical position.
- * Returns the existing key if found, otherwise `null` (caller generates new).
- */
-declare function resolveKey(keyMap: SeatKeyMap, primitiveId: string, logicalRow: number, logicalSeat: number): string | null;
 
 /**
  * @aioemp/seatmap-core — Grid block compiler
@@ -2439,4 +2474,4 @@ declare function generateUUID(): string;
 /** Round to 2 decimal places to avoid floating-point noise. */
 declare function round2(n: number): number;
 
-export { type ArcAisleGap, ArcAisleGapSchema, type Bounds, BoundsSchema, type Canvas, CanvasSchema, type CompileResult, type Compiled, CompiledSchema, type CompiledSeat, CompiledSeatSchema, type GridAisleGap, GridAisleGapSchema, type LabelPrimitive, LabelPrimitiveSchema, type Layout, type LayoutInput, LayoutSchema, type ObstaclePrimitive, ObstaclePrimitiveSchema, type Point, PointSchema, type Primitive, type PrimitiveInput, PrimitiveSchema, type RowLabel, RowLabelSchema, type SeatBlockArc, SeatBlockArcSchema, type SeatBlockGrid, SeatBlockGridSchema, type SeatBlockWedge, SeatBlockWedgeSchema, type SeatKeyMap, type SeatsPerRow, SeatsPerRowSchema, type StagePrimitive, StagePrimitiveSchema, type Transform, TransformSchema, buildSeatKeyMap, compileArc, compileGrid, compileLayout, compileWedge, computeBounds, degToRad, generateRowLabel, generateUUID, getSeatsPerRow, indexToLabel, labelToIndex, resolveKey, rotatePoint, round2, validateAndCompile };
+export { type ArcAisleGap, ArcAisleGapSchema, type Bounds, BoundsSchema, type Canvas, CanvasSchema, type CompileResult, type Compiled, CompiledSchema, type CompiledSeat, CompiledSeatSchema, type GridAisleGap, GridAisleGapSchema, type LabelPrimitive, LabelPrimitiveSchema, type Layout, type LayoutInput, LayoutSchema, type ObstaclePrimitive, ObstaclePrimitiveSchema, type Point, PointSchema, type Primitive, type PrimitiveInput, PrimitiveSchema, type RowLabel, RowLabelSchema, type SeatBlockArc, SeatBlockArcSchema, type SeatBlockGrid, SeatBlockGridSchema, type SeatBlockWedge, SeatBlockWedgeSchema, type SeatKeyMap, type SeatsPerRow, SeatsPerRowSchema, type StagePrimitive, StagePrimitiveSchema, type Transform, TransformSchema, buildSeatKeyMap, compileArc, compileGrid, compileLayout, compileWedge, computeBounds, degToRad, generateRowLabel, generateUUID, getSeatsPerRow, indexToLabel, labelToIndex, rotatePoint, round2, validateAndCompile };

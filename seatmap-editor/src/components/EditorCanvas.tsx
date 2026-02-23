@@ -26,7 +26,7 @@ const PAN_PX = 20;
 const MOVE_PX = 1;
 const MOVE_SHIFT_PX = 10;
 
-type InteractionMode = 'idle' | 'panning' | 'selecting' | 'moving' | 'creating';
+type InteractionMode = 'idle' | 'panning' | 'selecting' | 'moving' | 'creating' | 'rotating';
 
 interface DragRect {
   x: number; y: number; w: number; h: number;
@@ -36,11 +36,15 @@ interface DragRect {
 function primitiveUnderPointer(stage: Konva.Stage): string | null {
   const pos = stage.getPointerPosition();
   if (!pos) return null;
-  // Konva stores `attrs` on each node — we tagged shapes with primitiveId via the `attrs` prop.
   const shapes = stage.getAllIntersections(pos);
   for (const shape of shapes) {
-    const pid = (shape as any).attrs?.primitiveId;
-    if (pid) return pid as string;
+    // Walk up parent chain — child shapes inherit primitiveId from Group
+    let node: any = shape;
+    while (node && node !== stage) {
+      const pid = node.attrs?.primitiveId;
+      if (pid) return pid as string;
+      node = node.parent;
+    }
   }
   return null;
 }
@@ -54,6 +58,36 @@ function pointerToWorld(stage: Konva.Stage): { x: number; y: number } | null {
     x: (pos.x - stage.x()) / scale,
     y: (pos.y - stage.y()) / scale,
   };
+}
+
+/** Hit-test: find a rotation-handle node under the pointer. Returns primitiveId or null. */
+function rotateHandleUnderPointer(stage: Konva.Stage): string | null {
+  const pos = stage.getPointerPosition();
+  if (!pos) return null;
+  const shapes = stage.getAllIntersections(pos);
+  for (const shape of shapes) {
+    let node: any = shape;
+    while (node && node !== stage) {
+      if (node.attrs?.rotateHandle && node.attrs?.primitiveId) {
+        return node.attrs.primitiveId as string;
+      }
+      node = node.parent;
+    }
+  }
+  return null;
+}
+
+/** Compute the rotation center for a primitive (in world coords). */
+function getRotationCenter(p: any): { x: number; y: number } {
+  const tx = p.transform?.x ?? 0;
+  const ty = p.transform?.y ?? 0;
+  if (p.type === 'seatBlockGrid') {
+    return { x: p.origin.x + tx, y: p.origin.y + ty };
+  }
+  if (p.type === 'seatBlockArc' || p.type === 'seatBlockWedge') {
+    return { x: (p.center?.x ?? 0) + tx, y: (p.center?.y ?? 0) + ty };
+  }
+  return { x: tx, y: ty };
 }
 
 export const EditorCanvas: React.FC<{ width: number; height: number }> = ({
@@ -79,12 +113,15 @@ export const EditorCanvas: React.FC<{ width: number; height: number }> = ({
   const dragOriginRef = useRef({ wx: 0, wy: 0 });
   const spaceDownRef = useRef(false);
 
+  /* ── Rotation interaction refs ── */
+  const rotatePrimIdRef = useRef('');
+  const rotateCenterRef = useRef({ x: 0, y: 0 });
+  const rotateStartAngleRef = useRef(0);
+  const rotateInitialRotRef = useRef(0);
+
   /* ── Rubber-band / creation preview rect (state for rendering) ── */
   const [selRect, setSelRect] = useState<DragRect | null>(null);
   const [createRect, setCreateRect] = useState<DragRect | null>(null);
-
-  /* ── Excluded seat keys (visual only — computed from layout) ── */
-  const excludedSeatKeys = useMemo(() => new Set<string>(), [layout.primitives, compiledSeats]);
 
   /* ── selectedSeatKeys as Set for SeatDots ── */
   const selectedSeatKeysSet = useMemo(
@@ -138,6 +175,25 @@ export const EditorCanvas: React.FC<{ width: number; height: number }> = ({
 
       const world = pointerToWorld(stage);
       if (!world) return;
+
+      /* Rotation handle → start rotating */
+      if (tool === 'blockSelect') {
+        const rotatePid = rotateHandleUnderPointer(stage);
+        if (rotatePid) {
+          const prim = store.layout.primitives.find((p) => p.id === rotatePid);
+          if (prim) {
+            const center = getRotationCenter(prim as any);
+            rotatePrimIdRef.current = rotatePid;
+            rotateCenterRef.current = center;
+            rotateStartAngleRef.current =
+              (Math.atan2(world.y - center.y, world.x - center.x) * 180) / Math.PI;
+            rotateInitialRotRef.current = (prim as any).transform?.rotation ?? 0;
+            store.pushSnapshot();
+            modeRef.current = 'rotating';
+            return;
+          }
+        }
+      }
 
       /* addGrid / addArc → drag-to-create */
       if (tool === 'addGrid' || tool === 'addArc') {
@@ -246,6 +302,16 @@ export const EditorCanvas: React.FC<{ width: number; height: number }> = ({
         setCreateRect(rect);
         return;
       }
+
+      if (mode === 'rotating') {
+        const center = rotateCenterRef.current;
+        const currentAngle =
+          (Math.atan2(world.y - center.y, world.x - center.x) * 180) / Math.PI;
+        const delta = currentAngle - rotateStartAngleRef.current;
+        const newRotation = Math.round((rotateInitialRotRef.current + delta) * 10) / 10;
+        useEditorStore.getState().rotatePrimitive(rotatePrimIdRef.current, newRotation);
+        return;
+      }
     },
     [],
   );
@@ -258,6 +324,11 @@ export const EditorCanvas: React.FC<{ width: number; height: number }> = ({
       modeRef.current = 'idle';
 
       if (mode === 'panning') {
+        return;
+      }
+
+      if (mode === 'rotating') {
+        // Rotation is already applied continuously via rotatePrimitive; snapshot was pushed in mouseDown.
         return;
       }
 
@@ -317,8 +388,8 @@ export const EditorCanvas: React.FC<{ width: number; height: number }> = ({
         }
 
         if (store.activeTool === 'addGrid') {
-          const spacingX = 30;
-          const spacingY = 35;
+          const spacingX = 38;
+          const spacingY = 38;
           const cols = Math.max(1, Math.round(r.w / spacingX));
           const rows = Math.max(1, Math.round(r.h / spacingY));
           store.addPrimitive({
@@ -341,19 +412,13 @@ export const EditorCanvas: React.FC<{ width: number; height: number }> = ({
         if (store.activeTool === 'addArc') {
           /* Arc from drag rect:
              - center is at rect top-center, offset up by startRadius
-             - angle span computed from rect width
              - rows from rect height  */
           const startRadius = 1500;
-          const radiusStep = 35;
+          const radiusStep = 38;
           const rows = Math.max(1, Math.round(r.h / radiusStep));
-          const halfWidth = r.w / 2;
-          const halfAngleRad = Math.asin(Math.min(1, halfWidth / startRadius));
-          const halfAngleDeg = (halfAngleRad * 180) / Math.PI;
           const centerX = r.x + r.w / 2;
           const centerY = r.y - startRadius;
-          const startAngle = 90 - halfAngleDeg;
-          const endAngle = 90 + halfAngleDeg;
-          const seatsStart = Math.max(4, Math.round(r.w / 30));
+          const seatsStart = Math.max(4, Math.round(r.w / 38));
           store.addPrimitive({
             id: generateUUID(),
             type: 'seatBlockArc' as const,
@@ -362,10 +427,10 @@ export const EditorCanvas: React.FC<{ width: number; height: number }> = ({
             rowCount: rows,
             startRadius,
             radiusStep,
-            radiusRatio: 1,
-            startAngleDeg: Math.round(startAngle),
-            endAngleDeg: Math.round(endAngle),
-            seatsPerRow: { start: seatsStart, delta: 2 },
+            radiusRatio: 0.9,
+            startAngleDeg: 80,
+            endAngleDeg: 100,
+            seatsPerRow: { start: seatsStart, delta: 0 },
             rowLabel: { mode: 'alpha' as const, start: 'A', direction: 'asc' as const },
             numbering: 'L2R' as const,
             aisleGaps: [],
@@ -414,7 +479,11 @@ export const EditorCanvas: React.FC<{ width: number; height: number }> = ({
 
       /* Delete / Backspace */
       if (e.key === 'Delete' || e.key === 'Backspace') {
-        if (store.selectedIds.length > 0) {
+        // In seatSelect mode, prioritise seat exclusion over block deletion
+        if (store.activeTool === 'seatSelect' && store.selectedSeatKeys.length > 0) {
+          e.preventDefault();
+          store.removeSelectedSeats();
+        } else if (store.selectedIds.length > 0) {
           e.preventDefault();
           store.removePrimitives(store.selectedIds);
         } else if (store.selectedSeatKeys.length > 0) {
@@ -548,7 +617,6 @@ export const EditorCanvas: React.FC<{ width: number; height: number }> = ({
       <Layer listening={false}>
         <SeatDots
           seats={compiledSeats}
-          excludedSeatKeys={excludedSeatKeys}
           selectedSeatKeys={selectedSeatKeysSet}
         />
       </Layer>
@@ -569,7 +637,7 @@ export const EditorCanvas: React.FC<{ width: number; height: number }> = ({
         </Layer>
       )}
 
-      {/* Drag-to-create preview rectangle */}
+      {/* Drag-to-create preview rectangle with seat count */}
       {createRect && createRect.w > 0 && createRect.h > 0 && (
         <Layer listening={false}>
           <Rect
@@ -582,6 +650,16 @@ export const EditorCanvas: React.FC<{ width: number; height: number }> = ({
             strokeWidth={2}
             dash={[6, 3]}
           />
+          <Text
+            x={createRect.x}
+            y={createRect.y + createRect.h / 2 - 10}
+            width={createRect.w}
+            text={createPreviewText(activeTool, createRect)}
+            fontSize={14}
+            fill="#4B49AC"
+            fontStyle="bold"
+            align="center"
+          />
         </Layer>
       )}
     </Stage>
@@ -590,36 +668,116 @@ export const EditorCanvas: React.FC<{ width: number; height: number }> = ({
 
 /* ── Helpers ── */
 
-/** Compute a world-space bounding box for a primitive. */
+/** Compute a world-space bounding box for a primitive (rotation-aware). */
 function primitiveBBox(p: any): DragRect {
   const tx = p.transform?.x ?? 0;
   const ty = p.transform?.y ?? 0;
+  const rot = p.transform?.rotation ?? 0;
 
   if (p.type === 'stage' || p.type === 'obstacle') {
     return { x: tx, y: ty, w: p.width, h: p.height };
   }
   if (p.type === 'label') {
-    // Rough estimate — label bounding box is hard to compute without canvas
     const est = (p.text?.length ?? 5) * (p.fontSize ?? 18) * 0.6;
     return { x: tx, y: ty, w: est, h: (p.fontSize ?? 18) * 1.3 };
   }
   if (p.type === 'seatBlockGrid') {
     const ox = p.origin.x + tx;
     const oy = p.origin.y + ty;
-    return { x: ox, y: oy, w: p.cols * p.seatSpacingX, h: p.rows * p.seatSpacingY };
+    const seatW = (p.cols - 1) * p.seatSpacingX;
+    const seatH = (p.rows - 1) * p.seatSpacingY;
+    const gPad = 16;
+    const lblW = 24;
+    const bb = { x: ox - gPad - lblW, y: oy - gPad, w: seatW + 2 * gPad + lblW, h: seatH + 2 * gPad };
+    return rot !== 0 ? rotatedAABB(bb, { x: ox, y: oy }, rot) : bb;
   }
-  if (p.type === 'seatBlockArc' || p.type === 'seatBlockWedge') {
+  if (p.type === 'seatBlockArc') {
     const cx = (p.center?.x ?? 0) + tx;
     const cy = (p.center?.y ?? 0) + ty;
-    const outerR = p.type === 'seatBlockArc'
-      ? p.startRadius + p.rowCount * p.radiusStep
-      : p.outerRadius;
+    const ratio = p.radiusRatio ?? 1;
+    const pad = 16;
+    const lblAng = 28;
+    const innerBase = p.startRadius ?? 200;
+    const outerBase = innerBase + ((p.rowCount ?? 1) - 1) * (p.radiusStep ?? 38);
+    const outerRx = outerBase * ratio + pad;
+    const outerRy = outerBase + pad;
+    const innerRx = Math.max(0, innerBase * ratio - pad);
+    const innerRy = Math.max(0, innerBase - pad);
+    const angPad = outerBase > 0 ? (pad + lblAng) / outerBase : 0;
+    const aStartRad = ((p.startAngleDeg ?? 0) * Math.PI) / 180 - angPad;
+    const aEndRad = ((p.endAngleDeg ?? 0) * Math.PI) / 180 + angPad;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    const radRot = (rot * Math.PI) / 180;
+    const cosR = Math.cos(radRot), sinR = Math.sin(radRot);
+    for (let i = 0; i <= 32; i++) {
+      const a = aStartRad + ((aEndRad - aStartRad) * i) / 32;
+      const cos = Math.cos(a), sin = Math.sin(a);
+      for (const [rx, ry] of [[innerRx, innerRy], [outerRx, outerRy]] as const) {
+        let lx = rx * cos, ly = ry * sin;
+        if (rot !== 0) {
+          const rlx = lx * cosR - ly * sinR;
+          const rly = lx * sinR + ly * cosR;
+          lx = rlx; ly = rly;
+        }
+        const sx = cx + lx, sy = cy + ly;
+        minX = Math.min(minX, sx); minY = Math.min(minY, sy);
+        maxX = Math.max(maxX, sx); maxY = Math.max(maxY, sy);
+      }
+    }
+    return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+  }
+  if (p.type === 'seatBlockWedge') {
+    const cx = (p.center?.x ?? 0) + tx;
+    const cy = (p.center?.y ?? 0) + ty;
+    const outerR = p.outerRadius ?? 300;
     return { x: cx - outerR, y: cy - outerR, w: outerR * 2, h: outerR * 2 };
   }
   return { x: tx, y: ty, w: 0, h: 0 };
 }
 
+/** Compute AABB of a rotated rectangle. */
+function rotatedAABB(
+  bb: DragRect,
+  center: { x: number; y: number },
+  rotDeg: number,
+): DragRect {
+  const rad = (rotDeg * Math.PI) / 180;
+  const cos = Math.cos(rad), sin = Math.sin(rad);
+  const corners = [
+    { x: bb.x, y: bb.y },
+    { x: bb.x + bb.w, y: bb.y },
+    { x: bb.x + bb.w, y: bb.y + bb.h },
+    { x: bb.x, y: bb.y + bb.h },
+  ];
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const c of corners) {
+    const dx = c.x - center.x, dy = c.y - center.y;
+    const rx = center.x + dx * cos - dy * sin;
+    const ry = center.y + dx * sin + dy * cos;
+    minX = Math.min(minX, rx); minY = Math.min(minY, ry);
+    maxX = Math.max(maxX, rx); maxY = Math.max(maxY, ry);
+  }
+  return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+}
+
 /** Check if two rectangles overlap. */
 function rectsOverlap(a: DragRect, b: DragRect): boolean {
   return !(a.x + a.w < b.x || b.x + b.w < a.x || a.y + a.h < b.y || b.y + b.h < a.y);
+}
+
+/** Estimate seat count for drag-to-create preview. */
+function createPreviewText(tool: string, r: DragRect): string {
+  if (tool === 'addGrid') {
+    const cols = Math.max(1, Math.round(r.w / 38));
+    const rows = Math.max(1, Math.round(r.h / 38));
+    return `${cols} \u00d7 ${rows} = ${cols * rows} seats`;
+  }
+  if (tool === 'addArc') {
+    const rows = Math.max(1, Math.round(r.h / 38));
+    const seatsStart = Math.max(4, Math.round(r.w / 38));
+    let total = 0;
+    for (let i = 0; i < rows; i++) total += seatsStart;
+    return `${rows} rows \u2248 ${total} seats`;
+  }
+  return '';
 }

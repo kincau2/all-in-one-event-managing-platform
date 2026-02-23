@@ -78,6 +78,7 @@ export function compileArc(
   const seatRadius = primitive.seatRadius ?? globalSeatRadius;
   const rowLabel = primitive.rowLabel ?? { mode: 'alpha' as const, start: 'A', direction: 'asc' as const };
   const numbering = primitive.numbering ?? 'L2R';
+  const startNum = (primitive as any).startSeatNumber ?? 1;
   const seats: CompiledSeat[] = [];
 
   for (let r = 0; r < rowCount; r++) {
@@ -140,7 +141,7 @@ export function compileArc(
       y += transform?.y ?? 0;
 
       /* ── Label / key ── */
-      const seatNumber = numbering === 'R2L' ? n - s : s + 1;
+      const seatNumber = numbering === 'R2L' ? (n - s) + (startNum - 1) : s + startNum;
       const label = `${rowLabelStr}-${String(seatNumber).padStart(2, '0')}`;
 
       const logicalKey = `${id}:${r}:${s}`;

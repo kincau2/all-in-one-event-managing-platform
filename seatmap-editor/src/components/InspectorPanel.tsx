@@ -9,6 +9,8 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useEditorStore } from '../store';
+import { uploadBgImage } from '../api';
+import { LAYOUT_STYLE_DEFAULTS } from '../layoutDefaults';
 import type { Primitive } from '@aioemp/seatmap-core';
 
 /* ── Debounce hook ── */
@@ -165,6 +167,89 @@ const SelectField: React.FC<SelectFieldProps> = ({
   </label>
 );
 
+interface ColorFieldProps {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  disabled?: boolean;
+}
+
+const ColorField: React.FC<ColorFieldProps> = ({ label, value, onChange, disabled }) => {
+  const [local, setLocal] = useState(value);
+  const externalRef = useRef(value);
+  useEffect(() => {
+    if (value !== externalRef.current) {
+      externalRef.current = value;
+      setLocal(value);
+    }
+  }, [value]);
+  return (
+    <label className="sme-field">
+      <span className="sme-field__label">{label}</span>
+      <div style={{ display: 'flex', gap: 4 }}>
+        <input type="color" value={local} disabled={disabled}
+          style={{ width: 32, height: 28, padding: 0, border: 'none', cursor: 'pointer' }}
+          onChange={(e) => { setLocal(e.target.value); externalRef.current = e.target.value; onChange(e.target.value); }} />
+        <input className="sme-field__input" type="text" value={local} disabled={disabled}
+          style={{ flex: 1 }}
+          onChange={(e) => { setLocal(e.target.value); externalRef.current = e.target.value; onChange(e.target.value); }} />
+      </div>
+    </label>
+  );
+};
+
+interface ImageUploadFieldProps {
+  label: string;
+  value: string;
+  onChange: (url: string) => void;
+  disabled?: boolean;
+}
+
+const ImageUploadField: React.FC<ImageUploadFieldProps> = ({ label, value, onChange, disabled }) => {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleFile = async (file: File) => {
+    setError('');
+    setUploading(true);
+    try {
+      const url = await uploadBgImage(file);
+      onChange(url);
+    } catch (e: any) {
+      setError(e.message || 'Upload failed');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="sme-field">
+      <span className="sme-field__label">{label}</span>
+      {value && (
+        <div style={{ position: 'relative', marginBottom: 4 }}>
+          <img src={value} alt="bg" style={{ width: '100%', maxHeight: 80, objectFit: 'cover', borderRadius: 4, border: '1px solid #ddd' }} />
+          {!disabled && (
+            <button type="button" style={{
+              position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.6)',
+              color: '#fff', border: 'none', borderRadius: '50%', width: 20, height: 20,
+              cursor: 'pointer', fontSize: 12, lineHeight: '20px', padding: 0,
+            }} onClick={() => onChange('')} title="Remove">&times;</button>
+          )}
+        </div>
+      )}
+      <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }}
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = ''; }} />
+      <button type="button" className="sme-field__input" disabled={disabled || uploading}
+        style={{ cursor: disabled ? 'default' : 'pointer', textAlign: 'center', padding: '4px 8px' }}
+        onClick={() => fileRef.current?.click()}>
+        {uploading ? 'Uploading…' : value ? 'Change Image' : 'Upload Image'}
+      </button>
+      {error && <span style={{ color: '#c00', fontSize: 11 }}>{error}</span>}
+    </div>
+  );
+};
+
 /* ── Type-specific inspectors ── */
 
 interface InspectorProps {
@@ -187,7 +272,7 @@ const StageInspector: React.FC<InspectorProps> = ({ primitive: p, onUpdate, disa
         onChange={(v) => onUpdate({ transform: { ...prim.transform, x: v } } as any)} />
       <NumField label="Y" value={prim.transform?.y ?? 0} disabled={disabled}
         onChange={(v) => onUpdate({ transform: { ...prim.transform, y: v } } as any)} />
-      <NumField label="Rotation" value={prim.transform?.rotation ?? 0} step={5} disabled={disabled}
+      <NumField label="Rotation" value={prim.transform?.rotation ?? 0} step={1} disabled={disabled}
         onChange={(v) => onUpdate({ transform: { ...prim.transform, rotation: v } } as any)} />
     </>
   );
@@ -207,7 +292,7 @@ const LabelInspector: React.FC<InspectorProps> = ({ primitive: p, onUpdate, disa
         onChange={(v) => onUpdate({ transform: { ...prim.transform, x: v } } as any)} />
       <NumField label="Y" value={prim.transform?.y ?? 0} disabled={disabled}
         onChange={(v) => onUpdate({ transform: { ...prim.transform, y: v } } as any)} />
-      <NumField label="Rotation" value={prim.transform?.rotation ?? 0} step={5} disabled={disabled}
+      <NumField label="Rotation" value={prim.transform?.rotation ?? 0} step={1} disabled={disabled}
         onChange={(v) => onUpdate({ transform: { ...prim.transform, rotation: v } } as any)} />
     </>
   );
@@ -227,7 +312,7 @@ const ObstacleInspector: React.FC<InspectorProps> = ({ primitive: p, onUpdate, d
         onChange={(v) => onUpdate({ transform: { ...prim.transform, x: v } } as any)} />
       <NumField label="Y" value={prim.transform?.y ?? 0} disabled={disabled}
         onChange={(v) => onUpdate({ transform: { ...prim.transform, y: v } } as any)} />
-      <NumField label="Rotation" value={prim.transform?.rotation ?? 0} step={5} disabled={disabled}
+      <NumField label="Rotation" value={prim.transform?.rotation ?? 0} step={1} disabled={disabled}
         onChange={(v) => onUpdate({ transform: { ...prim.transform, rotation: v } } as any)} />
     </>
   );
@@ -237,8 +322,6 @@ const GridInspector: React.FC<InspectorProps> = ({ primitive: p, onUpdate, disab
   const prim = p as Extract<Primitive, { type: 'seatBlockGrid' }>;
   return (
     <>
-      <TextField label="Name" value={prim.name ?? ''} disabled={disabled}
-        onChange={(v) => onUpdate({ name: v } as any)} />
       <TextField label="Section" value={prim.section ?? ''} disabled={disabled}
         onChange={(v) => onUpdate({ section: v } as any)} />
       <NumField label="Origin X" value={prim.origin.x} disabled={disabled}
@@ -253,7 +336,9 @@ const GridInspector: React.FC<InspectorProps> = ({ primitive: p, onUpdate, disab
         onChange={(v) => onUpdate({ seatSpacingX: v } as any)} />
       <NumField label="Seat Spacing Y" value={prim.seatSpacingY} min={10} disabled={disabled}
         onChange={(v) => onUpdate({ seatSpacingY: v } as any)} />
-      <SelectField label="Numbering" value={prim.numbering} disabled={disabled}
+      <NumField label="Start Seat #" value={(prim as any).startSeatNumber ?? 1} min={1} disabled={disabled}
+        onChange={(v) => onUpdate({ startSeatNumber: v } as any)} />
+      <SelectField label="Numbering Direction" value={prim.numbering} disabled={disabled}
         options={[
           { value: 'L2R', label: 'Left → Right' },
           { value: 'R2L', label: 'Right ← Left' },
@@ -279,7 +364,7 @@ const GridInspector: React.FC<InspectorProps> = ({ primitive: p, onUpdate, disab
         onChange={(v) =>
           onUpdate({ rowLabel: { ...prim.rowLabel, direction: v } } as any)
         } />
-      <NumField label="Rotation" value={prim.transform?.rotation ?? 0} step={5} disabled={disabled}
+      <NumField label="Rotation" value={prim.transform?.rotation ?? 0} step={1} disabled={disabled}
         onChange={(v) => onUpdate({ transform: { ...prim.transform, rotation: v } } as any)} />
     </>
   );
@@ -291,8 +376,6 @@ const ArcInspector: React.FC<InspectorProps> = ({ primitive: p, onUpdate, disabl
   const isArray = Array.isArray(spr);
   return (
     <>
-      <TextField label="Name" value={prim.name ?? ''} disabled={disabled}
-        onChange={(v) => onUpdate({ name: v } as any)} />
       <TextField label="Section" value={prim.section ?? ''} disabled={disabled}
         onChange={(v) => onUpdate({ section: v } as any)} />
       <NumField label="Center X" value={prim.center.x} disabled={disabled}
@@ -307,9 +390,9 @@ const ArcInspector: React.FC<InspectorProps> = ({ primitive: p, onUpdate, disabl
         onChange={(v) => onUpdate({ radiusStep: v } as any)} />
       <NumField label="Radius Ratio" value={prim.radiusRatio ?? 1} min={0.1} max={5} step={0.1} disabled={disabled}
         onChange={(v) => onUpdate({ radiusRatio: v } as any)} />
-      <NumField label="Start Angle" value={prim.startAngleDeg} min={-360} max={360} step={5} disabled={disabled}
+      <NumField label="Start Angle" value={prim.startAngleDeg} min={-360} max={360} step={1} disabled={disabled}
         onChange={(v) => onUpdate({ startAngleDeg: v } as any)} />
-      <NumField label="End Angle" value={prim.endAngleDeg} min={-360} max={360} step={5} disabled={disabled}
+      <NumField label="End Angle" value={prim.endAngleDeg} min={-360} max={360} step={1} disabled={disabled}
         onChange={(v) => onUpdate({ endAngleDeg: v } as any)} />
       {!isArray && (
         <>
@@ -319,7 +402,9 @@ const ArcInspector: React.FC<InspectorProps> = ({ primitive: p, onUpdate, disabl
             onChange={(v) => onUpdate({ seatsPerRow: { ...(spr as any), delta: v } } as any)} />
         </>
       )}
-      <SelectField label="Numbering" value={(prim as any).numbering ?? 'L2R'} disabled={disabled}
+      <NumField label="Start Seat #" value={(prim as any).startSeatNumber ?? 1} min={1} disabled={disabled}
+        onChange={(v) => onUpdate({ startSeatNumber: v } as any)} />
+      <SelectField label="Numbering Direction" value={(prim as any).numbering ?? 'L2R'} disabled={disabled}
         options={[
           { value: 'L2R', label: 'Left → Right' },
           { value: 'R2L', label: 'Right ← Left' },
@@ -367,9 +452,9 @@ const WedgeInspector: React.FC<InspectorProps> = ({ primitive: p, onUpdate, disa
         onChange={(v) => onUpdate({ innerRadius: v } as any)} />
       <NumField label="Outer Radius" value={prim.outerRadius} min={20} disabled={disabled}
         onChange={(v) => onUpdate({ outerRadius: v } as any)} />
-      <NumField label="Start Angle" value={prim.startAngleDeg} min={-360} max={360} step={5} disabled={disabled}
+      <NumField label="Start Angle" value={prim.startAngleDeg} min={-360} max={360} step={1} disabled={disabled}
         onChange={(v) => onUpdate({ startAngleDeg: v } as any)} />
-      <NumField label="End Angle" value={prim.endAngleDeg} min={-360} max={360} step={5} disabled={disabled}
+      <NumField label="End Angle" value={prim.endAngleDeg} min={-360} max={360} step={1} disabled={disabled}
         onChange={(v) => onUpdate({ endAngleDeg: v } as any)} />
       <NumField label="Rows" value={prim.rowCount} min={1} max={50} disabled={disabled}
         onChange={(v) => onUpdate({ rowCount: v } as any)} />
@@ -381,7 +466,7 @@ const WedgeInspector: React.FC<InspectorProps> = ({ primitive: p, onUpdate, disa
             onChange={(v) => onUpdate({ seatsPerRow: { ...(spr as any), delta: v } } as any)} />
         </>
       )}
-      <SelectField label="Numbering" value={(prim as any).numbering ?? 'L2R'} disabled={disabled}
+      <SelectField label="Numbering Direction" value={(prim as any).numbering ?? 'L2R'} disabled={disabled}
         options={[
           { value: 'L2R', label: 'Left → Right' },
           { value: 'R2L', label: 'Right ← Left' },
@@ -447,10 +532,18 @@ export const InspectorPanel: React.FC = () => {
   if (selected.length === 0) {
     const totalSeats = compiledSeats.length;
     const primCount = primitives.length;
-    const canvas = useEditorStore.getState().layout.canvas;
-    const globalSeatRadius = (useEditorStore.getState().layout as any).seatRadius ?? 10;
+    const lay = useEditorStore.getState().layout;
+    const canvas = lay.canvas;
+    const globalSeatRadius = (lay as any).seatRadius ?? LAYOUT_STYLE_DEFAULTS.seatRadius;
+    const seatFill = (lay as any).seatFill ?? LAYOUT_STYLE_DEFAULTS.seatFill;
+    const seatStroke = (lay as any).seatStroke ?? LAYOUT_STYLE_DEFAULTS.seatStroke;
+    const seatFont = (lay as any).seatFont ?? LAYOUT_STYLE_DEFAULTS.seatFont;
+    const seatFontWeight = (lay as any).seatFontWeight ?? LAYOUT_STYLE_DEFAULTS.seatFontWeight;
+    const bgColor = (lay as any).bgColor ?? LAYOUT_STYLE_DEFAULTS.bgColor;
+    const bgImage = (lay as any).bgImage ?? LAYOUT_STYLE_DEFAULTS.bgImage;
     const updateCanvas = useEditorStore.getState().updateCanvas;
     const updateLayoutSeatRadius = useEditorStore.getState().updateLayoutSeatRadius;
+    const updateLayoutStyle = useEditorStore.getState().updateLayoutStyle;
     return (
       <div className="sme-inspector">
         <div className="sme-inspector__header">Layout Overview</div>
@@ -463,12 +556,34 @@ export const InspectorPanel: React.FC = () => {
             <span>Total Seats</span>
             <strong>{totalSeats}</strong>
           </div>
+
+          {/* ── Seat Section ── */}
+          <div className="sme-inspector__section-header">Seat</div>
+          <NumField label="Seat Radius" value={globalSeatRadius} min={2} max={30} disabled={isLocked}
+            onChange={(v) => updateLayoutSeatRadius(v)} />
+          <ColorField label="Circle Color" value={seatFill} disabled={isLocked}
+            onChange={(v) => updateLayoutStyle({ seatFill: v })} />
+          <ColorField label="Border Color" value={seatStroke} disabled={isLocked}
+            onChange={(v) => updateLayoutStyle({ seatStroke: v })} />
+          <TextField label="Font Family" value={seatFont} disabled={isLocked}
+            onChange={(v) => updateLayoutStyle({ seatFont: v })} />
+          <SelectField label="Font Weight" value={seatFontWeight} disabled={isLocked}
+            options={[
+              { value: 'normal', label: 'Normal' },
+              { value: 'bold', label: 'Bold' },
+            ]}
+            onChange={(v) => updateLayoutStyle({ seatFontWeight: v })} />
+
+          {/* ── Venue Section ── */}
+          <div className="sme-inspector__section-header">Venue</div>
           <NumField label="Canvas Width" value={canvas.w} min={200} max={10000} disabled={isLocked}
             onChange={(v) => updateCanvas({ w: v })} />
           <NumField label="Canvas Height" value={canvas.h} min={200} max={10000} disabled={isLocked}
             onChange={(v) => updateCanvas({ h: v })} />
-          <NumField label="Seat Radius (global)" value={globalSeatRadius} min={2} max={30} disabled={isLocked}
-            onChange={(v) => updateLayoutSeatRadius(v)} />
+          <ColorField label="Background Color" value={bgColor} disabled={isLocked}
+            onChange={(v) => updateLayoutStyle({ bgColor: v })} />
+          <ImageUploadField label="Background Image" value={bgImage} disabled={isLocked}
+            onChange={(v) => updateLayoutStyle({ bgImage: v })} />
         </div>
       </div>
     );

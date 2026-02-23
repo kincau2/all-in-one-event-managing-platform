@@ -60,7 +60,7 @@ export { compileArc } from './compile-arc.js';
 export { compileWedge } from './compile-wedge.js';
 
 /* ── seat_key utilities ── */
-export { buildSeatKeyMap, resolveKey, type SeatKeyMap } from './seat-key.js';
+export { buildSeatKeyMap, type SeatKeyMap } from './seat-key.js';
 
 /* ── General utilities ── */
 export {

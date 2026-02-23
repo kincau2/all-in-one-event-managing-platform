@@ -10,15 +10,14 @@ import React, { useMemo } from 'react';
 import { Shape } from 'react-konva';
 import type { CompiledSeat } from '@aioemp/seatmap-core';
 import type Konva from 'konva';
+import { useEditorStore } from '../store';
+import { LAYOUT_STYLE_DEFAULTS } from '../layoutDefaults';
 
 interface Props {
   seats: CompiledSeat[];
-  excludedSeatKeys?: Set<string>;
   selectedSeatKeys?: Set<string>;
 }
 
-const SEAT_FILL = '#4B49AC';
-const SEAT_STROKE = '#3a389a';
 const SELECTED_FILL = '#ff6d00';
 const SELECTED_STROKE = '#e65100';
 const EXCLUDED_FILL = '#e0e0e0';
@@ -30,7 +29,14 @@ const ROW_LABEL_COLOR = '#666666';
  * Render all seats with seat numbers + row labels using a single
  * Konva Shape with custom sceneFunc for performance.
  */
-export const SeatDots: React.FC<Props> = React.memo(({ seats, excludedSeatKeys, selectedSeatKeys }) => {
+export const SeatDots: React.FC<Props> = React.memo(({ seats, selectedSeatKeys }) => {
+  // Read layout-level seat styling
+  const lay = useEditorStore.getState().layout as any;
+  const seatFill = lay.seatFill ?? LAYOUT_STYLE_DEFAULTS.seatFill;
+  const seatStroke = lay.seatStroke ?? LAYOUT_STYLE_DEFAULTS.seatStroke;
+  const seatFont = lay.seatFont ?? LAYOUT_STYLE_DEFAULTS.seatFont;
+  const seatFontWeight = lay.seatFontWeight ?? LAYOUT_STYLE_DEFAULTS.seatFontWeight;
+
   // Group seats by row label for row label rendering
   const { normalSeats, excluded, selected, rowLabels } = useMemo(() => {
     const normal: CompiledSeat[] = [];
@@ -39,11 +45,8 @@ export const SeatDots: React.FC<Props> = React.memo(({ seats, excludedSeatKeys, 
     const rowMap = new Map<string, { label: string; x: number; y: number; r: number }>();
 
     for (const s of seats) {
-      const isExcluded = excludedSeatKeys?.has(s.seat_key);
       const isSelected = selectedSeatKeys?.has(s.seat_key);
-      if (isExcluded) {
-        excl.push(s);
-      } else if (isSelected) {
+      if (isSelected) {
         sel.push(s);
       } else {
         normal.push(s);
@@ -69,7 +72,7 @@ export const SeatDots: React.FC<Props> = React.memo(({ seats, excludedSeatKeys, 
       selected: sel,
       rowLabels: Array.from(rowMap.values()),
     };
-  }, [seats, excludedSeatKeys, selectedSeatKeys]);
+  }, [seats, selectedSeatKeys]);
 
   if (seats.length === 0) return null;
 
@@ -98,12 +101,12 @@ export const SeatDots: React.FC<Props> = React.memo(({ seats, excludedSeatKeys, 
             const r = s.radius ?? 8;
             // Scale font to fit inside circle
             const fontSize = Math.max(6, Math.min(r * 1.1, 14));
-            c.font = `bold ${fontSize}px -apple-system, sans-serif`;
+            c.font = `${seatFontWeight} ${fontSize}px ${seatFont}`;
             c.fillText(String(s.number ?? ''), s.x, s.y);
           }
         }}
-        fill={SEAT_FILL}
-        stroke={SEAT_STROKE}
+        fill={seatFill}
+        stroke={seatStroke}
         strokeWidth={1}
       />
 
@@ -161,7 +164,7 @@ export const SeatDots: React.FC<Props> = React.memo(({ seats, excludedSeatKeys, 
             for (const s of selected) {
               const r = s.radius ?? 8;
               const fontSize = Math.max(6, Math.min(r * 1.1, 14));
-              c.font = `bold ${fontSize}px -apple-system, sans-serif`;
+              c.font = `${seatFontWeight} ${fontSize}px ${seatFont}`;
               c.fillText(String(s.number ?? ''), s.x, s.y);
             }
           }}

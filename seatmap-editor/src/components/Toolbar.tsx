@@ -10,62 +10,8 @@
  */
 
 import React, { useCallback } from 'react';
-import { generateUUID } from '@aioemp/seatmap-core';
 import { useEditorStore, type Tool } from '../store';
-
-/* ── Default primitive factories (instant-add only) ── */
-
-function createDefaultWedge() {
-  return {
-    id: generateUUID(),
-    type: 'seatBlockWedge' as const,
-    name: 'Wedge Block',
-    center: { x: 400, y: 400 },
-    innerRadius: 120,
-    outerRadius: 300,
-    startAngleDeg: -30,
-    endAngleDeg: 30,
-    rowCount: 4,
-    seatsPerRow: { start: 8, delta: 2 },
-    rowLabel: { mode: 'alpha' as const, start: 'A', direction: 'asc' as const },
-    numbering: 'L2R' as const,
-    excludedSeats: [],
-    section: '',
-  };
-}
-
-function createDefaultStage() {
-  return {
-    id: generateUUID(),
-    type: 'stage' as const,
-    name: 'Stage',
-    width: 300,
-    height: 60,
-    transform: { x: 100, y: 20, rotation: 0 },
-  };
-}
-
-function createDefaultLabel() {
-  return {
-    id: generateUUID(),
-    type: 'label' as const,
-    name: 'Label',
-    text: 'Section',
-    fontSize: 18,
-    transform: { x: 100, y: 100, rotation: 0 },
-  };
-}
-
-function createDefaultObstacle() {
-  return {
-    id: generateUUID(),
-    type: 'obstacle' as const,
-    name: 'Obstacle',
-    width: 60,
-    height: 60,
-    transform: { x: 200, y: 200, rotation: 0 },
-  };
-}
+import { createDefaultStage, createDefaultLabel, createDefaultObstacle } from '../primitiveFactories';
 
 /* ── Component ── */
 
@@ -187,11 +133,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onClose, onSave }) => {
 
       {/* Instant-add shapes */}
       <div className="sme-toolbar__group">
-        <button className="sme-toolbar__btn" onClick={() => handleAdd(createDefaultWedge)}
-          title="Add Wedge Block" disabled={isLocked}>
-          <span className="dashicons dashicons-chart-pie" />
-          <span>Wedge</span>
-        </button>
         <button className="sme-toolbar__btn" onClick={() => handleAdd(createDefaultStage)}
           title="Add Stage" disabled={isLocked}>
           <span className="dashicons dashicons-slides" />

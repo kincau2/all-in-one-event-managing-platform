@@ -191,6 +191,17 @@
   margin: 0;
 }
 
+.sme-inspector__section-header {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--sa-muted, #6c757d);
+  border-bottom: 1px solid #e0e0e0;
+  padding: 8px 0 4px;
+  margin: 10px 0 4px;
+}
+
 /* ── Field components ── */
 
 .sme-field {

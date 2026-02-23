@@ -29,7 +29,6 @@ export type Tool =
   | 'seatSelect'
   | 'addGrid'
   | 'addArc'
-  | 'addWedge'
   | 'addStage'
   | 'addLabel'
   | 'addObstacle';
@@ -84,9 +83,11 @@ export interface EditorState {
   toggleSeatExclusion: (primitiveId: string, logicalRow: number, logicalSeat: number) => void;
   removeSelectedSeats: () => void;
   movePrimitivesBy: (ids: string[], dx: number, dy: number) => void;
+  rotatePrimitive: (id: string, rotation: number) => void;
 
   updateCanvas: (patch: Partial<Layout['canvas']>) => void;
   updateLayoutSeatRadius: (radius: number) => void;
+  updateLayoutStyle: (patch: Record<string, any>) => void;
 
   setActiveTool: (tool: Tool) => void;
 
@@ -111,6 +112,12 @@ const DEFAULT_LAYOUT: Layout = {
   title: '',
   canvas: { w: 1600, h: 900, unit: 'px' },
   seatRadius: 10,
+  seatFill: '#4B49AC',
+  seatStroke: '#3a389a',
+  seatFont: '-apple-system, sans-serif',
+  seatFontWeight: 'bold',
+  bgColor: '#ffffff',
+  bgImage: '',
   primitives: [],
   compiled: {
     seats: [],
@@ -319,6 +326,18 @@ export const useEditorStore = create<EditorState>()(
       get().recompile();
     },
 
+    rotatePrimitive(id, rotation) {
+      set((s) => {
+        const idx = s.layout.primitives.findIndex((p: Primitive) => p.id === id);
+        if (idx === -1) return;
+        const prim = s.layout.primitives[idx] as any;
+        if (!prim.transform) prim.transform = {};
+        prim.transform.rotation = rotation;
+        s.isDirty = true;
+      });
+      get().recompile();
+    },
+
     /* ── Canvas / Layout ── */
     updateCanvas(patch) {
       const state = get();
@@ -337,10 +356,23 @@ export const useEditorStore = create<EditorState>()(
       });
       get().recompile();
     },
+    updateLayoutStyle(patch) {
+      const state = get();
+      state.pushSnapshot();
+      set((s) => {
+        Object.assign(s.layout as any, patch);
+        s.isDirty = true;
+      });
+    },
 
     /* ── Tool ── */
     setActiveTool(tool) {
-      set((s) => { s.activeTool = tool; });
+      set((s) => {
+        s.activeTool = tool;
+        // Clear cross-mode selections to avoid accidental block/seat conflicts
+        if (tool === 'seatSelect') s.selectedIds = [];
+        else s.selectedSeatKeys = [];
+      });
     },
 
     /* ── Undo / Redo ── */

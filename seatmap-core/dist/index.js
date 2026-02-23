@@ -63,6 +63,7 @@ var SeatBlockGridSchema = z.object({
   seatSpacingX: z.number().positive(),
   seatSpacingY: z.number().positive(),
   seatRadius: z.number().positive().optional(),
+  startSeatNumber: z.number().int().positive().default(1),
   rowLabel: RowLabelSchema.default({ mode: "alpha", start: "A", direction: "asc" }),
   numbering: z.enum(["L2R", "R2L"]).default("L2R"),
   aisleGaps: z.array(GridAisleGapSchema).default([]),
@@ -82,6 +83,7 @@ var SeatBlockArcSchema = z.object({
   endAngleDeg: z.number(),
   seatsPerRow: SeatsPerRowSchema,
   seatRadius: z.number().positive().optional(),
+  startSeatNumber: z.number().int().positive().default(1),
   rowLabel: RowLabelSchema.default({ mode: "alpha", start: "A", direction: "asc" }),
   numbering: z.enum(["L2R", "R2L"]).default("L2R"),
   aisleGaps: z.array(ArcAisleGapSchema).default([]),
@@ -144,6 +146,12 @@ var LayoutSchema = z.object({
   title: z.string().default(""),
   canvas: CanvasSchema,
   seatRadius: z.number().positive().default(10),
+  seatFill: z.string().default("#4B49AC"),
+  seatStroke: z.string().default("#3a389a"),
+  seatFont: z.string().default("-apple-system, sans-serif"),
+  seatFontWeight: z.enum(["normal", "bold"]).default("bold"),
+  bgColor: z.string().default("#ffffff"),
+  bgImage: z.string().default(""),
   primitives: z.array(PrimitiveSchema),
   compiled: CompiledSchema.default({
     seats: [],
@@ -231,6 +239,7 @@ function compileGrid(primitive, keyMap, globalSeatRadius = 10) {
     transform
   } = primitive;
   const seatRadius = primitive.seatRadius ?? globalSeatRadius;
+  const startNum = primitive.startSeatNumber ?? 1;
   const seats = [];
   for (let r = 0; r < rows; r++) {
     const rowLabelStr = generateRowLabel(
@@ -251,7 +260,7 @@ function compileGrid(primitive, keyMap, globalSeatRadius = 10) {
       }
       x += transform?.x ?? 0;
       y += transform?.y ?? 0;
-      const seatNumber = numbering === "R2L" ? cols - c : c + 1;
+      const seatNumber = numbering === "R2L" ? cols - c + (startNum - 1) : c + startNum;
       const label = `${rowLabelStr}-${String(seatNumber).padStart(2, "0")}`;
       const logicalKey = `${id}:${r}:${c}`;
       const seat_key = keyMap.get(logicalKey) ?? generateUUID();
@@ -300,6 +309,7 @@ function compileArc(primitive, keyMap, globalSeatRadius = 10) {
   const seatRadius = primitive.seatRadius ?? globalSeatRadius;
   const rowLabel = primitive.rowLabel ?? { mode: "alpha", start: "A", direction: "asc" };
   const numbering = primitive.numbering ?? "L2R";
+  const startNum = primitive.startSeatNumber ?? 1;
   const seats = [];
   for (let r = 0; r < rowCount; r++) {
     const baseRadius = startRadius + r * radiusStep;
@@ -334,7 +344,7 @@ function compileArc(primitive, keyMap, globalSeatRadius = 10) {
       }
       x += transform?.x ?? 0;
       y += transform?.y ?? 0;
-      const seatNumber = numbering === "R2L" ? n - s : s + 1;
+      const seatNumber = numbering === "R2L" ? n - s + (startNum - 1) : s + startNum;
       const label = `${rowLabelStr}-${String(seatNumber).padStart(2, "0")}`;
       const logicalKey = `${id}:${r}:${s}`;
       const seat_key = keyMap.get(logicalKey) ?? generateUUID();
@@ -433,9 +443,6 @@ function buildSeatKeyMap(existingSeats) {
   }
   return map;
 }
-function resolveKey(keyMap, primitiveId, logicalRow, logicalSeat) {
-  return keyMap.get(`${primitiveId}:${logicalRow}:${logicalSeat}`) ?? null;
-}
 
 // src/compile-layout.ts
 function compileLayout(layout, existingLayout) {
@@ -521,7 +528,6 @@ export {
   getSeatsPerRow,
   indexToLabel,
   labelToIndex,
-  resolveKey,
   rotatePoint,
   round2,
   validateAndCompile

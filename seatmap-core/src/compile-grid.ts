@@ -35,6 +35,7 @@ export function compileGrid(
   } = primitive;
 
   const seatRadius = primitive.seatRadius ?? globalSeatRadius;
+  const startNum = (primitive as any).startSeatNumber ?? 1;
   const seats: CompiledSeat[] = [];
 
   for (let r = 0; r < rows; r++) {
@@ -71,7 +72,7 @@ export function compileGrid(
       y += transform?.y ?? 0;
 
       /* ── Numbering / label ── */
-      const seatNumber = numbering === 'R2L' ? cols - c : c + 1;
+      const seatNumber = numbering === 'R2L' ? (cols - c) + (startNum - 1) : c + startNum;
       const label = `${rowLabelStr}-${String(seatNumber).padStart(2, '0')}`;
 
       /* ── seat_key: preserve or generate ── */

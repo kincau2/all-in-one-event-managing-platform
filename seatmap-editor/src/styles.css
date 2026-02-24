@@ -202,6 +202,49 @@
   margin: 10px 0 4px;
 }
 
+/* ── Collapsible section ── */
+
+.sme-collapsible {
+  border-bottom: 1px solid var(--sa-border, #e8ebf1);
+}
+
+.sme-collapsible__toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--sa-muted, #6c757d);
+  text-align: left;
+}
+
+.sme-collapsible__toggle:hover {
+  color: var(--sa-text, #343a40);
+}
+
+.sme-collapsible__chevron {
+  flex-shrink: 0;
+  transition: transform 0.15s ease;
+}
+
+.sme-collapsible__toggle--open .sme-collapsible__chevron {
+  transform: rotate(90deg);
+}
+
+.sme-collapsible__body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 10px;
+}
+
 /* ── Field components ── */
 
 .sme-field {

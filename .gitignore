@@ -15,3 +15,6 @@ seatmap-editor/dist/
 
 # Deploy script (contains server credentials)
 deploy.sh
+.DS_Store
+public/.DS_Store
+seatmap-core/.DS_Store

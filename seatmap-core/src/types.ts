@@ -19,6 +19,7 @@ import {
   StagePrimitiveSchema,
   LabelPrimitiveSchema,
   ObstaclePrimitiveSchema,
+  ImagePrimitiveSchema,
   SeatBlockGridSchema,
   SeatBlockArcSchema,
   SeatBlockWedgeSchema,
@@ -43,6 +44,7 @@ export type SeatsPerRow = z.infer<typeof SeatsPerRowSchema>;
 export type StagePrimitive = z.infer<typeof StagePrimitiveSchema>;
 export type LabelPrimitive = z.infer<typeof LabelPrimitiveSchema>;
 export type ObstaclePrimitive = z.infer<typeof ObstaclePrimitiveSchema>;
+export type ImagePrimitive = z.infer<typeof ImagePrimitiveSchema>;
 export type SeatBlockGrid = z.infer<typeof SeatBlockGridSchema>;
 export type SeatBlockArc = z.infer<typeof SeatBlockArcSchema>;
 export type SeatBlockWedge = z.infer<typeof SeatBlockWedgeSchema>;

@@ -57,7 +57,15 @@ var ObstaclePrimitiveSchema = z.object({
   width: z.number().positive(),
   height: z.number().positive(),
   color: z.string().default("#ffcccc"),
-  borderColor: z.string().default("#cc5555")
+  borderColor: z.string().default("#cc5555"),
+  borderRadius: z.number().nonnegative().default(0)
+});
+var ImagePrimitiveSchema = z.object({
+  ...primitiveBase,
+  type: z.literal("image"),
+  src: z.string().min(1),
+  width: z.number().positive(),
+  height: z.number().positive()
 });
 var SeatBlockGridSchema = z.object({
   ...primitiveBase,
@@ -117,6 +125,7 @@ var PrimitiveSchema = z.discriminatedUnion("type", [
   StagePrimitiveSchema,
   LabelPrimitiveSchema,
   ObstaclePrimitiveSchema,
+  ImagePrimitiveSchema,
   SeatBlockGridSchema,
   SeatBlockArcSchema,
   SeatBlockWedgeSchema
@@ -247,7 +256,7 @@ function round2(n) {
 var GRID_PAD = 21;
 var GRID_LBL_W = 24;
 var ARC_PAD = 21;
-var ARC_LBL_ANG = 33;
+var ARC_LBL_ANG = 43;
 function gridPivotOffset(cols, rows, seatSpacingX, seatSpacingY) {
   const seatW = (cols - 1) * seatSpacingX;
   const seatH = (rows - 1) * seatSpacingY;
@@ -673,6 +682,7 @@ export {
   GRID_LBL_W,
   GRID_PAD,
   GridAisleGapSchema,
+  ImagePrimitiveSchema,
   LabelPrimitiveSchema,
   LayoutSchema,
   ObstaclePrimitiveSchema,

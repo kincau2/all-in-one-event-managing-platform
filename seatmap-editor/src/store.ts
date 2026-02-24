@@ -32,7 +32,8 @@ export type Tool =
   | 'addArc'
   | 'addStage'
   | 'addLabel'
-  | 'addObstacle';
+  | 'addObstacle'
+  | 'addImage';
 
 export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
@@ -58,7 +59,6 @@ export interface EditorState {
   stageX: number;
   stageY: number;
   stageScale: number;
-  snapToGrid: boolean;
 
   /* ── Save ── */
   saveStatus: SaveStatus;
@@ -100,7 +100,6 @@ export interface EditorState {
   pushSnapshot: () => void;
 
   setViewport: (x: number, y: number, scale: number) => void;
-  toggleSnapToGrid: () => void;
 
   setSaveStatus: (status: SaveStatus) => void;
   markDirty: () => void;
@@ -155,7 +154,6 @@ export const useEditorStore = create<EditorState>()(
     stageX: 0,
     stageY: 0,
     stageScale: 1,
-    snapToGrid: false,
     saveStatus: 'idle',
     isDirty: false,
     lockToken: null,
@@ -466,9 +464,6 @@ export const useEditorStore = create<EditorState>()(
         s.stageY = y;
         s.stageScale = scale;
       });
-    },
-    toggleSnapToGrid() {
-      set((s) => { s.snapToGrid = !s.snapToGrid; });
     },
 
     /* ── Save status ── */

@@ -180,6 +180,7 @@ declare const ObstaclePrimitiveSchema: z.ZodObject<{
     height: z.ZodNumber;
     color: z.ZodDefault<z.ZodString>;
     borderColor: z.ZodDefault<z.ZodString>;
+    borderRadius: z.ZodDefault<z.ZodNumber>;
     id: z.ZodString;
     name: z.ZodOptional<z.ZodString>;
     label: z.ZodOptional<z.ZodString>;
@@ -203,6 +204,7 @@ declare const ObstaclePrimitiveSchema: z.ZodObject<{
     id: string;
     color: string;
     borderColor: string;
+    borderRadius: number;
     name?: string | undefined;
     label?: string | undefined;
     transform?: {
@@ -224,6 +226,55 @@ declare const ObstaclePrimitiveSchema: z.ZodObject<{
     } | undefined;
     color?: string | undefined;
     borderColor?: string | undefined;
+    borderRadius?: number | undefined;
+}>;
+declare const ImagePrimitiveSchema: z.ZodObject<{
+    type: z.ZodLiteral<"image">;
+    src: z.ZodString;
+    width: z.ZodNumber;
+    height: z.ZodNumber;
+    id: z.ZodString;
+    name: z.ZodOptional<z.ZodString>;
+    label: z.ZodOptional<z.ZodString>;
+    transform: z.ZodOptional<z.ZodObject<{
+        x: z.ZodDefault<z.ZodNumber>;
+        y: z.ZodDefault<z.ZodNumber>;
+        rotation: z.ZodDefault<z.ZodNumber>;
+    }, "strip", z.ZodTypeAny, {
+        x: number;
+        y: number;
+        rotation: number;
+    }, {
+        x?: number | undefined;
+        y?: number | undefined;
+        rotation?: number | undefined;
+    }>>;
+}, "strip", z.ZodTypeAny, {
+    type: "image";
+    width: number;
+    height: number;
+    id: string;
+    src: string;
+    name?: string | undefined;
+    label?: string | undefined;
+    transform?: {
+        x: number;
+        y: number;
+        rotation: number;
+    } | undefined;
+}, {
+    type: "image";
+    width: number;
+    height: number;
+    id: string;
+    src: string;
+    name?: string | undefined;
+    label?: string | undefined;
+    transform?: {
+        x?: number | undefined;
+        y?: number | undefined;
+        rotation?: number | undefined;
+    } | undefined;
 }>;
 declare const SeatBlockGridSchema: z.ZodObject<{
     type: z.ZodLiteral<"seatBlockGrid">;
@@ -736,6 +787,7 @@ declare const PrimitiveSchema: z.ZodDiscriminatedUnion<"type", [z.ZodObject<{
     height: z.ZodNumber;
     color: z.ZodDefault<z.ZodString>;
     borderColor: z.ZodDefault<z.ZodString>;
+    borderRadius: z.ZodDefault<z.ZodNumber>;
     id: z.ZodString;
     name: z.ZodOptional<z.ZodString>;
     label: z.ZodOptional<z.ZodString>;
@@ -759,6 +811,7 @@ declare const PrimitiveSchema: z.ZodDiscriminatedUnion<"type", [z.ZodObject<{
     id: string;
     color: string;
     borderColor: string;
+    borderRadius: number;
     name?: string | undefined;
     label?: string | undefined;
     transform?: {
@@ -780,6 +833,54 @@ declare const PrimitiveSchema: z.ZodDiscriminatedUnion<"type", [z.ZodObject<{
     } | undefined;
     color?: string | undefined;
     borderColor?: string | undefined;
+    borderRadius?: number | undefined;
+}>, z.ZodObject<{
+    type: z.ZodLiteral<"image">;
+    src: z.ZodString;
+    width: z.ZodNumber;
+    height: z.ZodNumber;
+    id: z.ZodString;
+    name: z.ZodOptional<z.ZodString>;
+    label: z.ZodOptional<z.ZodString>;
+    transform: z.ZodOptional<z.ZodObject<{
+        x: z.ZodDefault<z.ZodNumber>;
+        y: z.ZodDefault<z.ZodNumber>;
+        rotation: z.ZodDefault<z.ZodNumber>;
+    }, "strip", z.ZodTypeAny, {
+        x: number;
+        y: number;
+        rotation: number;
+    }, {
+        x?: number | undefined;
+        y?: number | undefined;
+        rotation?: number | undefined;
+    }>>;
+}, "strip", z.ZodTypeAny, {
+    type: "image";
+    width: number;
+    height: number;
+    id: string;
+    src: string;
+    name?: string | undefined;
+    label?: string | undefined;
+    transform?: {
+        x: number;
+        y: number;
+        rotation: number;
+    } | undefined;
+}, {
+    type: "image";
+    width: number;
+    height: number;
+    id: string;
+    src: string;
+    name?: string | undefined;
+    label?: string | undefined;
+    transform?: {
+        x?: number | undefined;
+        y?: number | undefined;
+        rotation?: number | undefined;
+    } | undefined;
 }>, z.ZodObject<{
     type: z.ZodLiteral<"seatBlockGrid">;
     origin: z.ZodDefault<z.ZodObject<{
@@ -1522,6 +1623,7 @@ declare const LayoutSchema: z.ZodObject<{
         height: z.ZodNumber;
         color: z.ZodDefault<z.ZodString>;
         borderColor: z.ZodDefault<z.ZodString>;
+        borderRadius: z.ZodDefault<z.ZodNumber>;
         id: z.ZodString;
         name: z.ZodOptional<z.ZodString>;
         label: z.ZodOptional<z.ZodString>;
@@ -1545,6 +1647,7 @@ declare const LayoutSchema: z.ZodObject<{
         id: string;
         color: string;
         borderColor: string;
+        borderRadius: number;
         name?: string | undefined;
         label?: string | undefined;
         transform?: {
@@ -1566,6 +1669,54 @@ declare const LayoutSchema: z.ZodObject<{
         } | undefined;
         color?: string | undefined;
         borderColor?: string | undefined;
+        borderRadius?: number | undefined;
+    }>, z.ZodObject<{
+        type: z.ZodLiteral<"image">;
+        src: z.ZodString;
+        width: z.ZodNumber;
+        height: z.ZodNumber;
+        id: z.ZodString;
+        name: z.ZodOptional<z.ZodString>;
+        label: z.ZodOptional<z.ZodString>;
+        transform: z.ZodOptional<z.ZodObject<{
+            x: z.ZodDefault<z.ZodNumber>;
+            y: z.ZodDefault<z.ZodNumber>;
+            rotation: z.ZodDefault<z.ZodNumber>;
+        }, "strip", z.ZodTypeAny, {
+            x: number;
+            y: number;
+            rotation: number;
+        }, {
+            x?: number | undefined;
+            y?: number | undefined;
+            rotation?: number | undefined;
+        }>>;
+    }, "strip", z.ZodTypeAny, {
+        type: "image";
+        width: number;
+        height: number;
+        id: string;
+        src: string;
+        name?: string | undefined;
+        label?: string | undefined;
+        transform?: {
+            x: number;
+            y: number;
+            rotation: number;
+        } | undefined;
+    }, {
+        type: "image";
+        width: number;
+        height: number;
+        id: string;
+        src: string;
+        name?: string | undefined;
+        label?: string | undefined;
+        transform?: {
+            x?: number | undefined;
+            y?: number | undefined;
+            rotation?: number | undefined;
+        } | undefined;
     }>, z.ZodObject<{
         type: z.ZodLiteral<"seatBlockGrid">;
         origin: z.ZodDefault<z.ZodObject<{
@@ -2151,6 +2302,20 @@ declare const LayoutSchema: z.ZodObject<{
         id: string;
         color: string;
         borderColor: string;
+        borderRadius: number;
+        name?: string | undefined;
+        label?: string | undefined;
+        transform?: {
+            x: number;
+            y: number;
+            rotation: number;
+        } | undefined;
+    } | {
+        type: "image";
+        width: number;
+        height: number;
+        id: string;
+        src: string;
         name?: string | undefined;
         label?: string | undefined;
         transform?: {
@@ -2338,6 +2503,20 @@ declare const LayoutSchema: z.ZodObject<{
         } | undefined;
         color?: string | undefined;
         borderColor?: string | undefined;
+        borderRadius?: number | undefined;
+    } | {
+        type: "image";
+        width: number;
+        height: number;
+        id: string;
+        src: string;
+        name?: string | undefined;
+        label?: string | undefined;
+        transform?: {
+            x?: number | undefined;
+            y?: number | undefined;
+            rotation?: number | undefined;
+        } | undefined;
     } | {
         type: "seatBlockGrid";
         id: string;
@@ -2505,6 +2684,7 @@ type SeatsPerRow = z.infer<typeof SeatsPerRowSchema>;
 type StagePrimitive = z.infer<typeof StagePrimitiveSchema>;
 type LabelPrimitive = z.infer<typeof LabelPrimitiveSchema>;
 type ObstaclePrimitive = z.infer<typeof ObstaclePrimitiveSchema>;
+type ImagePrimitive = z.infer<typeof ImagePrimitiveSchema>;
 type SeatBlockGrid = z.infer<typeof SeatBlockGridSchema>;
 type SeatBlockArc = z.infer<typeof SeatBlockArcSchema>;
 type SeatBlockWedge = z.infer<typeof SeatBlockWedgeSchema>;
@@ -2623,7 +2803,7 @@ declare const GRID_LBL_W = 24;
 /** Radial pixel padding around an arc/wedge sector. */
 declare const ARC_PAD = 21;
 /** Extra angular pixels for row labels in an arc block. */
-declare const ARC_LBL_ANG = 33;
+declare const ARC_LBL_ANG = 43;
 /**
  * Rotation pivot offset for a grid block, in local coords relative to origin.
  * Returns the center of the visual dotted rectangle.
@@ -2689,4 +2869,4 @@ declare function generateUUID(): string;
 /** Round to 2 decimal places to avoid floating-point noise. */
 declare function round2(n: number): number;
 
-export { ARC_LBL_ANG, ARC_PAD, type ArcAisleGap, ArcAisleGapSchema, type ArcCompileResult, type Bounds, BoundsSchema, type Canvas, CanvasSchema, type CompileResult, type Compiled, type CompiledRowLabel, CompiledRowLabelSchema, CompiledSchema, type CompiledSeat, CompiledSeatSchema, GRID_LBL_W, GRID_PAD, type GridAisleGap, GridAisleGapSchema, type GridCompileResult, type LabelPrimitive, LabelPrimitiveSchema, type Layout, type LayoutInput, LayoutSchema, type ObstaclePrimitive, ObstaclePrimitiveSchema, type Point, PointSchema, type Primitive, type PrimitiveInput, PrimitiveSchema, type RowLabel, type RowLabelDisplay, RowLabelDisplaySchema, RowLabelSchema, type SeatBlockArc, SeatBlockArcSchema, type SeatBlockGrid, SeatBlockGridSchema, type SeatBlockWedge, SeatBlockWedgeSchema, type SeatKeyMap, type SeatsPerRow, SeatsPerRowSchema, type StagePrimitive, StagePrimitiveSchema, type Transform, TransformSchema, arcPivotOffset, buildSeatKeyMap, compileArc, compileGrid, compileLayout, compileWedge, computeBounds, degToRad, generateRowLabel, generateUUID, getSeatsPerRow, gridPivotOffset, indexToLabel, labelToIndex, rotatePoint, round2, validateAndCompile };
+export { ARC_LBL_ANG, ARC_PAD, type ArcAisleGap, ArcAisleGapSchema, type ArcCompileResult, type Bounds, BoundsSchema, type Canvas, CanvasSchema, type CompileResult, type Compiled, type CompiledRowLabel, CompiledRowLabelSchema, CompiledSchema, type CompiledSeat, CompiledSeatSchema, GRID_LBL_W, GRID_PAD, type GridAisleGap, GridAisleGapSchema, type GridCompileResult, type ImagePrimitive, ImagePrimitiveSchema, type LabelPrimitive, LabelPrimitiveSchema, type Layout, type LayoutInput, LayoutSchema, type ObstaclePrimitive, ObstaclePrimitiveSchema, type Point, PointSchema, type Primitive, type PrimitiveInput, PrimitiveSchema, type RowLabel, type RowLabelDisplay, RowLabelDisplaySchema, RowLabelSchema, type SeatBlockArc, SeatBlockArcSchema, type SeatBlockGrid, SeatBlockGridSchema, type SeatBlockWedge, SeatBlockWedgeSchema, type SeatKeyMap, type SeatsPerRow, SeatsPerRowSchema, type StagePrimitive, StagePrimitiveSchema, type Transform, TransformSchema, arcPivotOffset, buildSeatKeyMap, compileArc, compileGrid, compileLayout, compileWedge, computeBounds, degToRad, generateRowLabel, generateUUID, getSeatsPerRow, gridPivotOffset, indexToLabel, labelToIndex, rotatePoint, round2, validateAndCompile };

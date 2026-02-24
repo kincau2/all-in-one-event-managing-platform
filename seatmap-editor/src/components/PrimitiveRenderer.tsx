@@ -7,8 +7,8 @@
  * Arc/Wedge: draws only the seated sector (not a full circle).
  */
 
-import React from 'react';
-import { Rect, Text, Group, Circle, Shape } from 'react-konva';
+import React, { useEffect, useState } from 'react';
+import { Rect, Text, Group, Circle, Shape, Image as KonvaImage } from 'react-konva';
 import type { Primitive } from '@aioemp/seatmap-core';
 import {
   gridPivotOffset,
@@ -157,7 +157,7 @@ export const PrimitiveRenderer: React.FC<Props> = ({ primitive, isSelected }) =>
             stroke={isSelected ? SELECTION_STROKE : (op.borderColor ?? '#cc5555')}
             strokeWidth={sw}
             dash={isSelected ? SELECTION_DASH : undefined}
-            cornerRadius={2}
+            cornerRadius={op.borderRadius ?? 0}
             attrs={{ primitiveId: primitive.id }}
           />
           {isSelected && (
@@ -334,7 +334,121 @@ export const PrimitiveRenderer: React.FC<Props> = ({ primitive, isSelected }) =>
       );
     }
 
+    case 'image': {
+      const ip = primitive as any;
+      const iPivotX = ip.width / 2;
+      const iPivotY = ip.height / 2;
+      const EDGE = 6;
+      return (
+        <ImagePrimRenderer
+          primitive={primitive}
+          tx={tx}
+          ty={ty}
+          rotation={rotation}
+          isSelected={isSelected}
+          iPivotX={iPivotX}
+          iPivotY={iPivotY}
+          EDGE={EDGE}
+        />
+      );
+    }
+
     default:
       return null;
   }
+};
+
+/* ── Image primitive sub-component (needs state for async image load) ── */
+
+interface ImagePrimProps {
+  primitive: Primitive;
+  tx: number;
+  ty: number;
+  rotation: number;
+  isSelected: boolean;
+  iPivotX: number;
+  iPivotY: number;
+  EDGE: number;
+}
+
+const ImagePrimRenderer: React.FC<ImagePrimProps> = ({
+  primitive,
+  tx,
+  ty,
+  rotation,
+  isSelected,
+  iPivotX,
+  iPivotY,
+  EDGE,
+}) => {
+  const ip = primitive as any;
+  const [img, setImg] = useState<HTMLImageElement | null>(null);
+
+  useEffect(() => {
+    if (!ip.src) { setImg(null); return; }
+    const image = new window.Image();
+    image.crossOrigin = 'anonymous';
+    image.onload = () => setImg(image);
+    image.onerror = () => setImg(null);
+    image.src = ip.src;
+  }, [ip.src]);
+
+  return (
+    <Group
+      x={tx + iPivotX}
+      y={ty + iPivotY}
+      rotation={rotation}
+      offsetX={iPivotX}
+      offsetY={iPivotY}
+      attrs={{ primitiveId: primitive.id }}
+    >
+      {img ? (
+        <KonvaImage
+          x={0}
+          y={0}
+          width={ip.width}
+          height={ip.height}
+          image={img}
+          stroke={isSelected ? SELECTION_STROKE : undefined}
+          strokeWidth={isSelected ? 2 : 0}
+          dash={isSelected ? SELECTION_DASH : undefined}
+          attrs={{ primitiveId: primitive.id }}
+        />
+      ) : (
+        <Rect
+          x={0}
+          y={0}
+          width={ip.width}
+          height={ip.height}
+          fill="#f0f0f0"
+          stroke={isSelected ? SELECTION_STROKE : '#ccc'}
+          strokeWidth={isSelected ? 2 : 1}
+          dash={isSelected ? SELECTION_DASH : [4, 4]}
+          attrs={{ primitiveId: primitive.id }}
+        />
+      )}
+      {isSelected && (
+        <>
+          {/* Resize edge hit areas */}
+          <Rect x={EDGE} y={-EDGE / 2} width={ip.width - 2 * EDGE} height={EDGE}
+            fill="transparent" attrs={{ resizeEdge: 'top', primitiveId: primitive.id }} />
+          <Rect x={EDGE} y={ip.height - EDGE / 2} width={ip.width - 2 * EDGE} height={EDGE}
+            fill="transparent" attrs={{ resizeEdge: 'bottom', primitiveId: primitive.id }} />
+          <Rect x={-EDGE / 2} y={EDGE} width={EDGE} height={ip.height - 2 * EDGE}
+            fill="transparent" attrs={{ resizeEdge: 'left', primitiveId: primitive.id }} />
+          <Rect x={ip.width - EDGE / 2} y={EDGE} width={EDGE} height={ip.height - 2 * EDGE}
+            fill="transparent" attrs={{ resizeEdge: 'right', primitiveId: primitive.id }} />
+          {/* Corner rotation handles */}
+          <Circle x={0} y={0} radius={5} fill={SELECTION_STROKE} stroke="#fff" strokeWidth={1.5}
+            attrs={{ rotateHandle: true, primitiveId: primitive.id }} />
+          <Circle x={ip.width} y={0} radius={5} fill={SELECTION_STROKE} stroke="#fff" strokeWidth={1.5}
+            attrs={{ rotateHandle: true, primitiveId: primitive.id }} />
+          <Circle x={ip.width} y={ip.height} radius={5} fill={SELECTION_STROKE} stroke="#fff" strokeWidth={1.5}
+            attrs={{ rotateHandle: true, primitiveId: primitive.id }} />
+          <Circle x={0} y={ip.height} radius={5} fill={SELECTION_STROKE} stroke="#fff" strokeWidth={1.5}
+            attrs={{ rotateHandle: true, primitiveId: primitive.id }} />
+        </>
+      )}
+    </Group>
+  );
 };

@@ -154,7 +154,7 @@ function getRotationCenter(p: any): { x: number; y: number } {
   if (p.type === 'seatBlockWedge') {
     return { x: (p.center?.x ?? 0) + tx, y: (p.center?.y ?? 0) + ty };
   }
-  if (p.type === 'obstacle' || p.type === 'stage') {
+  if (p.type === 'obstacle' || p.type === 'stage' || p.type === 'image') {
     return { x: tx + (p.width ?? 0) / 2, y: ty + (p.height ?? 0) / 2 };
   }
   if (p.type === 'label') {
@@ -212,6 +212,41 @@ export const EditorCanvas: React.FC<{ width: number; height: number }> = ({
     () => new Set(selectedSeatKeys),
     [selectedSeatKeys],
   );
+
+  /* ── Auto-fit viewport on fresh load ── */
+  const seatmapId = useEditorStore((s) => s.seatmapId);
+  const autoFitDoneRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    // Reset when a different seatmap is opened
+    autoFitDoneRef.current = null;
+  }, [seatmapId]);
+
+  useEffect(() => {
+    // Already fitted for this seatmap
+    if (autoFitDoneRef.current === seatmapId) return;
+    // Viewer not measured yet
+    if (width < 10 || height < 10) return;
+
+    const canvasW = layout.canvas.w;
+    const canvasH = layout.canvas.h;
+    if (canvasW <= 0 || canvasH <= 0) return;
+
+    // 20% margin → content occupies 80% of the viewer
+    const MARGIN_RATIO = 0.8;
+    const scale = Math.min(
+      (width * MARGIN_RATIO) / canvasW,
+      (height * MARGIN_RATIO) / canvasH,
+      1, // don't zoom in beyond 100%
+    );
+
+    // Center the layout canvas inside the viewer
+    const offsetX = (width - canvasW * scale) / 2;
+    const offsetY = (height - canvasH * scale) / 2;
+
+    setViewport(offsetX, offsetY, scale);
+    autoFitDoneRef.current = seatmapId;
+  }, [seatmapId, width, height, layout.canvas.w, layout.canvas.h, setViewport]);
 
   /* ── Wheel zoom ── */
   const handleWheel = useCallback(
@@ -282,7 +317,7 @@ export const EditorCanvas: React.FC<{ width: number; height: number }> = ({
         const resizeHit = resizeEdgeUnderPointer(stage);
         if (resizeHit) {
           const prim = store.layout.primitives.find((p) => p.id === resizeHit.primitiveId) as any;
-          if (prim && prim.type === 'obstacle') {
+          if (prim && (prim.type === 'obstacle' || prim.type === 'image')) {
             resizePrimIdRef.current = resizeHit.primitiveId;
             resizeEdgeRef.current = resizeHit.edge;
             resizeInitialRef.current = {
@@ -794,6 +829,7 @@ export const EditorCanvas: React.FC<{ width: number; height: number }> = ({
         {(() => {
           const TIER: Record<string, number> = {
             stage: 0,
+            image: 1,
             obstacle: 1,
             seatBlockGrid: 2,
             seatBlockArc: 2,
@@ -890,7 +926,7 @@ function primitiveBBox(p: any): DragRect {
   const ty = p.transform?.y ?? 0;
   const rot = p.transform?.rotation ?? 0;
 
-  if (p.type === 'stage' || p.type === 'obstacle') {
+  if (p.type === 'stage' || p.type === 'obstacle' || p.type === 'image') {
     const bb = { x: tx, y: ty, w: p.width, h: p.height };
     if (rot !== 0) {
       return rotatedAABB(bb, { x: tx + p.width / 2, y: ty + p.height / 2 }, rot);

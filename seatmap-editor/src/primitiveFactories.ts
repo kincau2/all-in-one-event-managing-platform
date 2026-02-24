@@ -39,3 +39,15 @@ export function createDefaultObstacle() {
     transform: { x: 200, y: 200, rotation: 0 },
   };
 }
+
+export function createDefaultImage(src: string, width: number, height: number) {
+  return {
+    id: generateUUID(),
+    type: 'image' as const,
+    name: 'Image',
+    src,
+    width,
+    height,
+    transform: { x: 100, y: 100, rotation: 0 },
+  };
+}

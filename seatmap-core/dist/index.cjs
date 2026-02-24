@@ -31,6 +31,7 @@ __export(index_exports, {
   GRID_LBL_W: () => GRID_LBL_W,
   GRID_PAD: () => GRID_PAD,
   GridAisleGapSchema: () => GridAisleGapSchema,
+  ImagePrimitiveSchema: () => ImagePrimitiveSchema,
   LabelPrimitiveSchema: () => LabelPrimitiveSchema,
   LayoutSchema: () => LayoutSchema,
   ObstaclePrimitiveSchema: () => ObstaclePrimitiveSchema,
@@ -123,7 +124,15 @@ var ObstaclePrimitiveSchema = import_zod.z.object({
   width: import_zod.z.number().positive(),
   height: import_zod.z.number().positive(),
   color: import_zod.z.string().default("#ffcccc"),
-  borderColor: import_zod.z.string().default("#cc5555")
+  borderColor: import_zod.z.string().default("#cc5555"),
+  borderRadius: import_zod.z.number().nonnegative().default(0)
+});
+var ImagePrimitiveSchema = import_zod.z.object({
+  ...primitiveBase,
+  type: import_zod.z.literal("image"),
+  src: import_zod.z.string().min(1),
+  width: import_zod.z.number().positive(),
+  height: import_zod.z.number().positive()
 });
 var SeatBlockGridSchema = import_zod.z.object({
   ...primitiveBase,
@@ -183,6 +192,7 @@ var PrimitiveSchema = import_zod.z.discriminatedUnion("type", [
   StagePrimitiveSchema,
   LabelPrimitiveSchema,
   ObstaclePrimitiveSchema,
+  ImagePrimitiveSchema,
   SeatBlockGridSchema,
   SeatBlockArcSchema,
   SeatBlockWedgeSchema
@@ -313,7 +323,7 @@ function round2(n) {
 var GRID_PAD = 21;
 var GRID_LBL_W = 24;
 var ARC_PAD = 21;
-var ARC_LBL_ANG = 33;
+var ARC_LBL_ANG = 43;
 function gridPivotOffset(cols, rows, seatSpacingX, seatSpacingY) {
   const seatW = (cols - 1) * seatSpacingX;
   const seatH = (rows - 1) * seatSpacingY;
@@ -740,6 +750,7 @@ function computeBounds(seats) {
   GRID_LBL_W,
   GRID_PAD,
   GridAisleGapSchema,
+  ImagePrimitiveSchema,
   LabelPrimitiveSchema,
   LayoutSchema,
   ObstaclePrimitiveSchema,

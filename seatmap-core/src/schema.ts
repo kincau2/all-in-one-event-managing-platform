@@ -87,6 +87,15 @@ export const ObstaclePrimitiveSchema = z.object({
   height: z.number().positive(),
   color: z.string().default('#ffcccc'),
   borderColor: z.string().default('#cc5555'),
+  borderRadius: z.number().nonnegative().default(0),
+});
+
+export const ImagePrimitiveSchema = z.object({
+  ...primitiveBase,
+  type: z.literal('image'),
+  src: z.string().min(1),
+  width: z.number().positive(),
+  height: z.number().positive(),
 });
 
 /* ──────────────────────────────────────────────
@@ -158,6 +167,7 @@ export const PrimitiveSchema = z.discriminatedUnion('type', [
   StagePrimitiveSchema,
   LabelPrimitiveSchema,
   ObstaclePrimitiveSchema,
+  ImagePrimitiveSchema,
   SeatBlockGridSchema,
   SeatBlockArcSchema,
   SeatBlockWedgeSchema,

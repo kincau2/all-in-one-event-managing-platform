@@ -9,9 +9,10 @@
  * Wedge / Stage / Label / Obstacle remain instant-add.
  */
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { useEditorStore, type Tool } from '../store';
-import { createDefaultLabel, createDefaultObstacle } from '../primitiveFactories';
+import { createDefaultLabel, createDefaultObstacle, createDefaultImage } from '../primitiveFactories';
+import { uploadBgImage } from '../api';
 
 /* ── Component ── */
 
@@ -22,12 +23,13 @@ interface ToolbarProps {
 
 export const Toolbar: React.FC<ToolbarProps> = ({ onClose, onSave }) => {
   const [showHelp, setShowHelp] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const activeTool = useEditorStore((s) => s.activeTool);
   const selectedIds = useEditorStore((s) => s.selectedIds);
   const selectedSeatKeys = useEditorStore((s) => s.selectedSeatKeys);
   const undoStack = useEditorStore((s) => s.undoStack);
   const redoStack = useEditorStore((s) => s.redoStack);
-  const snapToGrid = useEditorStore((s) => s.snapToGrid);
+
   const isLocked = useEditorStore((s) => s.isLocked);
   const lockOwnerName = useEditorStore((s) => s.lockOwnerName);
   const compiledSeats = useEditorStore((s) => s.compiledSeats);
@@ -42,7 +44,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onClose, onSave }) => {
   const duplicatePrimitives = useEditorStore((s) => s.duplicatePrimitives);
   const undo = useEditorStore((s) => s.undo);
   const redo = useEditorStore((s) => s.redo);
-  const toggleSnap = useEditorStore((s) => s.toggleSnapToGrid);
+
   const setViewport = useEditorStore((s) => s.setViewport);
 
   const handleAdd = useCallback(
@@ -61,6 +63,31 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onClose, onSave }) => {
     },
     [activeTool, setTool, isLocked],
   );
+
+  const handleImageUpload = useCallback(async (file: File) => {
+    if (isLocked) return;
+    try {
+      const url = await uploadBgImage(file);
+      const img = new window.Image();
+      img.onload = () => {
+        const maxDim = 400;
+        let w = img.naturalWidth;
+        let h = img.naturalHeight;
+        if (w > maxDim || h > maxDim) {
+          const ratio = Math.min(maxDim / w, maxDim / h);
+          w = Math.round(w * ratio);
+          h = Math.round(h * ratio);
+        }
+        addPrimitive(createDefaultImage(url, w, h));
+      };
+      img.onerror = () => {
+        addPrimitive(createDefaultImage(url, 200, 200));
+      };
+      img.src = url;
+    } catch {
+      /* upload failed – silently ignore */
+    }
+  }, [addPrimitive, isLocked]);
 
   const btnClass = (tool: Tool) =>
     `sme-toolbar__btn${activeTool === tool ? ' sme-toolbar__btn--active' : ''}`;
@@ -132,7 +159,16 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onClose, onSave }) => {
         </button>
         <button className={btnClass('addArc')} onClick={() => toggleTool('addArc')}
           title="Draw Arc Block (A) — drag on canvas" disabled={isLocked}>
-          <span className="dashicons dashicons-undo" />
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" style={{marginRight:2}}>
+            {/* Outer arc */}
+            <path d="M2 17 A11 11 0 0 1 18 17" />
+            {/* Inner arc */}
+            <path d="M5 17 A8 8 0 0 1 15 17" />
+            {/* Left spoke */}
+            <line x1="2" y1="17" x2="5" y2="17" />
+            {/* Right spoke */}
+            <line x1="15" y1="17" x2="18" y2="17" />
+          </svg>
           <span>Arc</span>
         </button>
       </div>
@@ -141,14 +177,25 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onClose, onSave }) => {
       <div className="sme-toolbar__group">
         <button className="sme-toolbar__btn" onClick={() => handleAdd(createDefaultObstacle)}
           title="Add Obstacle" disabled={isLocked}>
-          <span className="dashicons dashicons-minus" />
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.8" style={{marginRight:2}}>
+            <rect x="2" y="3" width="14" height="12" rx="2" />
+          </svg>
           <span>Obstacle</span>
         </button>
         <button className="sme-toolbar__btn" onClick={() => handleAdd(createDefaultLabel)}
           title="Add Label" disabled={isLocked}>
-          <span className="dashicons dashicons-editor-textcolor" />
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor" style={{marginRight:2}}>
+            <text x="9" y="15" textAnchor="middle" fontSize="16" fontWeight="bold" fontFamily="sans-serif">T</text>
+          </svg>
           <span>Label</span>
         </button>
+        <button className="sme-toolbar__btn" onClick={() => imageInputRef.current?.click()}
+          title="Add Image" disabled={isLocked}>
+          <span className="dashicons dashicons-format-image" />
+          <span>Image</span>
+        </button>
+        <input ref={imageInputRef} type="file" accept="image/*" style={{ display: 'none' }}
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImageUpload(f); e.target.value = ''; }} />
       </div>
 
       {/* Edit */}
@@ -179,11 +226,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onClose, onSave }) => {
 
       {/* View */}
       <div className="sme-toolbar__group">
-        <button className={`sme-toolbar__btn${snapToGrid ? ' sme-toolbar__btn--active' : ''}`}
-          onClick={toggleSnap} title="Snap to Grid">
-          <span className="dashicons dashicons-align-none" />
-          <span>Snap</span>
-        </button>
         <button className="sme-toolbar__btn" onClick={handleZoomOut} title="Zoom Out">
           <span className="dashicons dashicons-minus" />
         </button>

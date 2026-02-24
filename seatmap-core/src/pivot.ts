@@ -19,7 +19,7 @@ export const GRID_LBL_W = 24;
 export const ARC_PAD = 21;
 
 /** Extra angular pixels for row labels in an arc block. */
-export const ARC_LBL_ANG = 33;
+export const ARC_LBL_ANG = 43;
 
 /* ── Pivot offset functions ── */
 

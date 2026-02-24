@@ -39,6 +39,8 @@ export const ArcAisleGapSchema = z.object({
   gapPx: z.number().positive().optional(),
 });
 
+export const RowLabelDisplaySchema = z.enum(['none', 'left', 'right', 'both']).default('left');
+
 export const SeatsPerRowSchema = z.union([
   z.object({
     start: z.number().int().positive(),
@@ -74,6 +76,8 @@ export const LabelPrimitiveSchema = z.object({
   type: z.literal('label'),
   text: z.string(),
   fontSize: z.number().positive().default(16),
+  fontColor: z.string().default('#333333'),
+  fontWeight: z.enum(['normal', 'bold']).default('normal'),
 });
 
 export const ObstaclePrimitiveSchema = z.object({
@@ -81,6 +85,8 @@ export const ObstaclePrimitiveSchema = z.object({
   type: z.literal('obstacle'),
   width: z.number().positive(),
   height: z.number().positive(),
+  color: z.string().default('#ffcccc'),
+  borderColor: z.string().default('#cc5555'),
 });
 
 /* ──────────────────────────────────────────────
@@ -102,6 +108,7 @@ export const SeatBlockGridSchema = z.object({
   aisleGaps: z.array(GridAisleGapSchema).default([]),
   excludedSeats: z.array(z.tuple([z.number().int(), z.number().int()])).default([]),
   section: z.string().default(''),
+  rowLabelDisplay: RowLabelDisplaySchema,
 });
 
 export const SeatBlockArcSchema = z.object({
@@ -123,6 +130,7 @@ export const SeatBlockArcSchema = z.object({
   aisleGaps: z.array(ArcAisleGapSchema).default([]),
   excludedSeats: z.array(z.tuple([z.number().int(), z.number().int()])).default([]),
   section: z.string().default(''),
+  rowLabelDisplay: RowLabelDisplaySchema,
 });
 
 export const SeatBlockWedgeSchema = z.object({
@@ -179,8 +187,17 @@ export const BoundsSchema = z.object({
   maxY: z.number(),
 });
 
+export const CompiledRowLabelSchema = z.object({
+  primitiveId: z.string(),
+  row: z.string(),
+  side: z.enum(['left', 'right']),
+  x: z.number(),
+  y: z.number(),
+});
+
 export const CompiledSchema = z.object({
   seats: z.array(CompiledSeatSchema),
+  rowLabels: z.array(CompiledRowLabelSchema).default([]),
   bounds: BoundsSchema,
 });
 
@@ -213,6 +230,7 @@ export const LayoutSchema = z.object({
   primitives: z.array(PrimitiveSchema),
   compiled: CompiledSchema.default({
     seats: [],
+    rowLabels: [],
     bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
   }),
 });

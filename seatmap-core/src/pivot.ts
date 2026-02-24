@@ -10,13 +10,13 @@
 /* ── Visual constants (shared with PrimitiveRenderer) ── */
 
 /** Pixel padding around the seat area in a grid block. */
-export const GRID_PAD = 16;
+export const GRID_PAD = 21;
 
-/** Row-label column width (left side of grid dotted area). */
+/** Row-label column width (each side of grid dotted area). */
 export const GRID_LBL_W = 24;
 
 /** Radial pixel padding around an arc/wedge sector. */
-export const ARC_PAD = 16;
+export const ARC_PAD = 21;
 
 /** Extra angular pixels for row labels in an arc block. */
 export const ARC_LBL_ANG = 28;
@@ -37,7 +37,7 @@ export function gridPivotOffset(
   const seatH = (rows - 1) * seatSpacingY;
   const lx = -GRID_PAD - GRID_LBL_W;
   const ly = -GRID_PAD;
-  const rectW = seatW + 2 * GRID_PAD + GRID_LBL_W;
+  const rectW = seatW + 2 * GRID_PAD + 2 * GRID_LBL_W;
   const rectH = seatH + 2 * GRID_PAD;
   return { x: lx + rectW / 2, y: ly + rectH / 2 };
 }
@@ -64,7 +64,7 @@ export function arcPivotOffset(
   const startRad = (startAngleDeg * Math.PI) / 180 - angPad;
   const endRad = (endAngleDeg * Math.PI) / 180 + angPad;
 
-  let sMinX = 0, sMinY = 0, sMaxX = 0, sMaxY = 0;
+  let sMinX = Infinity, sMinY = Infinity, sMaxX = -Infinity, sMaxY = -Infinity;
   for (let i = 0; i <= 32; i++) {
     const a = startRad + ((endRad - startRad) * i) / 32;
     const cos = Math.cos(a), sin = Math.sin(a);

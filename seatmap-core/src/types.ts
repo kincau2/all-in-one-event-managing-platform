@@ -22,6 +22,8 @@ import {
   SeatBlockGridSchema,
   SeatBlockArcSchema,
   SeatBlockWedgeSchema,
+  CompiledRowLabelSchema,
+  RowLabelDisplaySchema,
 } from './schema.js';
 
 /* ── Inferred output types (post-parse, with defaults applied) ── */
@@ -44,6 +46,8 @@ export type ObstaclePrimitive = z.infer<typeof ObstaclePrimitiveSchema>;
 export type SeatBlockGrid = z.infer<typeof SeatBlockGridSchema>;
 export type SeatBlockArc = z.infer<typeof SeatBlockArcSchema>;
 export type SeatBlockWedge = z.infer<typeof SeatBlockWedgeSchema>;
+export type CompiledRowLabel = z.infer<typeof CompiledRowLabelSchema>;
+export type RowLabelDisplay = z.infer<typeof RowLabelDisplaySchema>;
 
 /* ── Input types (before parse, for callers feeding raw data) ── */
 

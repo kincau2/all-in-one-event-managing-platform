@@ -1,21 +1,11 @@
 /**
  * @aioemp/seatmap-core — Arc block compiler
  *
- * Compiles a seatBlockArc primitive into a flat list of CompiledSeat objects.
- *
- * Algorithm per row i:
- *   radius = startRadius + i × radiusStep
- *   n      = seatsPerRow(i)
- *   usable = (endAngle − startAngle) − Σ gapAngles
- *   step   = usable / (n − 1)          [seats at both endpoints]
- *   θ_j    = startAngle + j × step + Σ(gap angles before j)
- *   x = center.x + radius × cos(θ)
- *   y = center.y + radius × sin(θ)
- *   → rotate around center by transform.rotation
- *   → translate by (transform.x, transform.y)
+ * Compiles a seatBlockArc primitive into a flat list of CompiledSeat objects,
+ * plus row-label positions computed in local coords then rotated + translated.
  */
 
-import type { SeatBlockArc, CompiledSeat, ArcAisleGap } from './types.js';
+import type { SeatBlockArc, CompiledSeat, ArcAisleGap, CompiledRowLabel } from './types.js';
 import type { SeatKeyMap } from './seat-key.js';
 import {
   degToRad,
@@ -25,21 +15,15 @@ import {
   rotatePoint,
   round2,
 } from './utils.js';
-import { arcPivotOffset } from './pivot.js';
+import { arcPivotOffset, ARC_PAD, ARC_LBL_ANG } from './pivot.js';
 
-/* ── Helpers ── */
+/* -- Helpers -- */
 
 interface ResolvedGap {
   afterSeatIndex: number;
   angleDeg: number;
 }
 
-/**
- * Resolve per-row aisle gaps:
- *   - `gapAngleDeg` used directly when provided.
- *   - `gapPx` converted to angle via arc-length formula:
- *       angle(deg) = (gapPx / radius) × (180 / π)
- */
 function resolveGaps(
   aisleGaps: ArcAisleGap[],
   radius: number,
@@ -53,13 +37,18 @@ function resolveGaps(
   });
 }
 
-/* ── Main compiler ── */
+/* -- Main compiler -- */
+
+export interface ArcCompileResult {
+  seats: CompiledSeat[];
+  rowLabels: CompiledRowLabel[];
+}
 
 export function compileArc(
   primitive: SeatBlockArc,
   keyMap: SeatKeyMap,
   globalSeatRadius: number = 10,
-): CompiledSeat[] {
+): ArcCompileResult {
   const {
     id,
     center,
@@ -80,9 +69,10 @@ export function compileArc(
   const rowLabel = primitive.rowLabel ?? { mode: 'alpha' as const, start: 'A', direction: 'asc' as const };
   const numbering = primitive.numbering ?? 'L2R';
   const startNum = (primitive as any).startSeatNumber ?? 1;
+  const rowLabelDisplay = primitive.rowLabelDisplay ?? 'left';
   const seats: CompiledSeat[] = [];
 
-  /* ── Rotation pivot = center of dotted area ── */
+  /* -- Rotation pivot = center of dotted area -- */
   const pivot = arcPivotOffset(startRadius, rowCount, radiusStep, radiusRatio, startAngleDeg, endAngleDeg);
   const pivotCx = center.x + pivot.x;
   const pivotCy = center.y + pivot.y;
@@ -101,29 +91,22 @@ export function compileArc(
       rowLabel.mode ?? 'alpha',
     );
 
-    /* ── Resolve aisle gap angles for this radius ── */
-    // Use the average radius for gap angle conversion (approximation for ellipses).
     const avgRadius = (radiusX + radiusY) / 2;
     const gaps = resolveGaps(aisleGaps, avgRadius);
     const totalGapAngle = gaps.reduce((s, g) => s + g.angleDeg, 0);
 
-    /* ── Usable angle & step ── */
     const totalAngle = endAngleDeg - startAngleDeg;
     const usableAngle = totalAngle - totalGapAngle;
-    // For a single seat, place at the midpoint of the arc.
     const step = n > 1 ? usableAngle / (n - 1) : 0;
 
     for (let s = 0; s < n; s++) {
-      /* ── Skip excluded seats ── */
       if (excludedSeats?.some(([er, ec]) => er === r && ec === s)) continue;
 
-      /* base angle for this seat */
       const baseAngle =
         n === 1
           ? startAngleDeg + totalAngle / 2
           : startAngleDeg + s * step;
 
-      /* accumulated gap angle from all gaps before this seat index */
       const accGap = gaps
         .filter((g) => g.afterSeatIndex < s)
         .reduce((sum, g) => sum + g.angleDeg, 0);
@@ -131,22 +114,18 @@ export function compileArc(
       const angleDeg = baseAngle + accGap;
       const angleRad = degToRad(angleDeg);
 
-      // Ellipse: x uses radiusX, y uses radiusY.
       let x = center.x + radiusX * Math.cos(angleRad);
       let y = center.y + radiusY * Math.sin(angleRad);
 
-      /* ── Apply rotation around pivot (center of dotted area) ── */
       if (transform?.rotation) {
         const rotated = rotatePoint(x, y, pivotCx, pivotCy, transform.rotation);
         x = rotated.x;
         y = rotated.y;
       }
 
-      /* ── Apply global translation ── */
       x += transform?.x ?? 0;
       y += transform?.y ?? 0;
 
-      /* ── Label / key ── */
       const seatNumber = numbering === 'R2L' ? (n - s) + (startNum - 1) : s + startNum;
       const label = `${rowLabelStr}-${String(seatNumber).padStart(2, '0')}`;
 
@@ -162,11 +141,63 @@ export function compileArc(
         x: round2(x),
         y: round2(y),
         radius: seatRadius,
-        rotation: round2(angleDeg + 90), // tangent direction
+        rotation: round2(angleDeg + 90),
         meta: { primitiveId: id, logicalRow: r, logicalSeat: s },
       });
     }
   }
 
-  return seats;
+  /* -- Row label positions -- */
+  const rowLabels: CompiledRowLabel[] = [];
+
+  if (rowLabelDisplay !== 'none') {
+    for (let r = 0; r < rowCount; r++) {
+      const baseRadius = startRadius + r * radiusStep;
+      const radiusX = baseRadius * radiusRatio;
+      const radiusY = baseRadius;
+      const avgRadius = (radiusX + radiusY) / 2;
+
+      /* Angular offset to push labels beyond the seat arc into the label zone */
+      const labelOffsetDeg = avgRadius > 0
+        ? (ARC_PAD + ARC_LBL_ANG * 0.5) / avgRadius * (180 / Math.PI)
+        : 0;
+
+      const rowLabelStr = generateRowLabel(
+        rowLabel.start,
+        r,
+        rowLabel.direction,
+        rowLabel.mode ?? 'alpha',
+      );
+
+      if (rowLabelDisplay === 'left' || rowLabelDisplay === 'both') {
+        const angleRad = degToRad(startAngleDeg - labelOffsetDeg);
+        let lx = center.x + radiusX * Math.cos(angleRad);
+        let ly = center.y + radiusY * Math.sin(angleRad);
+        if (transform?.rotation) {
+          const rotated = rotatePoint(lx, ly, pivotCx, pivotCy, transform.rotation);
+          lx = rotated.x;
+          ly = rotated.y;
+        }
+        lx += transform?.x ?? 0;
+        ly += transform?.y ?? 0;
+        rowLabels.push({ primitiveId: id, row: rowLabelStr, side: 'left', x: round2(lx), y: round2(ly) });
+      }
+
+      if (rowLabelDisplay === 'right' || rowLabelDisplay === 'both') {
+        const angleRad = degToRad(endAngleDeg + labelOffsetDeg);
+        let rx = center.x + radiusX * Math.cos(angleRad);
+        let ry = center.y + radiusY * Math.sin(angleRad);
+        if (transform?.rotation) {
+          const rotated = rotatePoint(rx, ry, pivotCx, pivotCy, transform.rotation);
+          rx = rotated.x;
+          ry = rotated.y;
+        }
+        rx += transform?.x ?? 0;
+        ry += transform?.y ?? 0;
+        rowLabels.push({ primitiveId: id, row: rowLabelStr, side: 'right', x: round2(rx), y: round2(ry) });
+      }
+    }
+  }
+
+  return { seats, rowLabels };
 }

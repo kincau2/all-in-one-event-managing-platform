@@ -8,13 +8,14 @@
 
 import React, { useMemo } from 'react';
 import { Shape } from 'react-konva';
-import type { CompiledSeat } from '@aioemp/seatmap-core';
+import type { CompiledSeat, CompiledRowLabel } from '@aioemp/seatmap-core';
 import type Konva from 'konva';
 import { useEditorStore } from '../store';
 import { LAYOUT_STYLE_DEFAULTS } from '../layoutDefaults';
 
 interface Props {
   seats: CompiledSeat[];
+  rowLabels: CompiledRowLabel[];
   selectedSeatKeys?: Set<string>;
 }
 
@@ -29,7 +30,7 @@ const FONT_FAMILY = '-apple-system, sans-serif';
  * Render all seats with seat numbers + row labels using a single
  * Konva Shape with custom sceneFunc for performance.
  */
-export const SeatDots: React.FC<Props> = React.memo(({ seats, selectedSeatKeys }) => {
+export const SeatDots: React.FC<Props> = React.memo(({ seats, rowLabels, selectedSeatKeys }) => {
   // Reactive selectors — re-renders SeatDots when any of these change
   const seatFill = useEditorStore((s) => (s.layout as any).seatFill ?? LAYOUT_STYLE_DEFAULTS.seatFill);
   const seatStroke = useEditorStore((s) => (s.layout as any).seatStroke ?? LAYOUT_STYLE_DEFAULTS.seatStroke);
@@ -40,12 +41,11 @@ export const SeatDots: React.FC<Props> = React.memo(({ seats, selectedSeatKeys }
   const rowFontSize = useEditorStore((s) => (s.layout as any).rowFontSize ?? LAYOUT_STYLE_DEFAULTS.rowFontSize);
   const rowFontWeight = useEditorStore((s) => (s.layout as any).rowFontWeight ?? LAYOUT_STYLE_DEFAULTS.rowFontWeight);
 
-  // Group seats by row label for row label rendering
-  const { normalSeats, excluded, selected, rowLabels } = useMemo(() => {
+  // Split seats into normal / selected
+  const { normalSeats, excluded, selected } = useMemo(() => {
     const normal: CompiledSeat[] = [];
     const excl: CompiledSeat[] = [];
     const sel: CompiledSeat[] = [];
-    const rowMap = new Map<string, { label: string; x: number; y: number; r: number }>();
 
     for (const s of seats) {
       const isSelected = selectedSeatKeys?.has(s.seat_key);
@@ -54,26 +54,12 @@ export const SeatDots: React.FC<Props> = React.memo(({ seats, selectedSeatKeys }
       } else {
         normal.push(s);
       }
-
-      // Track leftmost seat per row for row label placement
-      const primId = (s.meta as any)?.primitiveId ?? '';
-      const rowKey = `${primId}_${s.row ?? ''}`;
-      const existing = rowMap.get(rowKey);
-      if (!existing || s.x < existing.x) {
-        rowMap.set(rowKey, {
-          label: s.row ?? '',
-          x: s.x,
-          y: s.y,
-          r: s.radius ?? 8,
-        });
-      }
     }
 
     return {
       normalSeats: normal,
       excluded: excl,
       selected: sel,
-      rowLabels: Array.from(rowMap.values()),
     };
   }, [seats, selectedSeatKeys]);
 
@@ -180,19 +166,21 @@ export const SeatDots: React.FC<Props> = React.memo(({ seats, selectedSeatKeys }
         />
       )}
 
-      {/* Row labels — positioned to the left of each row's leftmost seat */}
-      <Shape
-        sceneFunc={(ctx: Konva.Context) => {
-          const c = ctx as any;
-          c.fillStyle = rowFontColor;
-          c.textAlign = 'right';
-          c.textBaseline = 'middle';
-          c.font = `${rowFontWeight} ${rowFontSize}px ${FONT_FAMILY}`;
-          for (const rl of rowLabels) {
-            c.fillText(rl.label, rl.x - rl.r - 6, rl.y);
-          }
-        }}
-      />
+      {/* Row labels — positioned from compiled data */}
+      {rowLabels.length > 0 && (
+        <Shape
+          sceneFunc={(ctx: Konva.Context) => {
+            const c = ctx as any;
+            c.fillStyle = rowFontColor;
+            c.textBaseline = 'middle';
+            c.textAlign = 'center';
+            c.font = `${rowFontWeight} ${rowFontSize}px ${FONT_FAMILY}`;
+            for (const rl of rowLabels) {
+              c.fillText(rl.row, rl.x, rl.y);
+            }
+          }}
+        />
+      )}
     </>
   );
 });

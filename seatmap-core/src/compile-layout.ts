@@ -5,7 +5,7 @@
  * aggregates compiled seats, and computes bounds.
  */
 
-import type { Layout, CompiledSeat, Bounds } from './types.js';
+import type { Layout, CompiledSeat, Bounds, CompiledRowLabel } from './types.js';
 import { LayoutSchema } from './schema.js';
 import { compileGrid } from './compile-grid.js';
 import { compileArc } from './compile-arc.js';
@@ -35,16 +35,23 @@ export function compileLayout(
     : new Map();
 
   const allSeats: CompiledSeat[] = [];
+  const allRowLabels: CompiledRowLabel[] = [];
   const globalSeatRadius = layout.seatRadius ?? 10;
 
   for (const primitive of layout.primitives) {
     switch (primitive.type) {
-      case 'seatBlockGrid':
-        allSeats.push(...compileGrid(primitive, keyMap, globalSeatRadius));
+      case 'seatBlockGrid': {
+        const result = compileGrid(primitive, keyMap, globalSeatRadius);
+        allSeats.push(...result.seats);
+        allRowLabels.push(...result.rowLabels);
         break;
-      case 'seatBlockArc':
-        allSeats.push(...compileArc(primitive, keyMap, globalSeatRadius));
+      }
+      case 'seatBlockArc': {
+        const result = compileArc(primitive, keyMap, globalSeatRadius);
+        allSeats.push(...result.seats);
+        allRowLabels.push(...result.rowLabels);
         break;
+      }
       case 'seatBlockWedge':
         allSeats.push(...compileWedge(primitive, keyMap, globalSeatRadius));
         break;
@@ -56,7 +63,7 @@ export function compileLayout(
 
   return {
     ...layout,
-    compiled: { seats: allSeats, bounds },
+    compiled: { seats: allSeats, rowLabels: allRowLabels, bounds },
   };
 }
 

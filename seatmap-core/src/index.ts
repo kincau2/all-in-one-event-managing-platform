@@ -22,6 +22,8 @@ export {
   SeatBlockGridSchema,
   SeatBlockArcSchema,
   SeatBlockWedgeSchema,
+  CompiledRowLabelSchema,
+  RowLabelDisplaySchema,
 } from './schema.js';
 
 /* ── Types ── */
@@ -46,6 +48,8 @@ export type {
   SeatBlockGrid,
   SeatBlockArc,
   SeatBlockWedge,
+  CompiledRowLabel,
+  RowLabelDisplay,
 } from './types.js';
 
 /* ── Compile ── */
@@ -55,8 +59,8 @@ export {
   computeBounds,
   type CompileResult,
 } from './compile-layout.js';
-export { compileGrid } from './compile-grid.js';
-export { compileArc } from './compile-arc.js';
+export { compileGrid, type GridCompileResult } from './compile-grid.js';
+export { compileArc, type ArcCompileResult } from './compile-arc.js';
 export { compileWedge } from './compile-wedge.js';
 
 /* ── seat_key utilities ── */

@@ -25,6 +25,7 @@ __export(index_exports, {
   ArcAisleGapSchema: () => ArcAisleGapSchema,
   BoundsSchema: () => BoundsSchema,
   CanvasSchema: () => CanvasSchema,
+  CompiledRowLabelSchema: () => CompiledRowLabelSchema,
   CompiledSchema: () => CompiledSchema,
   CompiledSeatSchema: () => CompiledSeatSchema,
   GRID_LBL_W: () => GRID_LBL_W,
@@ -35,6 +36,7 @@ __export(index_exports, {
   ObstaclePrimitiveSchema: () => ObstaclePrimitiveSchema,
   PointSchema: () => PointSchema,
   PrimitiveSchema: () => PrimitiveSchema,
+  RowLabelDisplaySchema: () => RowLabelDisplaySchema,
   RowLabelSchema: () => RowLabelSchema,
   SeatBlockArcSchema: () => SeatBlockArcSchema,
   SeatBlockGridSchema: () => SeatBlockGridSchema,
@@ -87,6 +89,7 @@ var ArcAisleGapSchema = import_zod.z.object({
   gapAngleDeg: import_zod.z.number().positive().optional(),
   gapPx: import_zod.z.number().positive().optional()
 });
+var RowLabelDisplaySchema = import_zod.z.enum(["none", "left", "right", "both"]).default("left");
 var SeatsPerRowSchema = import_zod.z.union([
   import_zod.z.object({
     start: import_zod.z.number().int().positive(),
@@ -110,13 +113,17 @@ var LabelPrimitiveSchema = import_zod.z.object({
   ...primitiveBase,
   type: import_zod.z.literal("label"),
   text: import_zod.z.string(),
-  fontSize: import_zod.z.number().positive().default(16)
+  fontSize: import_zod.z.number().positive().default(16),
+  fontColor: import_zod.z.string().default("#333333"),
+  fontWeight: import_zod.z.enum(["normal", "bold"]).default("normal")
 });
 var ObstaclePrimitiveSchema = import_zod.z.object({
   ...primitiveBase,
   type: import_zod.z.literal("obstacle"),
   width: import_zod.z.number().positive(),
-  height: import_zod.z.number().positive()
+  height: import_zod.z.number().positive(),
+  color: import_zod.z.string().default("#ffcccc"),
+  borderColor: import_zod.z.string().default("#cc5555")
 });
 var SeatBlockGridSchema = import_zod.z.object({
   ...primitiveBase,
@@ -132,7 +139,8 @@ var SeatBlockGridSchema = import_zod.z.object({
   numbering: import_zod.z.enum(["L2R", "R2L"]).default("L2R"),
   aisleGaps: import_zod.z.array(GridAisleGapSchema).default([]),
   excludedSeats: import_zod.z.array(import_zod.z.tuple([import_zod.z.number().int(), import_zod.z.number().int()])).default([]),
-  section: import_zod.z.string().default("")
+  section: import_zod.z.string().default(""),
+  rowLabelDisplay: RowLabelDisplaySchema
 });
 var SeatBlockArcSchema = import_zod.z.object({
   ...primitiveBase,
@@ -152,7 +160,8 @@ var SeatBlockArcSchema = import_zod.z.object({
   numbering: import_zod.z.enum(["L2R", "R2L"]).default("L2R"),
   aisleGaps: import_zod.z.array(ArcAisleGapSchema).default([]),
   excludedSeats: import_zod.z.array(import_zod.z.tuple([import_zod.z.number().int(), import_zod.z.number().int()])).default([]),
-  section: import_zod.z.string().default("")
+  section: import_zod.z.string().default(""),
+  rowLabelDisplay: RowLabelDisplaySchema
 });
 var SeatBlockWedgeSchema = import_zod.z.object({
   ...primitiveBase,
@@ -196,8 +205,16 @@ var BoundsSchema = import_zod.z.object({
   maxX: import_zod.z.number(),
   maxY: import_zod.z.number()
 });
+var CompiledRowLabelSchema = import_zod.z.object({
+  primitiveId: import_zod.z.string(),
+  row: import_zod.z.string(),
+  side: import_zod.z.enum(["left", "right"]),
+  x: import_zod.z.number(),
+  y: import_zod.z.number()
+});
 var CompiledSchema = import_zod.z.object({
   seats: import_zod.z.array(CompiledSeatSchema),
+  rowLabels: import_zod.z.array(CompiledRowLabelSchema).default([]),
   bounds: BoundsSchema
 });
 var CanvasSchema = import_zod.z.object({
@@ -224,6 +241,7 @@ var LayoutSchema = import_zod.z.object({
   primitives: import_zod.z.array(PrimitiveSchema),
   compiled: CompiledSchema.default({
     seats: [],
+    rowLabels: [],
     bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 }
   })
 });
@@ -292,16 +310,16 @@ function round2(n) {
 }
 
 // src/pivot.ts
-var GRID_PAD = 16;
+var GRID_PAD = 21;
 var GRID_LBL_W = 24;
-var ARC_PAD = 16;
+var ARC_PAD = 21;
 var ARC_LBL_ANG = 28;
 function gridPivotOffset(cols, rows, seatSpacingX, seatSpacingY) {
   const seatW = (cols - 1) * seatSpacingX;
   const seatH = (rows - 1) * seatSpacingY;
   const lx = -GRID_PAD - GRID_LBL_W;
   const ly = -GRID_PAD;
-  const rectW = seatW + 2 * GRID_PAD + GRID_LBL_W;
+  const rectW = seatW + 2 * GRID_PAD + 2 * GRID_LBL_W;
   const rectH = seatH + 2 * GRID_PAD;
   return { x: lx + rectW / 2, y: ly + rectH / 2 };
 }
@@ -315,7 +333,7 @@ function arcPivotOffset(startRadius, rowCount, radiusStep, radiusRatio, startAng
   const angPad = outerBase > 0 ? (ARC_PAD + ARC_LBL_ANG) / outerBase : 0;
   const startRad = startAngleDeg * Math.PI / 180 - angPad;
   const endRad = endAngleDeg * Math.PI / 180 + angPad;
-  let sMinX = 0, sMinY = 0, sMaxX = 0, sMaxY = 0;
+  let sMinX = Infinity, sMinY = Infinity, sMaxX = -Infinity, sMaxY = -Infinity;
   for (let i = 0; i <= 32; i++) {
     const a = startRad + (endRad - startRad) * i / 32;
     const cos = Math.cos(a), sin = Math.sin(a);
@@ -334,21 +352,34 @@ function arcPivotOffset(startRadius, rowCount, radiusStep, radiusRatio, startAng
 function compileGrid(primitive, keyMap, globalSeatRadius = 10) {
   const {
     id,
-    origin,
+    origin = { x: 0, y: 0 },
     rows,
     cols,
     seatSpacingX,
     seatSpacingY,
-    rowLabel,
-    numbering,
-    aisleGaps,
+    aisleGaps = [],
     excludedSeats,
     section,
     transform
   } = primitive;
   const seatRadius = primitive.seatRadius ?? globalSeatRadius;
+  const rowLabel = primitive.rowLabel ?? { mode: "alpha", start: "A", direction: "asc" };
+  const numbering = primitive.numbering ?? "L2R";
   const startNum = primitive.startSeatNumber ?? 1;
+  const rowLabelDisplay = primitive.rowLabelDisplay ?? "left";
   const seats = [];
+  const gapBefore = new Float64Array(cols);
+  let accGap = 0;
+  for (let c = 0; c < cols; c++) {
+    for (const g of aisleGaps) {
+      if (g.afterCol === c - 1 && c > 0) {
+        accGap += g.gapPx;
+      }
+    }
+    gapBefore[c] = accGap;
+  }
+  const seatW = (cols - 1) * seatSpacingX + gapBefore[cols - 1];
+  const seatH = (rows - 1) * seatSpacingY;
   const pivot = gridPivotOffset(cols, rows, seatSpacingX, seatSpacingY);
   const pivotCx = origin.x + pivot.x;
   const pivotCy = origin.y + pivot.y;
@@ -361,8 +392,7 @@ function compileGrid(primitive, keyMap, globalSeatRadius = 10) {
     );
     for (let c = 0; c < cols; c++) {
       if (excludedSeats?.some(([er, ec]) => er === r && ec === c)) continue;
-      const gapSum = aisleGaps.filter((g) => g.afterCol < c).reduce((sum, g) => sum + g.gapPx, 0);
-      let x = origin.x + c * seatSpacingX + gapSum;
+      let x = origin.x + c * seatSpacingX + gapBefore[c];
       let y = origin.y + r * seatSpacingY;
       if (transform?.rotation) {
         const rotated = rotatePoint(x, y, pivotCx, pivotCy, transform.rotation);
@@ -384,11 +414,48 @@ function compileGrid(primitive, keyMap, globalSeatRadius = 10) {
         x: round2(x),
         y: round2(y),
         radius: seatRadius,
+        rotation: 0,
         meta: { primitiveId: id, logicalRow: r, logicalSeat: c }
       });
     }
   }
-  return seats;
+  const rowLabels = [];
+  if (rowLabelDisplay !== "none") {
+    for (let r = 0; r < rows; r++) {
+      const rowLabelStr = generateRowLabel(
+        rowLabel.start,
+        r,
+        rowLabel.direction,
+        rowLabel.mode ?? "alpha"
+      );
+      const rowY = origin.y + r * seatSpacingY;
+      if (rowLabelDisplay === "left" || rowLabelDisplay === "both") {
+        let lx = origin.x - GRID_PAD - GRID_LBL_W * 0.5;
+        let ly = rowY;
+        if (transform?.rotation) {
+          const rotated = rotatePoint(lx, ly, pivotCx, pivotCy, transform.rotation);
+          lx = rotated.x;
+          ly = rotated.y;
+        }
+        lx += transform?.x ?? 0;
+        ly += transform?.y ?? 0;
+        rowLabels.push({ primitiveId: id, row: rowLabelStr, side: "left", x: round2(lx), y: round2(ly) });
+      }
+      if (rowLabelDisplay === "right" || rowLabelDisplay === "both") {
+        let rx = origin.x + seatW + GRID_PAD + GRID_LBL_W * 0.5;
+        let ry = rowY;
+        if (transform?.rotation) {
+          const rotated = rotatePoint(rx, ry, pivotCx, pivotCy, transform.rotation);
+          rx = rotated.x;
+          ry = rotated.y;
+        }
+        rx += transform?.x ?? 0;
+        ry += transform?.y ?? 0;
+        rowLabels.push({ primitiveId: id, row: rowLabelStr, side: "right", x: round2(rx), y: round2(ry) });
+      }
+    }
+  }
+  return { seats, rowLabels };
 }
 
 // src/compile-arc.ts
@@ -421,6 +488,7 @@ function compileArc(primitive, keyMap, globalSeatRadius = 10) {
   const rowLabel = primitive.rowLabel ?? { mode: "alpha", start: "A", direction: "asc" };
   const numbering = primitive.numbering ?? "L2R";
   const startNum = primitive.startSeatNumber ?? 1;
+  const rowLabelDisplay = primitive.rowLabelDisplay ?? "left";
   const seats = [];
   const pivot = arcPivotOffset(startRadius, rowCount, radiusStep, radiusRatio, startAngleDeg, endAngleDeg);
   const pivotCx = center.x + pivot.x;
@@ -472,12 +540,53 @@ function compileArc(primitive, keyMap, globalSeatRadius = 10) {
         y: round2(y),
         radius: seatRadius,
         rotation: round2(angleDeg + 90),
-        // tangent direction
         meta: { primitiveId: id, logicalRow: r, logicalSeat: s }
       });
     }
   }
-  return seats;
+  const rowLabels = [];
+  if (rowLabelDisplay !== "none") {
+    for (let r = 0; r < rowCount; r++) {
+      const baseRadius = startRadius + r * radiusStep;
+      const radiusX = baseRadius * radiusRatio;
+      const radiusY = baseRadius;
+      const avgRadius = (radiusX + radiusY) / 2;
+      const labelOffsetDeg = avgRadius > 0 ? (ARC_PAD + ARC_LBL_ANG * 0.5) / avgRadius * (180 / Math.PI) : 0;
+      const rowLabelStr = generateRowLabel(
+        rowLabel.start,
+        r,
+        rowLabel.direction,
+        rowLabel.mode ?? "alpha"
+      );
+      if (rowLabelDisplay === "left" || rowLabelDisplay === "both") {
+        const angleRad = degToRad(startAngleDeg - labelOffsetDeg);
+        let lx = center.x + radiusX * Math.cos(angleRad);
+        let ly = center.y + radiusY * Math.sin(angleRad);
+        if (transform?.rotation) {
+          const rotated = rotatePoint(lx, ly, pivotCx, pivotCy, transform.rotation);
+          lx = rotated.x;
+          ly = rotated.y;
+        }
+        lx += transform?.x ?? 0;
+        ly += transform?.y ?? 0;
+        rowLabels.push({ primitiveId: id, row: rowLabelStr, side: "left", x: round2(lx), y: round2(ly) });
+      }
+      if (rowLabelDisplay === "right" || rowLabelDisplay === "both") {
+        const angleRad = degToRad(endAngleDeg + labelOffsetDeg);
+        let rx = center.x + radiusX * Math.cos(angleRad);
+        let ry = center.y + radiusY * Math.sin(angleRad);
+        if (transform?.rotation) {
+          const rotated = rotatePoint(rx, ry, pivotCx, pivotCy, transform.rotation);
+          rx = rotated.x;
+          ry = rotated.y;
+        }
+        rx += transform?.x ?? 0;
+        ry += transform?.y ?? 0;
+        rowLabels.push({ primitiveId: id, row: rowLabelStr, side: "right", x: round2(rx), y: round2(ry) });
+      }
+    }
+  }
+  return { seats, rowLabels };
 }
 
 // src/compile-wedge.ts
@@ -562,15 +671,22 @@ function buildSeatKeyMap(existingSeats) {
 function compileLayout(layout, existingLayout) {
   const keyMap = existingLayout?.compiled?.seats ? buildSeatKeyMap(existingLayout.compiled.seats) : /* @__PURE__ */ new Map();
   const allSeats = [];
+  const allRowLabels = [];
   const globalSeatRadius = layout.seatRadius ?? 10;
   for (const primitive of layout.primitives) {
     switch (primitive.type) {
-      case "seatBlockGrid":
-        allSeats.push(...compileGrid(primitive, keyMap, globalSeatRadius));
+      case "seatBlockGrid": {
+        const result = compileGrid(primitive, keyMap, globalSeatRadius);
+        allSeats.push(...result.seats);
+        allRowLabels.push(...result.rowLabels);
         break;
-      case "seatBlockArc":
-        allSeats.push(...compileArc(primitive, keyMap, globalSeatRadius));
+      }
+      case "seatBlockArc": {
+        const result = compileArc(primitive, keyMap, globalSeatRadius);
+        allSeats.push(...result.seats);
+        allRowLabels.push(...result.rowLabels);
         break;
+      }
       case "seatBlockWedge":
         allSeats.push(...compileWedge(primitive, keyMap, globalSeatRadius));
         break;
@@ -579,7 +695,7 @@ function compileLayout(layout, existingLayout) {
   const bounds = computeBounds(allSeats);
   return {
     ...layout,
-    compiled: { seats: allSeats, bounds }
+    compiled: { seats: allSeats, rowLabels: allRowLabels, bounds }
   };
 }
 function validateAndCompile(rawLayout, existingLayout) {
@@ -618,6 +734,7 @@ function computeBounds(seats) {
   ArcAisleGapSchema,
   BoundsSchema,
   CanvasSchema,
+  CompiledRowLabelSchema,
   CompiledSchema,
   CompiledSeatSchema,
   GRID_LBL_W,
@@ -628,6 +745,7 @@ function computeBounds(seats) {
   ObstaclePrimitiveSchema,
   PointSchema,
   PrimitiveSchema,
+  RowLabelDisplaySchema,
   RowLabelSchema,
   SeatBlockArcSchema,
   SeatBlockGridSchema,

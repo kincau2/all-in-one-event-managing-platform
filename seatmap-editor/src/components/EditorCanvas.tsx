@@ -53,20 +53,20 @@ const PAN_PX = 20;
 const MOVE_PX = 1;
 const MOVE_SHIFT_PX = 10;
 
-type InteractionMode = 'idle' | 'panning' | 'selecting' | 'moving' | 'creating' | 'rotating';
+type InteractionMode = 'idle' | 'panning' | 'selecting' | 'moving' | 'creating' | 'rotating' | 'resizing';
 
 interface DragRect {
   x: number; y: number; w: number; h: number;
 }
 
-/** Hit-test: find the primitiveId under the pointer (or null). */
+/** Hit-test: find the primitiveId under the pointer (or null).
+ *  Iterates shapes in reverse so the topmost (last-rendered) shape wins. */
 function primitiveUnderPointer(stage: Konva.Stage): string | null {
   const pos = stage.getPointerPosition();
   if (!pos) return null;
   const shapes = stage.getAllIntersections(pos);
-  for (const shape of shapes) {
-    // Walk up parent chain — child shapes inherit primitiveId from Group
-    let node: any = shape;
+  for (let i = shapes.length - 1; i >= 0; i--) {
+    let node: any = shapes[i];
     while (node && node !== stage) {
       const pid = node.attrs?.primitiveId;
       if (pid) return pid as string;
@@ -87,13 +87,14 @@ function pointerToWorld(stage: Konva.Stage): { x: number; y: number } | null {
   };
 }
 
-/** Hit-test: find a rotation-handle node under the pointer. Returns primitiveId or null. */
+/** Hit-test: find a rotation-handle node under the pointer. Returns primitiveId or null.
+ *  Iterates in reverse so the topmost handle wins. */
 function rotateHandleUnderPointer(stage: Konva.Stage): string | null {
   const pos = stage.getPointerPosition();
   if (!pos) return null;
   const shapes = stage.getAllIntersections(pos);
-  for (const shape of shapes) {
-    let node: any = shape;
+  for (let i = shapes.length - 1; i >= 0; i--) {
+    let node: any = shapes[i];
     while (node && node !== stage) {
       if (node.attrs?.rotateHandle && node.attrs?.primitiveId) {
         return node.attrs.primitiveId as string;
@@ -102,6 +103,40 @@ function rotateHandleUnderPointer(stage: Konva.Stage): string | null {
     }
   }
   return null;
+}
+
+type ResizeEdge = 'top' | 'bottom' | 'left' | 'right';
+
+/** Hit-test: find a resize-edge rect. Returns { primitiveId, edge } or null. */
+function resizeEdgeUnderPointer(stage: Konva.Stage): { primitiveId: string; edge: ResizeEdge } | null {
+  const pos = stage.getPointerPosition();
+  if (!pos) return null;
+  const shapes = stage.getAllIntersections(pos);
+  for (let i = shapes.length - 1; i >= 0; i--) {
+    let node: any = shapes[i];
+    while (node && node !== stage) {
+      if (node.attrs?.resizeEdge && node.attrs?.primitiveId) {
+        return { primitiveId: node.attrs.primitiveId as string, edge: node.attrs.resizeEdge as ResizeEdge };
+      }
+      node = node.parent;
+    }
+  }
+  return null;
+}
+
+/** Map resize edge → CSS cursor, accounting for primitive rotation. */
+function resizeCursor(edge: ResizeEdge, rotationDeg: number): string {
+  const base: Record<ResizeEdge, number> = { top: 0, right: 90, bottom: 180, left: 270 };
+  const angle = ((base[edge] + rotationDeg) % 360 + 360) % 360;
+  // Map angle to nearest cursor direction
+  if (angle < 22.5 || angle >= 337.5) return 'ns-resize';
+  if (angle < 67.5) return 'nesw-resize';
+  if (angle < 112.5) return 'ew-resize';
+  if (angle < 157.5) return 'nwse-resize';
+  if (angle < 202.5) return 'ns-resize';
+  if (angle < 247.5) return 'nesw-resize';
+  if (angle < 292.5) return 'ew-resize';
+  return 'nwse-resize';
 }
 
 /** Compute the rotation center for a primitive (in world coords). */
@@ -119,6 +154,14 @@ function getRotationCenter(p: any): { x: number; y: number } {
   if (p.type === 'seatBlockWedge') {
     return { x: (p.center?.x ?? 0) + tx, y: (p.center?.y ?? 0) + ty };
   }
+  if (p.type === 'obstacle' || p.type === 'stage') {
+    return { x: tx + (p.width ?? 0) / 2, y: ty + (p.height ?? 0) / 2 };
+  }
+  if (p.type === 'label') {
+    const estW = (p.text?.length ?? 5) * (p.fontSize ?? 18) * 0.6;
+    const estH = (p.fontSize ?? 18) * 1.3;
+    return { x: tx + estW / 2, y: ty + estH / 2 };
+  }
   return { x: tx, y: ty };
 }
 
@@ -135,6 +178,7 @@ export const EditorCanvas: React.FC<{ width: number; height: number }> = ({
   const setViewport = useEditorStore((s) => s.setViewport);
   const layout = useEditorStore((s) => s.layout);
   const compiledSeats = useEditorStore((s) => s.compiledSeats);
+  const compiledRowLabels = useEditorStore((s) => s.compiledRowLabels);
   const selectedIds = useEditorStore((s) => s.selectedIds);
   const selectedSeatKeys = useEditorStore((s) => s.selectedSeatKeys);
   const activeTool = useEditorStore((s) => s.activeTool);
@@ -150,6 +194,14 @@ export const EditorCanvas: React.FC<{ width: number; height: number }> = ({
   const rotateCenterRef = useRef({ x: 0, y: 0 });
   const rotateStartAngleRef = useRef(0);
   const rotateInitialRotRef = useRef(0);
+
+  /* ── Resize interaction refs ── */
+  const resizePrimIdRef = useRef('');
+  const resizeEdgeRef = useRef<ResizeEdge>('right');
+  const resizeInitialRef = useRef({ x: 0, y: 0, w: 0, h: 0 });
+
+  /* ── Dynamic cursor state ── */
+  const [dynCursor, setDynCursor] = useState<string | null>(null);
 
   /* ── Rubber-band / creation preview rect (state for rendering) ── */
   const [selRect, setSelRect] = useState<DragRect | null>(null);
@@ -225,6 +277,26 @@ export const EditorCanvas: React.FC<{ width: number; height: number }> = ({
             return;
           }
         }
+
+        /* Resize edge → start resizing obstacle */
+        const resizeHit = resizeEdgeUnderPointer(stage);
+        if (resizeHit) {
+          const prim = store.layout.primitives.find((p) => p.id === resizeHit.primitiveId) as any;
+          if (prim && prim.type === 'obstacle') {
+            resizePrimIdRef.current = resizeHit.primitiveId;
+            resizeEdgeRef.current = resizeHit.edge;
+            resizeInitialRef.current = {
+              x: prim.transform?.x ?? 0,
+              y: prim.transform?.y ?? 0,
+              w: prim.width,
+              h: prim.height,
+            };
+            dragOriginRef.current = { wx: world.x, wy: world.y };
+            store.pushSnapshot();
+            modeRef.current = 'resizing';
+            return;
+          }
+        }
       }
 
       /* addGrid / addArc → drag-to-create */
@@ -251,6 +323,9 @@ export const EditorCanvas: React.FC<{ width: number; height: number }> = ({
             }
           } else if (!alreadySelected) {
             store.setSelectedIds([pid]);
+          } else {
+            /* Already selected — bring to front of its tier so it's on top */
+            store.bringToFront([pid]);
           }
           /* Start moving selected blocks */
           modeRef.current = 'moving';
@@ -350,8 +425,60 @@ export const EditorCanvas: React.FC<{ width: number; height: number }> = ({
         useEditorStore.getState().rotatePrimitive(rotatePrimIdRef.current, newRotation);
         return;
       }
+
+      if (mode === 'resizing') {
+        const store = useEditorStore.getState();
+        const prim = store.layout.primitives.find((p) => p.id === resizePrimIdRef.current) as any;
+        if (!prim) return;
+        const rot = (prim.transform?.rotation ?? 0) * Math.PI / 180;
+        const dxWorld = world.x - ox;
+        const dyWorld = world.y - oy;
+        // Project delta into the local rotated coordinate system
+        const dLocal = {
+          x: dxWorld * Math.cos(-rot) - dyWorld * Math.sin(-rot),
+          y: dxWorld * Math.sin(-rot) + dyWorld * Math.cos(-rot),
+        };
+        const init = resizeInitialRef.current;
+        const edge = resizeEdgeRef.current;
+        let newX = init.x, newY = init.y, newW = init.w, newH = init.h;
+        if (edge === 'right')  { newW = Math.max(10, init.w + dLocal.x); }
+        if (edge === 'left')   { newW = Math.max(10, init.w - dLocal.x); newX = init.x + (init.w - newW) * Math.cos(rot); newY = init.y + (init.w - newW) * Math.sin(rot); }
+        if (edge === 'bottom') { newH = Math.max(10, init.h + dLocal.y); }
+        if (edge === 'top')    { newH = Math.max(10, init.h - dLocal.y); newX = init.x - (init.h - newH) * Math.sin(rot); newY = init.y + (init.h - newH) * Math.cos(rot); }
+        store.resizeObstacle(
+          resizePrimIdRef.current,
+          Math.round(newX),
+          Math.round(newY),
+          Math.round(newW),
+          Math.round(newH),
+        );
+        return;
+      }
+
+      /* Idle hover — update cursor for rotation handles & resize edges */
+      if (mode === 'idle') {
+        const store = useEditorStore.getState();
+        if (store.activeTool !== 'blockSelect') {
+          if (dynCursor) setDynCursor(null);
+          return;
+        }
+        // Check rotation handle
+        if (rotateHandleUnderPointer(stage)) {
+          setDynCursor('grab');
+          return;
+        }
+        // Check resize edge
+        const resizeHit = resizeEdgeUnderPointer(stage);
+        if (resizeHit) {
+          const prim = store.layout.primitives.find((p) => p.id === resizeHit.primitiveId) as any;
+          const rot = prim?.transform?.rotation ?? 0;
+          setDynCursor(resizeCursor(resizeHit.edge, rot));
+          return;
+        }
+        if (dynCursor) setDynCursor(null);
+      }
     },
-    [],
+    [dynCursor],
   );
 
   /* ── MouseUp ── */
@@ -367,6 +494,12 @@ export const EditorCanvas: React.FC<{ width: number; height: number }> = ({
 
       if (mode === 'rotating') {
         // Rotation is already applied continuously via rotatePrimitive; snapshot was pushed in mouseDown.
+        return;
+      }
+
+      if (mode === 'resizing') {
+        // Resize is already applied continuously; snapshot was pushed in mouseDown.
+        setDynCursor(null);
         return;
       }
 
@@ -440,6 +573,7 @@ export const EditorCanvas: React.FC<{ width: number; height: number }> = ({
             seatSpacingX: spacingX,
             seatSpacingY: spacingY,
             rowLabel: { mode: 'alpha' as const, start: 'A', direction: 'asc' as const },
+            rowLabelDisplay: 'left' as const,
             numbering: 'L2R' as const,
             aisleGaps: [],
             excludedSeats: [],
@@ -470,6 +604,7 @@ export const EditorCanvas: React.FC<{ width: number; height: number }> = ({
             endAngleDeg: 100,
             seatsPerRow: { start: seatsStart, delta: 0 },
             rowLabel: { mode: 'alpha' as const, start: 'A', direction: 'asc' as const },
+            rowLabelDisplay: 'left' as const,
             numbering: 'L2R' as const,
             aisleGaps: [],
             excludedSeats: [],
@@ -594,14 +729,14 @@ export const EditorCanvas: React.FC<{ width: number; height: number }> = ({
 
   /* ── Cursor ── */
   const cursor = useMemo(() => {
+    if (dynCursor) return dynCursor;
     if (spaceDownRef.current) return 'grab';
     switch (activeTool) {
-      case 'seatSelect': return 'crosshair';
       case 'addGrid':
       case 'addArc': return 'crosshair';
       default: return 'default';
     }
-  }, [activeTool]);
+  }, [activeTool, dynCursor]);
 
   /* ── Background color & image from layout ── */
   const bgColor = (layout as any).bgColor ?? LAYOUT_STYLE_DEFAULTS.bgColor;
@@ -654,23 +789,52 @@ export const EditorCanvas: React.FC<{ width: number; height: number }> = ({
         />
       </Layer>
 
-      {/* Primitives */}
+      {/* Primitives (non-label) — sorted by type-tier; within each tier array order = stacking */}
       <Layer>
-        {layout.primitives.map((prim) => (
-          <PrimitiveRenderer
-            key={prim.id}
-            primitive={prim}
-            isSelected={selectedIds.includes(prim.id)}
-          />
-        ))}
+        {(() => {
+          const TIER: Record<string, number> = {
+            stage: 0,
+            obstacle: 1,
+            seatBlockGrid: 2,
+            seatBlockArc: 2,
+          };
+          const nonLabels = layout.primitives
+            .filter((p) => p.type !== 'label')
+            .sort((a, b) => {
+              const ta = TIER[a.type] ?? 2;
+              const tb = TIER[b.type] ?? 2;
+              return ta - tb;
+            });
+          return nonLabels.map((prim) => (
+            <PrimitiveRenderer
+              key={prim.id}
+              primitive={prim}
+              isSelected={selectedIds.includes(prim.id)}
+            />
+          ));
+        })()}
       </Layer>
 
       {/* Compiled seats */}
       <Layer listening={false}>
         <SeatDots
           seats={compiledSeats}
+          rowLabels={compiledRowLabels}
           selectedSeatKeys={selectedSeatKeysSet}
         />
+      </Layer>
+
+      {/* Labels — always on top of seats */}
+      <Layer>
+        {layout.primitives
+          .filter((p) => p.type === 'label')
+          .map((prim) => (
+            <PrimitiveRenderer
+              key={prim.id}
+              primitive={prim}
+              isSelected={selectedIds.includes(prim.id)}
+            />
+          ))}
       </Layer>
 
       {/* Rubber-band selection rectangle */}
@@ -727,11 +891,20 @@ function primitiveBBox(p: any): DragRect {
   const rot = p.transform?.rotation ?? 0;
 
   if (p.type === 'stage' || p.type === 'obstacle') {
-    return { x: tx, y: ty, w: p.width, h: p.height };
+    const bb = { x: tx, y: ty, w: p.width, h: p.height };
+    if (rot !== 0) {
+      return rotatedAABB(bb, { x: tx + p.width / 2, y: ty + p.height / 2 }, rot);
+    }
+    return bb;
   }
   if (p.type === 'label') {
     const est = (p.text?.length ?? 5) * (p.fontSize ?? 18) * 0.6;
-    return { x: tx, y: ty, w: est, h: (p.fontSize ?? 18) * 1.3 };
+    const estH = (p.fontSize ?? 18) * 1.3;
+    const bb = { x: tx, y: ty, w: est, h: estH };
+    if (rot !== 0) {
+      return rotatedAABB(bb, { x: tx + est / 2, y: ty + estH / 2 }, rot);
+    }
+    return bb;
   }
   if (p.type === 'seatBlockGrid') {
     const ox = p.origin.x + tx;

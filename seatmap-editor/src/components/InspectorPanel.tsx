@@ -288,6 +288,14 @@ const LabelInspector: React.FC<InspectorProps> = ({ primitive: p, onUpdate, disa
         onChange={(v) => onUpdate({ text: v } as any)} />
       <NumField label="Font Size" value={prim.fontSize} min={8} max={120} disabled={disabled}
         onChange={(v) => onUpdate({ fontSize: v } as any)} />
+      <ColorField label="Font Color" value={(prim as any).fontColor ?? '#333333'} disabled={disabled}
+        onChange={(v) => onUpdate({ fontColor: v } as any)} />
+      <SelectField label="Font Weight" value={(prim as any).fontWeight ?? 'normal'} disabled={disabled}
+        options={[
+          { value: 'normal', label: 'Normal' },
+          { value: 'bold', label: 'Bold' },
+        ]}
+        onChange={(v) => onUpdate({ fontWeight: v } as any)} />
       <NumField label="X" value={prim.transform?.x ?? 0} disabled={disabled}
         onChange={(v) => onUpdate({ transform: { ...prim.transform, x: v } } as any)} />
       <NumField label="Y" value={prim.transform?.y ?? 0} disabled={disabled}
@@ -308,6 +316,10 @@ const ObstacleInspector: React.FC<InspectorProps> = ({ primitive: p, onUpdate, d
         onChange={(v) => onUpdate({ width: v } as any)} />
       <NumField label="Height" value={prim.height} min={1} disabled={disabled}
         onChange={(v) => onUpdate({ height: v } as any)} />
+      <ColorField label="Fill Color" value={(prim as any).color ?? '#ffcccc'} disabled={disabled}
+        onChange={(v) => onUpdate({ color: v } as any)} />
+      <ColorField label="Border Color" value={(prim as any).borderColor ?? '#cc5555'} disabled={disabled}
+        onChange={(v) => onUpdate({ borderColor: v } as any)} />
       <NumField label="X" value={prim.transform?.x ?? 0} disabled={disabled}
         onChange={(v) => onUpdate({ transform: { ...prim.transform, x: v } } as any)} />
       <NumField label="Y" value={prim.transform?.y ?? 0} disabled={disabled}
@@ -364,6 +376,14 @@ const GridInspector: React.FC<InspectorProps> = ({ primitive: p, onUpdate, disab
         onChange={(v) =>
           onUpdate({ rowLabel: { ...prim.rowLabel, direction: v } } as any)
         } />
+      <SelectField label="Row Label Display" value={(prim as any).rowLabelDisplay ?? 'left'} disabled={disabled}
+        options={[
+          { value: 'none', label: 'Not Display' },
+          { value: 'left', label: 'Left Side' },
+          { value: 'right', label: 'Right Side' },
+          { value: 'both', label: 'Both Sides' },
+        ]}
+        onChange={(v) => onUpdate({ rowLabelDisplay: v } as any)} />
       <NumField label="Rotation" value={prim.transform?.rotation ?? 0} step={1} disabled={disabled}
         onChange={(v) => onUpdate({ transform: { ...prim.transform, rotation: v } } as any)} />
     </>
@@ -430,6 +450,14 @@ const ArcInspector: React.FC<InspectorProps> = ({ primitive: p, onUpdate, disabl
         onChange={(v) =>
           onUpdate({ rowLabel: { ...(prim as any).rowLabel, direction: v } } as any)
         } />
+      <SelectField label="Row Label Display" value={(prim as any).rowLabelDisplay ?? 'left'} disabled={disabled}
+        options={[
+          { value: 'none', label: 'Not Display' },
+          { value: 'left', label: 'Left Side' },
+          { value: 'right', label: 'Right Side' },
+          { value: 'both', label: 'Both Sides' },
+        ]}
+        onChange={(v) => onUpdate({ rowLabelDisplay: v } as any)} />
     </>
   );
 };

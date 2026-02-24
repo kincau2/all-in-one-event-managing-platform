@@ -16,6 +16,7 @@ import type {
   Layout,
   Primitive,
   CompiledSeat,
+  CompiledRowLabel,
 } from '@aioemp/seatmap-core';
 import {
   compileLayout,
@@ -40,6 +41,7 @@ export interface EditorState {
   seatmapId: number | null;
   layout: Layout;
   compiledSeats: CompiledSeat[];
+  compiledRowLabels: CompiledRowLabel[];
 
   /* ── Selection ── */
   selectedIds: string[];
@@ -78,11 +80,13 @@ export interface EditorState {
   duplicatePrimitives: (ids: string[]) => void;
 
   setSelectedIds: (ids: string[]) => void;
+  bringToFront: (ids: string[]) => void;
   clearSelection: () => void;
   setSelectedSeatKeys: (keys: string[]) => void;
   toggleSeatExclusion: (primitiveId: string, logicalRow: number, logicalSeat: number) => void;
   removeSelectedSeats: () => void;
   movePrimitivesBy: (ids: string[], dx: number, dy: number) => void;
+  resizeObstacle: (id: string, x: number, y: number, w: number, h: number) => void;
   rotatePrimitive: (id: string, rotation: number) => void;
 
   updateCanvas: (patch: Partial<Layout['canvas']>) => void;
@@ -126,6 +130,7 @@ const DEFAULT_LAYOUT: Layout = {
   primitives: [],
   compiled: {
     seats: [],
+    rowLabels: [],
     bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
   },
 } as Layout;
@@ -141,6 +146,7 @@ export const useEditorStore = create<EditorState>()(
     seatmapId: null,
     layout: DEFAULT_LAYOUT,
     compiledSeats: [],
+    compiledRowLabels: [],
     selectedIds: [],
     selectedSeatKeys: [],
     activeTool: 'blockSelect',
@@ -162,6 +168,7 @@ export const useEditorStore = create<EditorState>()(
       set((s) => {
         s.layout = layout;
         s.compiledSeats = layout.compiled?.seats ?? [];
+        s.compiledRowLabels = (layout.compiled as any)?.rowLabels ?? [];
         s.selectedIds = [];
         s.undoStack = [];
         s.redoStack = [];
@@ -177,6 +184,7 @@ export const useEditorStore = create<EditorState>()(
         const compiled = compileLayout(s.layout, previousLayout);
         s.layout = compiled;
         s.compiledSeats = compiled.compiled.seats;
+        s.compiledRowLabels = (compiled.compiled as any).rowLabels ?? [];
       });
     },
 
@@ -254,6 +262,22 @@ export const useEditorStore = create<EditorState>()(
     /* ── Selection ── */
     setSelectedIds(ids) {
       set((s) => { s.selectedIds = ids; });
+      if (ids.length > 0) get().bringToFront(ids);
+    },
+    bringToFront(ids) {
+      set((s) => {
+        const prims = s.layout.primitives as Primitive[];
+        // Pull out the selected primitives, then append them at the end.
+        // The tier-sort in the renderer still groups by type,
+        // and within each tier the later array position renders on top.
+        const selected: Primitive[] = [];
+        const rest: Primitive[] = [];
+        for (const p of prims) {
+          if (ids.includes(p.id)) selected.push(p);
+          else rest.push(p);
+        }
+        s.layout.primitives = [...rest, ...selected] as any;
+      });
     },
     clearSelection() {
       set((s) => { s.selectedIds = []; s.selectedSeatKeys = []; });
@@ -331,6 +355,20 @@ export const useEditorStore = create<EditorState>()(
       get().recompile();
     },
 
+    resizeObstacle(id, x, y, w, h) {
+      set((s) => {
+        const idx = s.layout.primitives.findIndex((p: Primitive) => p.id === id);
+        if (idx === -1) return;
+        const prim = s.layout.primitives[idx] as any;
+        if (!prim.transform) prim.transform = { x: 0, y: 0, rotation: 0 };
+        prim.transform.x = x;
+        prim.transform.y = y;
+        prim.width = w;
+        prim.height = h;
+        s.isDirty = true;
+      });
+    },
+
     rotatePrimitive(id, rotation) {
       set((s) => {
         const idx = s.layout.primitives.findIndex((p: Primitive) => p.id === id);
@@ -399,6 +437,7 @@ export const useEditorStore = create<EditorState>()(
         s.redoStack.push(JSON.parse(JSON.stringify(s.layout)));
         s.layout = snapshot;
         s.compiledSeats = snapshot.compiled?.seats ?? [];
+        s.compiledRowLabels = (snapshot.compiled as any)?.rowLabels ?? [];
         s.isDirty = true;
       });
     },
@@ -410,6 +449,7 @@ export const useEditorStore = create<EditorState>()(
         s.undoStack.push(JSON.parse(JSON.stringify(s.layout)));
         s.layout = snapshot;
         s.compiledSeats = snapshot.compiled?.seats ?? [];
+        s.compiledRowLabels = (snapshot.compiled as any)?.rowLabels ?? [];
         s.isDirty = true;
       });
     },

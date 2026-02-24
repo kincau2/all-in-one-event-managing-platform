@@ -90,36 +90,105 @@ export const PrimitiveRenderer: React.FC<Props> = ({ primitive, isSelected }) =>
         />
       );
 
-    case 'label':
+    case 'label': {
+      const lp = primitive as any;
+      const textW = (lp.text?.length ?? 5) * (lp.fontSize ?? 18) * 0.6;
+      const textH = (lp.fontSize ?? 18) * 1.3;
+      const lPivotX = textW / 2;
+      const lPivotY = textH / 2;
       return (
-        <Text
-          x={tx}
-          y={ty}
-          text={primitive.text}
-          fontSize={primitive.fontSize}
-          fill={isSelected ? SELECTION_STROKE : '#333'}
-          fontStyle={isSelected ? 'bold' : 'normal'}
-          rotation={rotation}
-          attrs={{ primitiveId: primitive.id }}
-        />
+        <Group x={tx + lPivotX} y={ty + lPivotY} rotation={rotation}
+          offsetX={lPivotX} offsetY={lPivotY}
+          attrs={{ primitiveId: primitive.id }}>
+          {isSelected && (
+            <Rect
+              x={-4}
+              y={-2}
+              width={textW + 8}
+              height={textH + 4}
+              fill="transparent"
+              stroke={SELECTION_STROKE}
+              strokeWidth={1.5}
+              dash={SELECTION_DASH}
+              cornerRadius={3}
+              attrs={{ primitiveId: primitive.id }}
+            />
+          )}
+          <Text
+            x={0}
+            y={0}
+            text={lp.text}
+            fontSize={lp.fontSize}
+            fill={lp.fontColor ?? '#333333'}
+            fontStyle={lp.fontWeight ?? 'normal'}
+            attrs={{ primitiveId: primitive.id }}
+          />
+          {isSelected && (
+            <>
+              <Circle x={0} y={0} radius={5} fill={SELECTION_STROKE} stroke="#fff" strokeWidth={1.5}
+                attrs={{ rotateHandle: true, primitiveId: primitive.id }} />
+              <Circle x={textW} y={0} radius={5} fill={SELECTION_STROKE} stroke="#fff" strokeWidth={1.5}
+                attrs={{ rotateHandle: true, primitiveId: primitive.id }} />
+              <Circle x={textW} y={textH} radius={5} fill={SELECTION_STROKE} stroke="#fff" strokeWidth={1.5}
+                attrs={{ rotateHandle: true, primitiveId: primitive.id }} />
+              <Circle x={0} y={textH} radius={5} fill={SELECTION_STROKE} stroke="#fff" strokeWidth={1.5}
+                attrs={{ rotateHandle: true, primitiveId: primitive.id }} />
+            </>
+          )}
+        </Group>
       );
+    }
 
-    case 'obstacle':
+    case 'obstacle': {
+      const op = primitive as any;
+      const oPivotX = op.width / 2;
+      const oPivotY = op.height / 2;
+      const EDGE = 6; // invisible edge hit area thickness
       return (
-        <Rect
-          x={tx}
-          y={ty}
-          width={primitive.width}
-          height={primitive.height}
-          rotation={rotation}
-          fill="#ffcccc"
-          stroke={isSelected ? SELECTION_STROKE : '#cc5555'}
-          strokeWidth={sw}
-          dash={isSelected ? SELECTION_DASH : undefined}
-          cornerRadius={2}
-          attrs={{ primitiveId: primitive.id }}
-        />
+        <Group x={tx + oPivotX} y={ty + oPivotY} rotation={rotation}
+          offsetX={oPivotX} offsetY={oPivotY}
+          attrs={{ primitiveId: primitive.id }}>
+          <Rect
+            x={0}
+            y={0}
+            width={op.width}
+            height={op.height}
+            fill={op.color ?? '#ffcccc'}
+            stroke={isSelected ? SELECTION_STROKE : (op.borderColor ?? '#cc5555')}
+            strokeWidth={sw}
+            dash={isSelected ? SELECTION_DASH : undefined}
+            cornerRadius={2}
+            attrs={{ primitiveId: primitive.id }}
+          />
+          {isSelected && (
+            <>
+              {/* Resize edge hit areas (invisible fat rects along each edge) */}
+              {/* Top edge */}
+              <Rect x={EDGE} y={-EDGE / 2} width={op.width - 2 * EDGE} height={EDGE}
+                fill="transparent" attrs={{ resizeEdge: 'top', primitiveId: primitive.id }} />
+              {/* Bottom edge */}
+              <Rect x={EDGE} y={op.height - EDGE / 2} width={op.width - 2 * EDGE} height={EDGE}
+                fill="transparent" attrs={{ resizeEdge: 'bottom', primitiveId: primitive.id }} />
+              {/* Left edge */}
+              <Rect x={-EDGE / 2} y={EDGE} width={EDGE} height={op.height - 2 * EDGE}
+                fill="transparent" attrs={{ resizeEdge: 'left', primitiveId: primitive.id }} />
+              {/* Right edge */}
+              <Rect x={op.width - EDGE / 2} y={EDGE} width={EDGE} height={op.height - 2 * EDGE}
+                fill="transparent" attrs={{ resizeEdge: 'right', primitiveId: primitive.id }} />
+              {/* Corner rotation handles */}
+              <Circle x={0} y={0} radius={5} fill={SELECTION_STROKE} stroke="#fff" strokeWidth={1.5}
+                attrs={{ rotateHandle: true, primitiveId: primitive.id }} />
+              <Circle x={op.width} y={0} radius={5} fill={SELECTION_STROKE} stroke="#fff" strokeWidth={1.5}
+                attrs={{ rotateHandle: true, primitiveId: primitive.id }} />
+              <Circle x={op.width} y={op.height} radius={5} fill={SELECTION_STROKE} stroke="#fff" strokeWidth={1.5}
+                attrs={{ rotateHandle: true, primitiveId: primitive.id }} />
+              <Circle x={0} y={op.height} radius={5} fill={SELECTION_STROKE} stroke="#fff" strokeWidth={1.5}
+                attrs={{ rotateHandle: true, primitiveId: primitive.id }} />
+            </>
+          )}
+        </Group>
       );
+    }
 
     case 'seatBlockGrid': {
       const gp = primitive as any;
@@ -128,7 +197,7 @@ export const PrimitiveRenderer: React.FC<Props> = ({ primitive, isSelected }) =>
       const gridSection = gp.section || '';
       const seatW = (gp.cols - 1) * gp.seatSpacingX;
       const seatH = (gp.rows - 1) * gp.seatSpacingY;
-      const rectW = seatW + 2 * GRID_PAD + GRID_LBL_W;
+      const rectW = seatW + 2 * GRID_PAD + 2 * GRID_LBL_W;
       const rectH = seatH + 2 * GRID_PAD;
       const lx = -GRID_PAD - GRID_LBL_W;
       const ly = -GRID_PAD;
@@ -184,7 +253,7 @@ export const PrimitiveRenderer: React.FC<Props> = ({ primitive, isSelected }) =>
       const endRad = (ap.endAngleDeg * Math.PI) / 180 + angPad;
       const arcSection = ap.section || '';
       /* Bounding box in local coords (center = 0,0) */
-      let sMinX = 0, sMinY = 0, sMaxX = 0, sMaxY = 0;
+      let sMinX = Infinity, sMinY = Infinity, sMaxX = -Infinity, sMaxY = -Infinity;
       for (let i = 0; i <= 32; i++) {
         const a = startRad + ((endRad - startRad) * i) / 32;
         const cos = Math.cos(a), sin = Math.sin(a);
@@ -220,8 +289,7 @@ export const PrimitiveRenderer: React.FC<Props> = ({ primitive, isSelected }) =>
             strokeWidth={sw}
             dash={dash}
           />
-          <Circle x={0} y={0} radius={3} fill={isSelected ? SELECTION_STROKE : '#4B49AC'}
-            attrs={{ primitiveId: primitive.id }} />
+
           {isSelected && (
             <>
               <Circle x={sMinX} y={sMinY} radius={5} fill={SELECTION_STROKE} stroke="#fff" strokeWidth={1.5}

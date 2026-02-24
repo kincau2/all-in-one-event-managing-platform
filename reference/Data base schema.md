@@ -65,6 +65,8 @@
 | company | VARCHAR(190) NULL |  |
 | email | VARCHAR(190) NULL |  |
 | qrcode_hash | CHAR(64) NOT NULL | store hex sha256 (or VARCHAR(128) if you use something else) |
+| created_at_gmt | DATETIME NOT NULL | registration timestamp (UTC) |
+| status | VARCHAR(32) NOT NULL | default 'registered' |
   
 **Indexes**  
 * INDEX(event_id)  
@@ -95,13 +97,17 @@
 | ------------------- | --------------------------------- | ---------------------------------- |
 | id | BIGINT UNSIGNED AUTO_INCREMENT PK |  |
 | title | VARCHAR(255) NOT NULL |  |
+| status | VARCHAR(32) NOT NULL | default 'draft' |
 | layout | LONGTEXT NOT NULL | JSON (primitives + compiled seats) |
 | lock_user_id | BIGINT UNSIGNED NULL |  |
 | lock_token | CHAR(36) NULL |  |
 | lock_expires_at_gmt | DATETIME NULL |  |
 | lock_updated_at_gmt | DATETIME NULL |  |
+| updated_at_gmt | DATETIME NULL | auto-set on every update |
+| created_at_gmt | DATETIME NOT NULL | creation timestamp (UTC) |
   
 **Indexes**  
+* INDEX(status)
 * INDEX(lock_expires_at_gmt) (optional)  
   
 ## aioemp_seatmap_meta  

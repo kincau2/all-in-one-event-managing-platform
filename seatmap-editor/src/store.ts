@@ -167,8 +167,13 @@ export const useEditorStore = create<EditorState>()(
     initLayout(layout) {
       set((s) => {
         s.layout = layout;
-        s.compiledSeats = layout.compiled?.seats ?? [];
-        s.compiledRowLabels = (layout.compiled as any)?.rowLabels ?? [];
+        /* Always recompile on load so compiled positions
+           match the current algorithm / constants rather
+           than using potentially stale saved data. */
+        const compiled = compileLayout(layout, layout);
+        s.layout = compiled;
+        s.compiledSeats = compiled.compiled.seats;
+        s.compiledRowLabels = (compiled.compiled as any)?.rowLabels ?? [];
         s.selectedIds = [];
         s.undoStack = [];
         s.redoStack = [];

@@ -2623,7 +2623,7 @@ declare const GRID_LBL_W = 24;
 /** Radial pixel padding around an arc/wedge sector. */
 declare const ARC_PAD = 21;
 /** Extra angular pixels for row labels in an arc block. */
-declare const ARC_LBL_ANG = 28;
+declare const ARC_LBL_ANG = 33;
 /**
  * Rotation pivot offset for a grid block, in local coords relative to origin.
  * Returns the center of the visual dotted rectangle.

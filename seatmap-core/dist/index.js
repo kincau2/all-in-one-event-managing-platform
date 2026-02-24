@@ -247,7 +247,7 @@ function round2(n) {
 var GRID_PAD = 21;
 var GRID_LBL_W = 24;
 var ARC_PAD = 21;
-var ARC_LBL_ANG = 28;
+var ARC_LBL_ANG = 33;
 function gridPivotOffset(cols, rows, seatSpacingX, seatSpacingY) {
   const seatW = (cols - 1) * seatSpacingX;
   const seatH = (rows - 1) * seatSpacingY;

@@ -1,7 +1,7 @@
 # AIOEMP — AI Agent Development Guideline
 
 **All-in-One Event Managing Platform (AIOEMP)**
-Version 1.0 | 18 Feb 2026
+Version 1.1 | 24 Feb 2026
 
 ---
 
@@ -57,9 +57,9 @@ AIOEMP is a **custom WordPress plugin** that provides an all-in-one platform for
 | Frontend (public) | Elementor-based pages, client-provided design/mockups |
 | Admin Dashboard | SPA-style shell inside wp-admin (client-side routing, AJAX/REST) |
 | Seatmap Builder | Konva.js + React (react-konva) — preferred rendering stack |
-| State Management | Zustand or Redux Toolkit + Immer |
+| State Management | Zustand 5 + Immer |
 | Schema Validation | Zod (layout schema) |
-| IDs | nanoid or uuid (stable primitive/seat IDs) |
+| IDs | Custom `generateUUID()` using `crypto.randomUUID()` (stable primitive/seat IDs) |
 | Backend | PHP (WordPress plugin API, custom REST endpoints) |
 | Database | WordPress $wpdb with custom tables (prefixed `aioemp_`) |
 | Email | WordPress `wp_mail()` with configurable templates |
@@ -200,7 +200,7 @@ All custom tables use the WordPress table prefix + `aioemp_`. No WordPress core 
 | `aioemp_event_log` | Audit log for event-related actions |
 | `aioemp_attender` | Candidate/registrant records per event |
 | `aioemp_attendance` | Append-only check-in/out log |
-| `aioemp_seatmap` | Reusable seatmap templates (layout JSON + lock fields) |
+| `aioemp_seatmap` | Reusable seatmap templates (status, layout JSON, lock fields, timestamps) |
 | `aioemp_seatmap_meta` | Flexible key-value metadata for seatmaps |
 | `aioemp_seat_assignment` | Current seat-to-candidate assignments per event |
 | `aioemp_blocked_seat` | Blocked seats per event |
@@ -266,6 +266,8 @@ All custom tables use the WordPress table prefix + `aioemp_`. No WordPress core 
 | company | VARCHAR(190) NULL | |
 | email | VARCHAR(190) NULL | |
 | qrcode_hash | CHAR(64) NOT NULL | SHA-256 hex |
+| created_at_gmt | DATETIME NOT NULL | Registration timestamp (UTC) |
+| status | VARCHAR(32) NOT NULL | Default `'registered'` |
 
 **Indexes:** INDEX(event_id), INDEX(event_id, last_name), INDEX(event_id, email), UNIQUE(qrcode_hash)
 
@@ -293,13 +295,16 @@ All custom tables use the WordPress table prefix + `aioemp_`. No WordPress core 
 |---|---|---|
 | id | BIGINT UNSIGNED AUTO_INCREMENT PK | |
 | title | VARCHAR(255) NOT NULL | |
+| status | VARCHAR(32) NOT NULL | Default `'draft'` |
 | layout | LONGTEXT NOT NULL | JSON (primitives + compiled seats) |
 | lock_user_id | BIGINT UNSIGNED NULL | |
 | lock_token | CHAR(36) NULL | |
 | lock_expires_at_gmt | DATETIME NULL | |
 | lock_updated_at_gmt | DATETIME NULL | |
+| updated_at_gmt | DATETIME NULL | Auto-set on every update |
+| created_at_gmt | DATETIME NOT NULL | Creation timestamp (UTC) |
 
-**Indexes:** INDEX(lock_expires_at_gmt)
+**Indexes:** INDEX(status), INDEX(lock_expires_at_gmt)
 
 #### aioemp_seatmap_meta
 
@@ -367,42 +372,98 @@ Follow WordPress plugin best practices:
 
 ```
 all-in-one-event-managing-platform/
-├── all-in-one-event-managing-platform.php   # Main plugin bootstrap
-├── reference/                               # Design docs (do not modify)
+├── all-in-one-event-managing-platform.php   # Main plugin bootstrap (v0.1.0)
+├── deploy.sh                                # SSH deployment pipeline (see .ai-agent-notes.md)
+├── .ai-agent-notes.md                       # Credentials & deployment details (git-ignored)
+├── .gitignore
+├── reference/                               # Design docs
+│   ├── AI_AGENT_GUIDELINE.md               # THIS FILE
+│   ├── AIOEMP_Logic_Flow_Notes_v0.2.md
+│   ├── Build Parametric Seatmap Builder.md
+│   ├── Data base schema.md
+│   ├── Editor Locking (WP-style "one editor at a time").md
+│   └── Functional Requirements.md
 ├── includes/
-│   ├── class-aioemp-activator.php           # Activation hooks (DB install)
-│   ├── class-aioemp-deactivator.php         # Deactivation hooks
-│   ├── class-aioemp-loader.php              # Hook/filter registration
-│   ├── class-aioemp-security.php            # Shared security helpers
-│   ├── rest-api/                            # REST endpoint controllers
-│   │   ├── class-aioemp-events-controller.php
-│   │   ├── class-aioemp-candidates-controller.php
-│   │   ├── class-aioemp-attendance-controller.php
-│   │   ├── class-aioemp-seatmaps-controller.php
-│   │   ├── class-aioemp-seating-controller.php
-│   │   ├── class-aioemp-locking-controller.php
-│   │   ├── class-aioemp-settings-controller.php
-│   │   └── class-aioemp-public-registration-controller.php
-│   ├── models/                              # Data access layer
-│   └── services/                            # Business logic layer
+│   ├── class-aioemp-activator.php           # DB installer (dbDelta, 10 tables)
+│   ├── class-aioemp-deactivator.php         # Capability revocation
+│   ├── class-aioemp-loader.php              # Singleton, wires all hooks
+│   ├── class-aioemp-security.php            # Capabilities, nonces, sanitisation, rate limiting
+│   ├── rest-api/
+│   │   ├── class-aioemp-rest-controller.php       # Abstract base controller
+│   │   ├── class-aioemp-events-controller.php     # CRUD /events (395 lines)
+│   │   ├── class-aioemp-seatmaps-controller.php   # CRUD /seatmaps
+│   │   ├── class-aioemp-seatmap-upload-controller.php  # BG image upload
+│   │   ├── class-aioemp-locking-controller.php    # Lock acquire/heartbeat/release/takeover
+│   │   └── class-aioemp-settings-controller.php   # Settings CRUD + logo upload
+│   ├── models/
+│   │   ├── class-aioemp-model.php                 # Abstract base model ($wpdb wrapper)
+│   │   ├── class-aioemp-events-model.php          # Events CRUD + search/pagination
+│   │   ├── class-aioemp-event-log-model.php       # Append-only audit log
+│   │   └── class-aioemp-seatmap-model.php         # Seatmap CRUD + search/pagination
+│   └── services/
+│       ├── class-aioemp-locking-service.php       # Atomic SQL locking (TTL 90s)
+│       └── class-aioemp-settings-service.php      # Single wp_options key, typed defaults
 ├── admin/
-│   ├── class-aioemp-admin.php               # Admin hooks, menu, enqueue
-│   ├── js/                                  # Admin SPA JavaScript
-│   ├── css/                                 # Admin styles
-│   └── views/                               # PHP view templates (shell)
-├── public/
-│   ├── class-aioemp-public.php              # Public hooks, shortcodes
+│   ├── class-aioemp-admin.php               # Admin hooks, menu entry, script enqueue chain
+│   ├── css/aioemp-admin.css                 # Admin styles (CSS custom properties)
 │   ├── js/
-│   ├── css/
+│   │   ├── aioemp-admin.js                  # Admin SPA shell (jQuery)
+│   │   ├── aioemp-settings.js               # Settings page JS
+│   │   ├── aioemp-seatmaps.js               # Seatmaps list page JS
+│   │   └── seatmap-editor/                  # ← Vite IIFE build output
+│   │       ├── seatmap-editor.js            # ~573 KB (React+Konva+Zustand bundle)
+│   │       └── seatmap-editor.css           # ~4.5 KB
 │   └── views/
-├── seatmap-builder/                         # React + Konva seatmap editor
-│   ├── packages/
-│   │   ├── seatmap-core/                    # @aioemp/seatmap-core
-│   │   └── seatmap-editor/                  # @aioemp/seatmap-editor
+│       └── dashboard-shell.php              # Full-screen SPA shell template
+├── public/                                  # Public-facing (not yet implemented)
+├── seatmap-core/                            # @aioemp/seatmap-core (TypeScript library)
 │   ├── package.json
-│   └── webpack.config.js (or vite.config.js)
-├── languages/                               # i18n .pot/.po/.mo files
-└── tests/                                   # PHPUnit + JS tests
+│   ├── tsconfig.json
+│   ├── vitest.config.ts                     # Vitest configuration
+│   ├── src/                                 # Source (see Section 20.2)
+│   │   ├── index.ts                         # Barrel re-exports
+│   │   ├── schema.ts                        # Zod schemas (236 lines)
+│   │   ├── types.ts                         # Zod-inferred TypeScript types
+│   │   ├── compile-layout.ts                # Orchestrator compiler
+│   │   ├── compile-grid.ts                  # Grid block compiler
+│   │   ├── compile-arc.ts                   # Arc block compiler (203 lines)
+│   │   ├── compile-wedge.ts                 # Wedge block compiler
+│   │   ├── pivot.ts                         # Rotation pivot helpers + visual constants
+│   │   ├── seat-key.ts                      # seat_key preservation map
+│   │   └── utils.ts                         # Shared utilities (134 lines)
+│   ├── tests/                               # Vitest (100 tests, 7 files)
+│   │   ├── compile-grid.test.ts             # 13 tests
+│   │   ├── compile-arc.test.ts              # 11 tests
+│   │   ├── compile-wedge.test.ts            # 7 tests
+│   │   ├── compile-layout.test.ts           # 10 tests
+│   │   ├── schema.test.ts                   # 17 tests
+│   │   ├── seat-key.test.ts                 # 8 tests
+│   │   └── utils.test.ts                    # 34 tests
+│   └── dist/                                # tsup output (ESM + CJS + DTS, git-ignored)
+└── seatmap-editor/                          # @aioemp/seatmap-editor (React SPA)
+    ├── package.json
+    ├── tsconfig.json
+    ├── vite.config.ts                       # IIFE build → ../admin/js/seatmap-editor/
+    ├── tsconfig.node.json                   # Node-specific TS config (Vite)
+    └── src/
+        ├── main.tsx                         # Entry: window.aioemp_seatmap_editor.mount()
+        ├── App.tsx                          # Root: Toolbar + EditorCanvas + InspectorPanel
+        ├── store.ts                         # Zustand + Immer store (495 lines)
+        ├── api.ts                           # REST wrappers (seatmapApi, lockApi)
+        ├── layoutDefaults.ts                # LAYOUT_STYLE_DEFAULTS
+        ├── primitiveFactories.ts            # Factory functions for instant-add
+        ├── styles.css                       # Editor styles (imported by main.tsx)
+        ├── globals.d.ts                     # Window type declarations
+        ├── hooks/
+        │   ├── useDraftPersistence.ts       # Auto-save to localStorage
+        │   ├── useLockHeartbeat.ts          # Lock acquire + heartbeat + release
+        │   └── useSave.ts                   # Ctrl+S, auto-save, REST PUT
+        └── components/
+            ├── EditorCanvas.tsx             # Konva Stage + all interactions (1009 lines)
+            ├── InspectorPanel.tsx            # Right sidebar inspector (676 lines)
+            ├── PrimitiveRenderer.tsx         # Per-primitive visual renderer (340 lines)
+            ├── SeatDots.tsx                  # High-perf seat circles + row labels
+            └── Toolbar.tsx                   # Horizontal toolbar (276 lines)
 ```
 
 ### Architecture Rules
@@ -451,7 +512,10 @@ All agent-generated UI must follow this colour palette and component style. Do *
 | `--sa-border` | `#E8E8E8` | Borders, dividers |
 | `--sa-radius` | `6px` | Default border-radius |
 | `--sa-shadow` | `0 0 10px rgba(0,0,0,.05)` | Cards, top bar |
+| `--sa-shadow-lg` | `0 2px 12px rgba(0,0,0,.08)` | Elevated elements |
 | `--sa-font` | Ubuntu, system stack | Typography |
+| `--sa-sidebar-w` | `240px` | Sidebar width |
+| `--sa-topbar-h` | `60px` | Top bar height |
 
 #### Reusable CSS Classes
 
@@ -640,14 +704,14 @@ type CompiledSeat = {
 ### 10.7 UI Editor Requirements
 
 - **Canvas:** Zoom/pan, multi-select primitives, move/rotate with handles, snap-to-grid toggle.
-- **Tools palette:** Add Grid/Arc/Wedge blocks, add Stage/Label/Obstacle, Delete, Duplicate, Undo/Redo.
+- **Tools palette:** Add Grid/Arc blocks, add Stage/Label/Obstacle, Delete, Duplicate, Undo/Redo. (Wedge compile algorithm exists in core but no +Wedge toolbar button yet.)
 - **Inspector panel:** Editable params for selected primitive, live recompile preview (debounced 150–300ms).
 - **Performance:** Render seats as lightweight circles in Konva. Seats are NOT individually draggable — selection is per primitive. Target: 2,000+ seats without lag.
 
 ### 10.8 Drafts & Save Pipeline
 
 - Keep state in memory (Zustand/Redux store).
-- Auto-persist draft to `localStorage` key `aioemp_draft_seatmap_<seatmapId>` (debounced 1–2s). Clear on successful save. For large layouts, use IndexedDB via `localforage`.
+- Auto-persist draft to `localStorage` key `aioemp_seatmap_draft_<seatmapId>` (debounced 2s). Clear on successful save.
 - **Save pipeline:** Validate (Zod) → Compile → POST to server → server validates lock + schema → store in DB.
 
 ### 10.9 Seatmaps List Page
@@ -691,7 +755,7 @@ Only one user can edit a seatmap or event at a time. Locks are DB-backed with au
 ### 12.2 Constants
 
 - **Lock TTL:** 90 seconds.
-- **Heartbeat interval:** 30 seconds.
+- **Heartbeat interval:** 60 seconds.
 - All timestamps in UTC.
 
 ### 12.3 API Endpoints (4 actions per resource type)
@@ -713,7 +777,7 @@ Only one user can edit a seatmap or event at a time. Locks are DB-backed with au
 ### 12.5 Frontend Behavior
 
 - On editor open → call `lock_acquire`.
-- If `locked_by_you` → store `lock_token` in **sessionStorage** (`aioemp_lock_<type>_<id>`), start heartbeat, enable editing.
+- If `locked_by_you` → store `lock_token` in a React `useRef` (in-memory only), start heartbeat, enable editing.
 - If `locked_by_other` → show modal: "Currently being edited by {name}. Take over or exit?" Disable editing.
 - On heartbeat `lock_lost` → stop heartbeat, disable editing, show modal.
 - On page leave → attempt `lock_release`; also try `navigator.sendBeacon()` in `beforeunload`. **Do not rely on unload** — TTL expiry is the primary safety mechanism.
@@ -852,6 +916,296 @@ The following files in the `reference/` folder are the authoritative sources for
 | `Editor Locking (WP-style "one editor at a time").md` | Locking API contract, SQL patterns, frontend behavior, edge cases |
 | `Functional Requirements.md` | High-level functional requirements from the client |
 
+### Operational Files (git-ignored, not in reference/)
+
+| File | Content |
+|---|---|
+| `.ai-agent-notes.md` | **Credentials and deployment instructions** — WP admin login, SSH connection details, server paths. Read this file for deployment procedures. Do NOT commit credentials to git or include them in this guideline. |
+| `deploy.sh` | Automated deployment pipeline (build → test → rsync to server). See `.ai-agent-notes.md` for SSH setup details. |
+
+---
+
+## 20. Implementation Progress (as of 24 Feb 2026)
+
+> **CRITICAL: Read this section carefully.** It documents what has been built, what works, and known patterns/pitfalls from previous development sessions.
+
+### 20.1 Milestone Status
+
+| Phase | Status | Notes |
+|---|---|---|
+| 1. Foundation | **DONE** | DB installer (10 tables via `dbDelta`), plugin bootstrap, custom capabilities (`aioemp_manage_events`, `aioemp_manage_seatmaps`, `aioemp_manage_settings`, `aioemp_scan_attendance`), security helper class |
+| 2. Admin SPA Shell + Settings | **DONE** | Full-screen SPA shell, Star Admin 2 Pro colour palette, Settings page (logo upload, behaviour toggles), CSS custom properties |
+| 3. `@aioemp/seatmap-core` | **DONE** | Zod schemas, all compile algorithms (Grid, Arc, Wedge), seat_key stability, row label compilation, 100 vitest tests passing |
+| 4. `@aioemp/seatmap-editor` | **DONE** | Konva + React 18 canvas, Zustand 5 + Immer store, inspector panel, undo/redo, draft persistence (localStorage), save pipeline with lock token, keyboard shortcuts |
+| 5. Editor Locking | **DONE** | Atomic SQL locking (TTL 90s), heartbeat 60s, acquire/release/takeover, sendBeacon on unload, frontend takeover modal |
+| 6. Event Seatmap Snapshot | **NOT STARTED** | |
+| 7. Events + Candidates CRUD | **PARTIAL** | Events CRUD REST endpoints exist. Candidates module not started. |
+| 8. Attendance | **NOT STARTED** | |
+| 9. Public Registration | **NOT STARTED** | |
+| 10. Email Automation | **NOT STARTED** | |
+
+### 20.2 `@aioemp/seatmap-core` — Detailed Architecture
+
+**Package:** TypeScript library, built with `tsup` (ESM + CJS + DTS). No React dependency.
+
+**Build:** `cd seatmap-core && npm run build` → outputs to `seatmap-core/dist/`
+
+**Test:** `cd seatmap-core && npm run test` → 100 tests across 7 test files
+
+#### Schema (`schema.ts`, 236 lines)
+
+All data structures are defined as **Zod schemas** with TypeScript types inferred via `z.infer<>`:
+
+- **Primitives** — Discriminated union on `type` field:
+  - `seatBlockGrid`: origin, rows, cols, seatSpacingX/Y, aisleGaps[], excludedSeats[], section, rowLabel (mode/start/direction), numbering (L2R/R2L), startSeatNumber, rowLabelDisplay (none/left/right/both), seatRadius, transform
+  - `seatBlockArc`: center, rowCount, startRadius, radiusStep, radiusRatio, startAngleDeg, endAngleDeg, seatsPerRow, aisleGaps[], excludedSeats[], section, rowLabel, numbering, startSeatNumber, rowLabelDisplay, seatRadius, transform
+  - `seatBlockWedge`: center, innerRadius, outerRadius, startAngleDeg, endAngleDeg, rowCount, seatsPerRow, excludedSeats[], section, rowLabel, numbering, seatRadius, transform
+  - `stage`: width, height (position via transform.x/y; inherits primitiveBase: id, name, label, transform)
+  - `label`: text, fontSize, fontColor, fontWeight (position via transform.x/y; inherits primitiveBase)
+  - `obstacle`: width, height, color (`#ffcccc`), borderColor (`#cc5555`) (position via transform.x/y; inherits primitiveBase)
+
+- **Compiled output** (`CompiledSchema`):
+  - `seats: CompiledSeat[]` — seat_key, label, section, row, number, x, y, radius, rotation, meta
+  - `rowLabels: CompiledRowLabel[]` — primitiveId, row, side ('left'|'right'), x, y
+  - `bounds: Bounds` — minX, minY, maxX, maxY
+
+- **Layout** (`LayoutSchema`): schemaVersion (literal 1), title, canvas (w/h/unit), seatRadius, style fields (seatFill, seatStroke, seatFont (`-apple-system, sans-serif`), seatFontWeight, seatFontColor, seatFontSize, rowFontColor, rowFontSize, rowFontWeight, bgColor, bgImage), primitives[], compiled
+
+#### Compile Algorithms
+
+**`compileLayout(layout, existingLayout?)`** — Orchestrator in `compile-layout.ts`:
+1. Builds `SeatKeyMap` from existing compiled seats for key preservation
+2. Iterates primitives, dispatches to type-specific compilers
+3. Aggregates all seats and row labels
+4. Computes bounds (AABB)
+5. Returns new Layout with updated `compiled` section
+
+**`compileGrid(primitive, keyMap, globalSeatRadius)`** — in `compile-grid.ts`:
+- Seat positions: `x = origin.x + col * spacingX + cumulativeGapBefore[col]`, `y = origin.y + row * spacingY`
+- Rotation around pivot (center of dotted area), then translation
+- Aisle gaps: cumulative px gaps applied per column
+- Row labels: Left labels at `origin.x - GRID_PAD - GRID_LBL_W * 0.5`, right labels at `origin.x + seatW + GRID_PAD + GRID_LBL_W * 0.5` (centered in label columns)
+- Returns `{ seats: CompiledSeat[], rowLabels: CompiledRowLabel[] }`
+
+**`compileArc(primitive, keyMap, globalSeatRadius)`** — in `compile-arc.ts`:
+- Elliptical arc via `radiusRatio` (radiusX = baseRadius * ratio, radiusY = baseRadius)
+- Seat positions: polar → cartesian, distributed evenly across `[startAngleDeg, endAngleDeg]` minus gap angles
+- Aisle gaps: px→angle conversion via `(gapPx / avgRadius) * (180/π)`
+- Row labels: offset angularly beyond the seat arc by `(ARC_PAD + ARC_LBL_ANG * 0.5) / avgRadius * (180/π)` degrees
+- Returns `{ seats: CompiledSeat[], rowLabels: CompiledRowLabel[] }`
+
+**`compileWedge(primitive, keyMap, globalSeatRadius)`** — in `compile-wedge.ts`:
+- Pie-slice sections with inner/outer radius interpolation per row
+
+#### Pivot & Visual Constants (`pivot.ts`)
+
+Shared between compiler and editor renderer. **Current values (24 Feb 2026):**
+
+| Constant | Value | Purpose |
+|---|---|---|
+| `GRID_PAD` | `21` | Pixel padding around seat area in grid dotted rect |
+| `GRID_LBL_W` | `24` | Row-label column width (applied to BOTH left and right sides) |
+| `ARC_PAD` | `21` | Radial pixel padding around arc/wedge sector |
+| `ARC_LBL_ANG` | `33` | Extra angular pixels for row labels in arc |
+
+**`gridPivotOffset(cols, rows, seatSpacingX, seatSpacingY)`**: Returns center of the dotted rectangle. Rectangle dimensions: `lx = -GRID_PAD - GRID_LBL_W`, `ly = -GRID_PAD`, `rectW = seatW + 2*GRID_PAD + 2*GRID_LBL_W`, `rectH = seatH + 2*GRID_PAD`. Pivot = `(lx + rectW/2, ly + rectH/2)`.
+
+**`arcPivotOffset(...)`**: Samples 33 points along padded sector (inner + outer radii, with angular padding), computes AABB, returns center.
+
+#### seat_key Preservation (`seat-key.ts`)
+
+`buildSeatKeyMap(existingSeats)` creates `Map<"primId:row:seat", uuid>`. On recompile, seats at the same logical position (primitive ID + row index + seat index) retain their UUID. New seats get new UUIDs. This is critical for database seat assignments surviving layout edits.
+
+#### Utilities (`utils.ts`)
+
+`degToRad`, `rotatePoint(px,py,cx,cy,angleDeg)`, `labelToIndex/indexToLabel` (A→0, Z→25, AA→26), `generateRowLabel(start, rowIdx, direction, mode)`, `getSeatsPerRow(spec, rowIdx)`, `generateUUID()`, `round2(n)`.
+
+### 20.3 `@aioemp/seatmap-editor` — Detailed Architecture
+
+**Package:** React 18 SPA, built with Vite as IIFE → `admin/js/seatmap-editor/`
+
+**Build:** `cd seatmap-editor && npm run build` → outputs `seatmap-editor.js` (~573 KB) + `seatmap-editor.css` (~4.5 KB)
+
+**Entry point:** `window.aioemp_seatmap_editor.mount(container, { seatmapId, onClose })` — creates React 18 root, renders `<App>`.
+
+#### Store (`store.ts`, 495 lines)
+
+Zustand 5 + Immer middleware. Key design decisions:
+
+- **`initLayout(layout)`**: Always recompiles on load via `compileLayout(layout, layout)`. This ensures compiled seat/label positions match the current algorithm, not stale positions saved in the database. This was a critical bug fix — without recompilation, the dotted area (computed fresh by PrimitiveRenderer) would mismatch the compiled seat positions (from DB), causing visual bleeding on fresh load.
+
+- **`recompile()`**: Called after every primitive edit. Spread-copies layout as `previousLayout` for seat_key preservation, then calls `compileLayout()`.
+
+- **Undo/Redo**: Snapshot-based (max 50 depth). `pushSnapshot()` called before every mutation. Full layout snapshots (not diffs).
+
+- **State shape**:
+  ```
+  seatmapId, layout, compiledSeats[], compiledRowLabels[],
+  selectedIds[], selectedSeatKeys[], activeTool,
+  undoStack[], redoStack[],
+  stageX, stageY, stageScale, snapToGrid,
+  saveStatus, isDirty,
+  lockToken, lockOwnerId, lockOwnerName, isLocked
+  ```
+
+#### Components
+
+**`EditorCanvas.tsx`** (1009 lines) — The main Konva Stage. Handles:
+- Wheel zoom (centered on pointer)
+- Pan: middle mouse button drag OR Space + left drag
+- Block selection: rubber-band rectangle in `blockSelect` tool
+- Seat selection: rubber-band in `seatSelect` tool, tests point-in-rect for each compiled seat
+- Drag-to-create: `addGrid` / `addArc` tools — drag rectangle on canvas, creates primitive on mouse up with computed rows/cols from rect size
+- Move: drag selected primitives with Ctrl/Cmd to duplicate
+- Rotation: drag corner circle handles
+- Resize: drag edge hit-areas (obstacle only)
+- Arrow keys: pan viewport or move selected primitives (Shift = 10x)
+- Delete/Backspace: remove selected primitives
+- Escape: deselect all
+- Renders: background color/image, grid guides (when snap enabled), `<PrimitiveRenderer>` per primitive, `<SeatDots>` for all compiled seats + row labels
+
+**`InspectorPanel.tsx`** (676 lines) — Right sidebar:
+- Nothing selected → Layout overview (canvas size, seat radius, colours, font settings, bg image upload)
+- Stage selected → StageInspector (x, y, width, height, label)
+- Label selected → LabelInspector (text, fontSize, fontColor)
+- Obstacle selected → ObstacleInspector (x, y, width, height, fill, stroke, label)
+- Grid selected → GridInspector (rows, cols, spacingX/Y, aisleGaps, section, rowLabel mode/start/direction, numbering, startSeatNumber, rowLabelDisplay, seatRadius)
+- Arc selected → ArcInspector (rowCount, startRadius, radiusStep, radiusRatio, startAngleDeg, endAngleDeg, seatsPerRow, section, rowLabel, numbering, rowLabelDisplay, seatRadius)
+- Wedge selected → WedgeInspector
+- All numeric inputs debounced 200ms to prevent lag during typing
+
+**`PrimitiveRenderer.tsx`** (340 lines) — Pure visual renderer:
+- Grid blocks: `<Group>` with pivot rotation, dotted `<Rect>` (stroke `#4B49AC44`, dash `[4,4]`), section label, corner `<Circle>` rotation handles when selected
+- Arc blocks: `<Group>` with pivot rotation, custom `<Shape>` sector path (`drawSectorPath`), section label, corner handles
+- Wedge blocks: sector around center
+- Obstacles: filled `<Rect>` with resize edge hit-areas when selected
+- Stages: grey `<Rect>`
+- Labels: `<Text>` with rotation
+- Uses shared constants/functions from `@aioemp/seatmap-core` (`GRID_PAD`, `GRID_LBL_W`, `ARC_PAD`, `ARC_LBL_ANG`, `gridPivotOffset`, `arcPivotOffset`)
+
+**`SeatDots.tsx`** — Performance-optimized rendering:
+- Single Konva `<Shape>` with custom `sceneFunc` draws ALL seats as circles + numbers
+- Three render passes: normal seats (layout colours), excluded seats (greyed + X), selected seats (orange)
+- Row labels: separate `<Shape>` with `textAlign = 'center'`, `textBaseline = 'middle'`
+- Reads style settings reactively from store (seatFill, seatStroke, seatFontColor, seatFontSize, rowFontColor, rowFontSize, rowFontWeight)
+- `React.memo` for performance
+
+**`Toolbar.tsx`** (276 lines) — Horizontal toolbar:
+- Tool groups: Block Select (V), Seat Select (S), Draw Grid (G), Draw Arc (A), +Stage, +Obstacle, +Label, Delete, Duplicate, Undo (Ctrl+Z), Redo (Ctrl+Shift+Z), Snap toggle, Zoom slider
+- **Note:** +Wedge tool is not yet implemented (Wedge compile algorithm exists in core but has no toolbar button)
+- Seat count display, lock/user warning, save status indicator
+- Help modal with keyboard shortcuts
+- Seat select icon: pretix SVG (`tool-seatselect` — cursor with arc indicator)
+
+#### Hooks
+
+- **`useDraftPersistence`**: Auto-saves to `localStorage` key `aioemp_seatmap_draft_<id>` every 2s when dirty. Restores if < 1 hour old. Clears on successful save.
+- **`useLockHeartbeat`**: Acquires lock on mount. Heartbeat every 60s (server TTL = 90s). Releases on unmount + `sendBeacon` in `beforeunload`.
+- **`useSave`**: `save()` validates via `validateAndCompile`, PUTs to `/aioemp/v1/seatmaps/<id>`. Ctrl+S shortcut. Auto-save every 30s when dirty.
+
+#### Layout Style Defaults (`layoutDefaults.ts`)
+
+```typescript
+{
+  seatRadius: 10,
+  seatFill: '#4B49AC',
+  seatStroke: '#3a389a',
+  seatFontWeight: 'bold',
+  seatFontColor: '#ffffff',
+  seatFontSize: 0,        // 0 = auto-scale to fit circle
+  rowFontColor: '#666666',
+  rowFontSize: 11,
+  rowFontWeight: 'bold',
+  bgColor: '#ffffff',
+  bgImage: '',
+}
+```
+
+### 20.4 PHP Backend — Implemented Components
+
+#### Plugin Bootstrap (`all-in-one-event-managing-platform.php`)
+
+Constants: `AIOEMP_VERSION = '0.1.0'`, `AIOEMP_DB_VERSION = '1.1.0'`. Auto-creates tables on every `plugins_loaded` (version check in `AIOEMP_Activator::create_tables()`).
+
+#### Database (10 tables)
+
+All created via `dbDelta()` in `class-aioemp-activator.php`:
+
+1. `aioemp_events` — Full schema per Section 4.2
+2. `aioemp_event_meta` — Key/value meta
+3. `aioemp_event_log` — Audit trail
+4. `aioemp_attender` — Registrants with QR hash
+5. `aioemp_attendance` — Append-only scan log
+6. `aioemp_seatmap` — Seatmap templates (layout JSON + lock columns + timestamps)
+7. `aioemp_seatmap_meta` — Key/value meta
+8. `aioemp_seat_assignment` — Seat ↔ candidate per event
+9. `aioemp_blocked_seat` — Blocked seats per event
+10. `aioemp_seat_assignment_log` — Seat operation audit
+
+#### REST API (namespace: `aioemp/v1`)
+
+| Controller | Endpoints | Status |
+|---|---|---|
+| `class-aioemp-rest-controller.php` | Abstract base | DONE |
+| `class-aioemp-events-controller.php` | GET/POST/PUT/DELETE `/events` | DONE (395 lines) |
+| `class-aioemp-seatmaps-controller.php` | GET/POST/PUT/DELETE `/seatmaps` | DONE |
+| `class-aioemp-seatmap-upload-controller.php` | POST/DELETE `/seatmaps/upload-bg` | DONE |
+| `class-aioemp-locking-controller.php` | POST `/lock/*` | DONE |
+| `class-aioemp-settings-controller.php` | GET/PUT `/settings`, POST `/settings/logo` | DONE |
+
+#### Services
+
+- **Locking service**: Atomic SQL (`UPDATE ... WHERE lock_user_id IS NULL OR lock_expires_at_gmt < NOW()`) for race-free lock acquisition. TTL 90s.
+- **Settings service**: Single `wp_options` key, field-level sanitisation, typed defaults.
+
+#### Admin
+
+- **Menu**: Top-level "Event Manager" menu item (`dashicons-calendar-alt`, capability `aioemp_manage_events`)
+- **Script chain**: `aioemp-admin.js` → `aioemp-settings.js` → `aioemp-seatmaps.js` → `aioemp-seatmap-editor` (React bundle)
+- **Localization**: `wp_localize_script` passes `rest_url`, `nonce`, `user_id`, `version`, `logo_url` to `window.aioemp`
+
+### 20.5 Deployment Pipeline
+
+Deployment is handled by `deploy.sh` which runs locally and pushes to the Hostinger server via SSH/rsync. **For credentials and SSH connection details, see `.ai-agent-notes.md`.** The pipeline:
+
+1. **Pre-flight checks**: Scans for 0-byte files (FTP Simple corruption guard), validates critical file sizes
+2. **Build core**: `cd seatmap-core && npm run build` (tsup: ESM + CJS + DTS)
+3. **Test**: `npm run test` (100 vitest tests must pass)
+4. **Build editor**: `cd seatmap-editor && npm run build` (Vite IIFE → admin/js/seatmap-editor/)
+5. **Deploy**: `rsync --delete` to remote server (excludes node_modules, .git, deploy.sh, .ai-agent-notes.md)
+6. **Verify**: Checks JS file size matches, no empty files on server
+
+To deploy manually: `cd <plugin-root> && bash deploy.sh`
+
+### 20.6 Known Issues & Patterns for Future Agents
+
+#### File Persistence Issues (RESOLVED)
+
+Previous sessions experienced `replace_string_in_file` tool silently failing — reporting success but not actually writing changes. This was caused by the **FTP Simple VS Code extension** overwriting local files with stale server copies. The workspace has since been disconnected from FTP Simple. If this recurs:
+- Workaround: write files via Python scripts (`python3 /tmp/write_file.py`) or use `cat > file << 'EOF' ... EOF`
+- Always verify edits with `grep` or `read_file` after writing
+- The `deploy.sh` Step 0 corruption guard will catch 0-byte files
+
+#### initLayout Recompile (CRITICAL)
+
+The store's `initLayout()` **must** call `compileLayout()` on every load, not just copy `layout.compiled` from the database. This is because:
+- The database stores compiled positions from when the seatmap was last saved
+- If compile algorithms or constants (GRID_PAD, ARC_PAD, etc.) change between sessions, the saved positions will be stale
+- PrimitiveRenderer always computes the dotted area fresh from current constants
+- Without recompilation, seats appear misaligned with their dotted areas on fresh load but "fix themselves" after the first interaction triggers `recompile()`
+
+#### node_modules Management
+
+`seatmap-core` and `seatmap-editor` each have their own `node_modules/`. The editor depends on core via `"@aioemp/seatmap-core": "file:../seatmap-core"`. After cloning:
+```bash
+cd seatmap-core && npm install && npm run build
+cd ../seatmap-editor && npm install && npm run build
+```
+
+#### konva Type Definitions
+
+The `konva` package's `lib/Node.d.ts` can become corrupted (0 bytes), causing ~54 TypeScript errors across all react-konva components. Fix: `cd seatmap-editor && rm -rf node_modules/konva && npm install konva@9.3.22 --no-save`.
+
 ---
 
 ## Reminders for the AI Agent
@@ -867,4 +1221,9 @@ The following files in the `reference/` folder are the authoritative sources for
 9. **Seatmap snapshot is immutable** once finalized or once assignments/attendance exist.
 10. **Duplicate email registrations are allowed** by design — do not add uniqueness constraints on (event_id, email).
 11. **All timestamps in the database are UTC** (`_gmt` suffix columns).
-12. **Do not modify files in the `reference/` folder** — they are the source of truth.
+12. **Read `.ai-agent-notes.md`** for credentials, SSH details, and deployment instructions.
+13. **Always run tests before deploying:** `cd seatmap-core && npm run test` (expect 100 passing).
+14. **Build order matters:** Build seatmap-core FIRST (editor depends on its dist/), then seatmap-editor.
+15. **Deploy via:** `cd <plugin-root> && bash deploy.sh` — never manually copy files to server.
+16. **initLayout must recompile** — never use raw `layout.compiled` from DB without re-running `compileLayout()`.
+17. **Dev site:** https://mediation2026.dev01.online — admin login in `.ai-agent-notes.md`.

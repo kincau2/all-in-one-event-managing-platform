@@ -24,7 +24,11 @@ export const App: React.FC<AppProps> = ({ seatmapId, onClose }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const canvasWrapRef = useRef<HTMLDivElement>(null);
-  const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
+  // Start at 0×0 so the auto-fit effect is gated by the `width < 10` guard
+  // until ResizeObserver fires with the real container dimensions.
+  // Using 800×600 as a default caused auto-fit to fire too early (before
+  // the actual viewport was measured), locking in the wrong scale.
+  const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
 
   const initLayout = useEditorStore((s) => s.initLayout);
   const isDirty = useEditorStore((s) => s.isDirty);

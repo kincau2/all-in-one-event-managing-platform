@@ -112,6 +112,15 @@ class AIOEMP_Admin {
             true
         );
 
+        // Events module (depends on core admin script).
+        wp_enqueue_script(
+            'aioemp-events',
+            AIOEMP_PLUGIN_URL . 'admin/js/aioemp-events.js',
+            array( 'jquery', 'aioemp-admin' ),
+            AIOEMP_VERSION,
+            true
+        );
+
         // Seatmaps list module (depends on core admin script).
         wp_enqueue_script(
             'aioemp-seatmaps',

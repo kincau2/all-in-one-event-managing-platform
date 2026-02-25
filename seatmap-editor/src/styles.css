@@ -117,6 +117,34 @@
   white-space: nowrap;
 }
 
+/* ── Seat integrity indicator ── */
+
+.sme-integrity {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: none;
+  background: none;
+  cursor: default;
+  line-height: 1.4;
+}
+.sme-integrity--pass {
+  color: #19d895;
+}
+.sme-integrity--fail {
+  color: #dc3545;
+  cursor: pointer;
+  background: rgba(220, 53, 69, 0.08);
+  border-radius: 4px;
+}
+.sme-integrity--fail:hover {
+  background: rgba(220, 53, 69, 0.16);
+}
+
 /* ── Workspace (canvas + inspector) ── */
 
 .sme-workspace {

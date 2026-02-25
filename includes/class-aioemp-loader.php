@@ -195,6 +195,10 @@ function aioemp_register_rest_routes(): void {
     require_once AIOEMP_PLUGIN_DIR . 'includes/rest-api/class-aioemp-events-controller.php';
     ( new AIOEMP_Events_Controller() )->register_routes();
 
+    // Attenders (Candidates) CRUD — nested under events.
+    require_once AIOEMP_PLUGIN_DIR . 'includes/rest-api/class-aioemp-attenders-controller.php';
+    ( new AIOEMP_Attenders_Controller() )->register_routes();
+
     // Seatmaps CRUD.
     require_once AIOEMP_PLUGIN_DIR . 'includes/rest-api/class-aioemp-seatmaps-controller.php';
     ( new AIOEMP_Seatmaps_Controller() )->register_routes();

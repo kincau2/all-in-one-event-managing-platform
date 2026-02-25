@@ -19,6 +19,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 require_once __DIR__ . '/class-aioemp-rest-controller.php';
 require_once AIOEMP_PLUGIN_DIR . 'includes/models/class-aioemp-events-model.php';
 require_once AIOEMP_PLUGIN_DIR . 'includes/models/class-aioemp-event-log-model.php';
+require_once AIOEMP_PLUGIN_DIR . 'includes/models/class-aioemp-seatmap-model.php';
 
 class AIOEMP_Events_Controller extends AIOEMP_REST_Controller {
 
@@ -282,7 +283,7 @@ class AIOEMP_Events_Controller extends AIOEMP_REST_Controller {
         }
 
         // Datetime fields (ISO 8601 / MySQL datetime).
-        foreach ( array( 'start_at_gmt', 'end_at_gmt' ) as $dt_field ) {
+        foreach ( array( 'start_date_gmt', 'end_date_gmt' ) as $dt_field ) {
             $val = $request->get_param( $dt_field );
             if ( null !== $val && '' !== $val ) {
                 $sanitized = sanitize_text_field( (string) $val );
@@ -299,15 +300,35 @@ class AIOEMP_Events_Controller extends AIOEMP_REST_Controller {
         }
 
         // Integer fields.
-        $max_att = $request->get_param( 'max_attenders' );
-        if ( null !== $max_att ) {
-            $data['max_attenders'] = absint( $max_att );
+        $capacity = $request->get_param( 'capacity' );
+        if ( null !== $capacity ) {
+            $data['capacity'] = absint( $capacity );
         }
 
         // Seatmap ID (nullable).
         $seatmap_id = $request->get_param( 'seatmap_id' );
         if ( null !== $seatmap_id ) {
-            $data['seatmap_id'] = '' === $seatmap_id ? null : absint( $seatmap_id );
+            if ( '' === $seatmap_id ) {
+                $data['seatmap_id'] = null;
+            } else {
+                $sm_id = absint( $seatmap_id );
+
+                // Verify seatmap passes integrity check before allowing assignment.
+                $sm_model = new AIOEMP_Seatmap_Model();
+                $seatmap  = $sm_model->find( $sm_id );
+
+                if ( ! $seatmap ) {
+                    return $this->error( 'seatmap_not_found', __( 'Seatmap not found.', 'aioemp' ), 404 );
+                }
+                if ( empty( $seatmap->integrity_pass ) ) {
+                    return $this->error(
+                        'seatmap_integrity_fail',
+                        __( 'This seatmap has duplicate seat assignments and cannot be used for an event. Please fix the seatmap first.', 'aioemp' )
+                    );
+                }
+
+                $data['seatmap_id'] = $sm_id;
+            }
         }
 
         return $data;

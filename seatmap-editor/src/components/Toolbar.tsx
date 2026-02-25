@@ -9,7 +9,7 @@
  * Wedge / Stage / Label / Obstacle remain instant-add.
  */
 
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { useEditorStore, type Tool } from '../store';
 import { createDefaultLabel, createDefaultObstacle, createDefaultImage } from '../primitiveFactories';
 import { uploadBgImage } from '../api';
@@ -46,6 +46,58 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onClose, onSave }) => {
   const redo = useEditorStore((s) => s.redo);
 
   const setViewport = useEditorStore((s) => s.setViewport);
+  const primitives = useEditorStore((s) => s.layout.primitives);
+
+  /* ── Seat integrity check (O(n) — runs reactively on every recompile) ── */
+  const [showIntegrity, setShowIntegrity] = useState(false);
+
+  interface DuplicateGroup {
+    key: string;           // "row||number"
+    row: string;
+    number: number;
+    count: number;
+    blockNames: string[];  // primitive names that contribute
+    sections: string[];    // sections involved for context
+  }
+
+  const duplicateGroups = useMemo<DuplicateGroup[]>(() => {
+    // Key by row+number ONLY — duplicates across ALL blocks regardless of section
+    const map = new Map<string, { count: number; primIds: Set<string>; sections: Set<string> }>();
+    for (const seat of compiledSeats) {
+      if (seat.row == null || seat.number == null) continue;
+      const k = `${seat.row}||${seat.number}`;
+      const entry = map.get(k);
+      const pid = (seat.meta as any)?.primitiveId as string | undefined;
+      const sec = seat.section ?? '';
+      if (entry) {
+        entry.count++;
+        if (pid) entry.primIds.add(pid);
+        if (sec) entry.sections.add(sec);
+      } else {
+        const primIds = new Set<string>();
+        const sections = new Set<string>();
+        if (pid) primIds.add(pid);
+        if (sec) sections.add(sec);
+        map.set(k, { count: 1, primIds, sections });
+      }
+    }
+    // Collect only entries with count > 1
+    const groups: DuplicateGroup[] = [];
+    for (const [k, v] of map) {
+      if (v.count <= 1) continue;
+      const [row, numStr] = k.split('||');
+      const blockNames = [...v.primIds].map((pid) => {
+        const prim = primitives.find((p) => p.id === pid);
+        return (prim as any)?.name || (prim as any)?.section || prim?.id.slice(0, 8) || 'Unknown';
+      });
+      groups.push({ key: k, row, number: parseInt(numStr, 10), count: v.count, blockNames, sections: [...v.sections] });
+    }
+    // Sort by row then number for readability
+    groups.sort((a, b) => a.row.localeCompare(b.row) || a.number - b.number);
+    return groups;
+  }, [compiledSeats, primitives]);
+
+  const integrityPass = duplicateGroups.length === 0;
 
   const handleAdd = useCallback(
     (factory: () => any) => {
@@ -159,15 +211,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onClose, onSave }) => {
         </button>
         <button className={btnClass('addArc')} onClick={() => toggleTool('addArc')}
           title="Draw Arc Block (A) — drag on canvas" disabled={isLocked}>
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" style={{marginRight:2}}>
-            {/* Outer arc */}
-            <path d="M2 17 A11 11 0 0 1 18 17" />
-            {/* Inner arc */}
-            <path d="M5 17 A8 8 0 0 1 15 17" />
-            {/* Left spoke */}
-            <line x1="2" y1="17" x2="5" y2="17" />
-            {/* Right spoke */}
-            <line x1="15" y1="17" x2="18" y2="17" />
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" width="20" height="20" fill="currentColor" style={{marginRight:2}}>
+            <path transform="rotate(90,320,320)" d="M457.1 206.9C394.6 144.4 301.3 144.4 238.8 206.9C176.3 269.4 176.3 370.7 238.8 433.2C301.3 495.7 394.6 495.7 457.1 433.2C469.6 420.7 489.9 420.7 502.4 433.2C514.9 445.7 514.9 466 502.4 478.5C414.9 566 281.1 566 193.6 478.5C106.1 391 106.1 249.2 193.6 161.7C281.1 74.2 414.9 74.2 502.4 161.7C514.9 174.2 514.9 194.5 502.4 207C489.9 219.5 469.6 219.5 457.1 207z"/>
           </svg>
           <span>Arc</span>
         </button>
@@ -247,6 +292,26 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onClose, onSave }) => {
 
       {/* Right side: meta + save */}
       <div className="sme-toolbar__group sme-toolbar__group--right">
+        {/* Seat integrity indicator */}
+        {compiledSeats.length > 0 && (
+          integrityPass ? (
+            <span className="sme-integrity sme-integrity--pass" title="Seat integrity check passed">
+              <svg width="14" height="14" viewBox="0 0 20 20" fill="#19d895" style={{ marginRight: 3, verticalAlign: '-2px' }}>
+                <path d="M10 0C4.5 0 0 4.5 0 10s4.5 10 10 10 10-4.5 10-10S15.5 0 10 0zm-1.7 14.3L4 10l1.4-1.4 2.9 2.9 6.3-6.3L16 6.6l-7.7 7.7z"/>
+              </svg>
+              Seat integrity check pass
+            </span>
+          ) : (
+            <button className="sme-integrity sme-integrity--fail" onClick={() => setShowIntegrity(true)}
+              title={`${duplicateGroups.length} duplicate group(s) found`}>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" width="14" height="14" fill="#dc3545"
+                style={{ marginRight: 3, verticalAlign: '-2px' }}>
+                <path d="M320 576C178.6 576 64 461.4 64 320C64 178.6 178.6 64 320 64C461.4 64 576 178.6 576 320C576 461.4 461.4 576 320 576zM320 384C302.3 384 288 398.3 288 416C288 433.7 302.3 448 320 448C337.7 448 352 433.7 352 416C352 398.3 337.7 384 320 384zM320 192C301.8 192 287.3 207.5 288.6 225.7L296 329.7C296.9 342.3 307.4 352 319.9 352C332.5 352 342.9 342.3 343.8 329.7L351.2 225.7C352.5 207.5 338.1 192 319.8 192z"/>
+              </svg>
+              Seat integrity check fail
+            </button>
+          )
+        )}
         <span className="sme-toolbar__meta">{compiledSeats.length} seats</span>
         {isLocked && (
           <span className="sme-toolbar__lock-warning">
@@ -269,6 +334,60 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onClose, onSave }) => {
           {saveStatus === 'saving' ? 'Saving…' : 'Save'}
         </button>
       </div>
+
+      {/* Integrity check detail modal */}
+      {showIntegrity && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 100000,
+          background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }} onClick={() => setShowIntegrity(false)}>
+          <div style={{
+            background: '#fff', borderRadius: 10, padding: '24px 32px', minWidth: 380, maxWidth: 520,
+            maxHeight: '70vh', overflow: 'auto',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.25)', position: 'relative',
+          }} onClick={(e) => e.stopPropagation()}>
+            <button onClick={() => setShowIntegrity(false)} style={{
+              position: 'absolute', top: 10, right: 14, background: 'none',
+              border: 'none', fontSize: 20, cursor: 'pointer', color: '#666', lineHeight: 1,
+            }}>&times;</button>
+            <h3 style={{ margin: '0 0 6px', fontSize: 16, fontWeight: 600, color: '#dc3545' }}>
+              Seat Integrity Check Failed
+            </h3>
+            <p style={{ margin: '0 0 16px', fontSize: 13, color: '#666' }}>
+              {duplicateGroups.length} duplicate seat group{duplicateGroups.length > 1 ? 's' : ''} found.
+              Each Row + Seat # pair must be unique across all seat blocks.
+            </p>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid #ddd', textAlign: 'left' }}>
+                  <th style={{ padding: '6px 8px' }}>Row</th>
+                  <th style={{ padding: '6px 8px' }}>Seat #</th>
+                  <th style={{ padding: '6px 8px' }}>Count</th>
+                  <th style={{ padding: '6px 8px' }}>Found in Blocks</th>
+                </tr>
+              </thead>
+              <tbody>
+                {duplicateGroups.map((g) => (
+                  <tr key={g.key} style={{ borderBottom: '1px solid #eee' }}>
+                    <td style={{ padding: '5px 8px', fontWeight: 600 }}>{g.row}</td>
+                    <td style={{ padding: '5px 8px', fontWeight: 600 }}>{g.number}</td>
+                    <td style={{ padding: '5px 8px', color: '#dc3545', fontWeight: 600 }}>{g.count}×</td>
+                    <td style={{ padding: '5px 8px', fontSize: 12, color: '#555' }}>
+                      {g.blockNames.map((name, i) => (
+                        <span key={i}>
+                          {name}
+                          {g.sections[i] ? <span style={{ color: '#999' }}> ({g.sections[i]})</span> : ''}
+                          {i < g.blockNames.length - 1 ? ', ' : ''}
+                        </span>
+                      ))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Help modal */}
       {showHelp && (

@@ -99,6 +99,7 @@
 | title | VARCHAR(255) NOT NULL |  |
 | status | VARCHAR(32) NOT NULL | default 'draft' |
 | layout | LONGTEXT NOT NULL | JSON (primitives + compiled seats) |
+| integrity_pass | TINYINT(1) NOT NULL | default 0; 1 = no duplicate row+number pairs |
 | lock_user_id | BIGINT UNSIGNED NULL |  |
 | lock_token | CHAR(36) NULL |  |
 | lock_expires_at_gmt | DATETIME NULL |  |

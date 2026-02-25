@@ -131,6 +131,9 @@ class AIOEMP_Seatmaps_Controller extends AIOEMP_REST_Controller {
                 return $this->error( 'invalid_layout', __( 'layout must be valid JSON.', 'aioemp' ) );
             }
             $data['layout'] = wp_json_encode( $decoded );
+
+            // Server-side seat integrity check.
+            $data['integrity_pass'] = self::check_seat_integrity( $decoded ) ? 1 : 0;
         }
 
         $id = $this->model->create( $data );
@@ -182,6 +185,9 @@ class AIOEMP_Seatmaps_Controller extends AIOEMP_REST_Controller {
                 return $this->error( 'invalid_layout', __( 'layout must be valid JSON.', 'aioemp' ) );
             }
             $data['layout'] = wp_json_encode( $decoded );
+
+            // Server-side seat integrity check.
+            $data['integrity_pass'] = self::check_seat_integrity( $decoded ) ? 1 : 0;
         }
 
         if ( empty( $data ) ) {
@@ -231,5 +237,49 @@ class AIOEMP_Seatmaps_Controller extends AIOEMP_REST_Controller {
             'per_page' => array( 'type' => 'integer', 'default' => 20, 'minimum' => 1, 'maximum' => 100, 'sanitize_callback' => 'absint' ),
             'search'   => array( 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ),
         );
+    }
+
+    /*--------------------------------------------------------------
+     * Seat integrity check
+     *
+     * Mirrors the client-side logic: scan compiled seats for
+     * duplicate row+number pairs regardless of section.
+     * Returns true when no duplicates are found (pass).
+     *------------------------------------------------------------*/
+
+    /**
+     * Check seat integrity of a decoded layout object.
+     *
+     * @param object|array $layout Decoded layout JSON.
+     * @return bool True if integrity passes (no duplicate row+number pairs).
+     */
+    public static function check_seat_integrity( $layout ): bool {
+        $layout = is_array( $layout ) ? (object) $layout : $layout;
+
+        if ( ! isset( $layout->compiled->seats ) || ! is_array( $layout->compiled->seats ) ) {
+            // No compiled seats — passes by default (empty layout).
+            return true;
+        }
+
+        $seen = array();
+        foreach ( $layout->compiled->seats as $seat ) {
+            $seat = is_array( $seat ) ? (object) $seat : $seat;
+
+            $row    = isset( $seat->row )    ? (string) $seat->row    : '';
+            $number = isset( $seat->number ) ? (string) $seat->number : '';
+
+            // Skip seats with no row or number (non-addressable).
+            if ( '' === $row && '' === $number ) {
+                continue;
+            }
+
+            $key = $row . '||' . $number;
+            if ( isset( $seen[ $key ] ) ) {
+                return false; // Duplicate found.
+            }
+            $seen[ $key ] = true;
+        }
+
+        return true;
     }
 }

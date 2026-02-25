@@ -97,10 +97,15 @@
         // Check for dynamic route: seatmap-edit/{id}
         const editMatch = hash.match(/^seatmap-edit\/(\d+)$/);
 
+        // Check for dynamic route: event/{id}
+        const eventDetailMatch = hash.match(/^event\/(\d+)$/);
+
         // Update active nav link.
         $('.aioemp-nav-link').removeClass('is-active');
         if (editMatch) {
             $(`.aioemp-nav-link[data-route="seatmaps"]`).addClass('is-active');
+        } else if (eventDetailMatch) {
+            $(`.aioemp-nav-link[data-route="events"]`).addClass('is-active');
         } else {
             $(`.aioemp-nav-link[data-route="${hash}"]`).addClass('is-active');
         }
@@ -110,6 +115,12 @@
             $content.empty();
             if (window.aioemp_seatmaps && window.aioemp_seatmaps.renderEdit) {
                 window.aioemp_seatmaps.renderEdit($content);
+            }
+        } else if (eventDetailMatch) {
+            $title.text('Event Detail');
+            $content.empty();
+            if (window.aioemp_events && window.aioemp_events.renderDetail) {
+                window.aioemp_events.renderDetail($content);
             }
         } else if (route) {
             $title.text(route.title);
@@ -127,12 +138,16 @@
      * Placeholder route handlers (replaced per-module in later phases)
      * --------------------------------------------------------------------- */
     registerRoute('events', 'Events', function ($el) {
-        $el.html(
-            '<div class="aioemp-card">' +
-                '<h3 class="aioemp-card__title">Events</h3>' +
-                '<p>Events module — coming in Phase 7.</p>' +
-            '</div>'
-        );
+        if (window.aioemp_events && window.aioemp_events.render) {
+            window.aioemp_events.render($el);
+        } else {
+            $el.html(
+                '<div class="aioemp-card">' +
+                    '<h3 class="aioemp-card__title">Events</h3>' +
+                    '<p>Events module is loading…</p>' +
+                '</div>'
+            );
+        }
     });
 
     registerRoute('seatmaps', 'Seatmaps', function ($el) {

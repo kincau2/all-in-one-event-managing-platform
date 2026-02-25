@@ -518,3 +518,324 @@ body.aioemp-active {
 .aioemp-settings__status--error {
     color: var(--sa-danger);
 }
+
+/* ===================================================================
+   11. Card header (with action buttons)
+   =================================================================== */
+.aioemp-card__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+
+.aioemp-card__header .aioemp-card__title {
+    margin: 0;
+}
+
+/* ===================================================================
+   12. Toolbar (search + filters row)
+   =================================================================== */
+.aioemp-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+.aioemp-toolbar__bulk {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+}
+
+.aioemp-input--sm,
+.aioemp-select--sm {
+    padding: 6px 10px;
+    font-size: 12px;
+}
+
+/* ===================================================================
+   13. Pagination
+   =================================================================== */
+.aioemp-pagination {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding-top: 12px;
+}
+
+.aioemp-pagination__info {
+    font-size: 12px;
+    color: var(--sa-muted);
+    margin: 0 4px;
+}
+
+/* ===================================================================
+   14. Button sizes
+   =================================================================== */
+.aioemp-btn--sm {
+    padding: 6px 14px;
+    font-size: 12px;
+}
+
+.aioemp-btn--xs {
+    padding: 4px 10px;
+    font-size: 11px;
+}
+
+/* ===================================================================
+   15. Detail page header
+   =================================================================== */
+.aioemp-detail-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.aioemp-detail-header__left {
+    flex: 1;
+    min-width: 0;
+}
+
+.aioemp-detail-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--sa-text);
+    margin: 8px 0 6px;
+}
+
+.aioemp-detail-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    font-size: 13px;
+    color: var(--sa-muted);
+}
+
+/* ===================================================================
+   16. Tabs
+   =================================================================== */
+.aioemp-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 2px solid var(--sa-border);
+    margin-bottom: 20px;
+}
+
+.aioemp-tab {
+    padding: 10px 20px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--sa-muted);
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    cursor: pointer;
+    transition: all .15s ease;
+}
+
+.aioemp-tab:hover {
+    color: var(--sa-primary);
+}
+
+.aioemp-tab.is-active {
+    color: var(--sa-primary);
+    border-bottom-color: var(--sa-primary);
+}
+
+.aioemp-tab-content {
+    min-height: 200px;
+}
+
+/* ===================================================================
+   17. Detail grid (key-value rows)
+   =================================================================== */
+.aioemp-detail-grid {
+    display: grid;
+    grid-template-columns: 160px 1fr;
+    gap: 0;
+}
+
+.aioemp-detail-row {
+    display: contents;
+}
+
+.aioemp-detail-row__label {
+    padding: 8px 12px 8px 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--sa-muted);
+    border-bottom: 1px solid var(--sa-border);
+}
+
+.aioemp-detail-row__value {
+    padding: 8px 0;
+    font-size: 13px;
+    color: var(--sa-text);
+    border-bottom: 1px solid var(--sa-border);
+    word-break: break-word;
+}
+
+.aioemp-detail-row:last-child .aioemp-detail-row__label,
+.aioemp-detail-row:last-child .aioemp-detail-row__value {
+    border-bottom: none;
+}
+
+/* ===================================================================
+   18. Stat cards
+   =================================================================== */
+.aioemp-stat-cards {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.aioemp-stat-card {
+    flex: 1 1 120px;
+    padding: 16px;
+    border-radius: var(--sa-radius);
+    text-align: center;
+    background: #f8f9fa;
+}
+
+.aioemp-stat-card__value {
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.aioemp-stat-card__label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .3px;
+    color: var(--sa-muted);
+    margin-top: 4px;
+}
+
+.aioemp-stat-card--primary .aioemp-stat-card__value { color: var(--sa-primary); }
+.aioemp-stat-card--info    .aioemp-stat-card__value { color: var(--sa-info); }
+.aioemp-stat-card--success .aioemp-stat-card__value { color: var(--sa-success); }
+.aioemp-stat-card--warning .aioemp-stat-card__value { color: var(--sa-warning); }
+.aioemp-stat-card--danger  .aioemp-stat-card__value { color: var(--sa-danger); }
+
+/* ===================================================================
+   19. Additional badge colours (venue, candidate status)
+   =================================================================== */
+.aioemp-badge--info    { background: rgba(36,138,253,.12); color: var(--sa-info); }
+.aioemp-badge--success { background: rgba(58,196,125,.15); color: var(--sa-success); }
+.aioemp-badge--warning { background: rgba(255,193,0,.18); color: #b38600; }
+.aioemp-badge--danger  { background: rgba(245,54,92,.12); color: var(--sa-danger); }
+.aioemp-badge--primary { background: rgba(75,73,172,.12); color: var(--sa-primary); }
+
+/* ===================================================================
+   20. Modal overlay
+   =================================================================== */
+.aioemp-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100001;
+}
+
+.aioemp-modal {
+    background: var(--sa-card-bg);
+    border-radius: var(--sa-radius);
+    box-shadow: var(--sa-shadow-lg);
+    width: 90%;
+    max-width: 560px;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.aioemp-modal__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--sa-border);
+}
+
+.aioemp-modal__header h3 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.aioemp-modal__close {
+    background: none;
+    border: none;
+    font-size: 20px;
+    color: var(--sa-muted);
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+}
+
+.aioemp-modal__close:hover { color: var(--sa-danger); }
+
+.aioemp-modal__body {
+    padding: 20px;
+}
+
+/* ===================================================================
+   21. Form actions bar
+   =================================================================== */
+.aioemp-form-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-top: 16px;
+    border-top: 1px solid var(--sa-border);
+    margin-top: 8px;
+}
+
+.aioemp-form-status {
+    font-size: 13px;
+    color: var(--sa-muted);
+}
+
+.aioemp-form-status--ok  { color: var(--sa-success); }
+.aioemp-form-status--err { color: var(--sa-danger); }
+
+/* ===================================================================
+   22. Utility states
+   =================================================================== */
+.aioemp-loading {
+    color: var(--sa-muted);
+    font-size: 13px;
+    padding: 16px 0;
+}
+
+.aioemp-empty {
+    color: var(--sa-muted);
+    font-size: 13px;
+    padding: 20px 0;
+    text-align: center;
+}
+
+.aioemp-error {
+    color: var(--sa-danger);
+    font-size: 13px;
+    padding: 16px 0;
+}
+
+/* Link in table row */
+.evt-link-title {
+    color: var(--sa-primary);
+    text-decoration: none;
+    font-weight: 500;
+}
+.evt-link-title:hover {
+    text-decoration: underline;
+}

@@ -58,17 +58,24 @@ class AIOEMP_Activator {
         $sql[] = "CREATE TABLE {$prefix}events (
             id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
             title varchar(255) NOT NULL,
+            description text DEFAULT NULL,
             status varchar(32) NOT NULL DEFAULT 'draft',
             start_date_gmt datetime DEFAULT NULL,
             end_date_gmt datetime DEFAULT NULL,
             capacity int unsigned DEFAULT NULL,
             venue_mode varchar(32) DEFAULT NULL,
+            location_name varchar(255) DEFAULT NULL,
+            location_address text DEFAULT NULL,
+            online_url varchar(500) DEFAULT NULL,
+            cover_img_url varchar(500) DEFAULT NULL,
+            seatmap_id bigint(20) unsigned DEFAULT NULL,
             seatmap_layout_snapshot longtext DEFAULT NULL,
             seatmap_finalized_at_gmt datetime DEFAULT NULL,
             lock_user_id bigint(20) unsigned DEFAULT NULL,
             lock_token char(36) DEFAULT NULL,
             lock_expires_at_gmt datetime DEFAULT NULL,
             lock_updated_at_gmt datetime DEFAULT NULL,
+            created_by bigint(20) unsigned DEFAULT NULL,
             created_at_gmt datetime NOT NULL,
             PRIMARY KEY  (id),
             KEY idx_status (status),
@@ -150,6 +157,7 @@ class AIOEMP_Activator {
             title varchar(255) NOT NULL,
             status varchar(32) NOT NULL DEFAULT 'draft',
             layout longtext NOT NULL,
+            integrity_pass tinyint(1) NOT NULL DEFAULT 0,
             lock_user_id bigint(20) unsigned DEFAULT NULL,
             lock_token char(36) DEFAULT NULL,
             lock_expires_at_gmt datetime DEFAULT NULL,
@@ -243,24 +251,50 @@ class AIOEMP_Activator {
      * that dbDelta may not handle reliably.
      */
     private static function run_migrations( $wpdb, string $prefix ): void {
+        // ── Seatmap table migrations ──
         $table = $prefix . 'seatmap';
 
         // Skip if table doesn't exist yet (fresh install — dbDelta will create it).
         $exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) );
-        if ( ! $exists ) {
-            return;
+        if ( $exists ) {
+            // v1.1.0 — add status column.
+            $col = $wpdb->get_results( "SHOW COLUMNS FROM `{$table}` LIKE 'status'" );
+            if ( empty( $col ) ) {
+                $wpdb->query( "ALTER TABLE `{$table}` ADD COLUMN `status` varchar(32) NOT NULL DEFAULT 'draft' AFTER `title`" );
+            }
+
+            // v1.1.0 — add updated_at_gmt column.
+            $col = $wpdb->get_results( "SHOW COLUMNS FROM `{$table}` LIKE 'updated_at_gmt'" );
+            if ( empty( $col ) ) {
+                $wpdb->query( "ALTER TABLE `{$table}` ADD COLUMN `updated_at_gmt` datetime DEFAULT NULL AFTER `lock_updated_at_gmt`" );
+            }
+
+            // v1.2.0 — add integrity_pass column.
+            $col = $wpdb->get_results( "SHOW COLUMNS FROM `{$table}` LIKE 'integrity_pass'" );
+            if ( empty( $col ) ) {
+                $wpdb->query( "ALTER TABLE `{$table}` ADD COLUMN `integrity_pass` tinyint(1) NOT NULL DEFAULT 0 AFTER `layout`" );
+            }
         }
 
-        // v1.1.0 — add status column.
-        $col = $wpdb->get_results( "SHOW COLUMNS FROM `{$table}` LIKE 'status'" );
-        if ( empty( $col ) ) {
-            $wpdb->query( "ALTER TABLE `{$table}` ADD COLUMN `status` varchar(32) NOT NULL DEFAULT 'draft' AFTER `title`" );
-        }
-
-        // v1.1.0 — add updated_at_gmt column.
-        $col = $wpdb->get_results( "SHOW COLUMNS FROM `{$table}` LIKE 'updated_at_gmt'" );
-        if ( empty( $col ) ) {
-            $wpdb->query( "ALTER TABLE `{$table}` ADD COLUMN `updated_at_gmt` datetime DEFAULT NULL AFTER `lock_updated_at_gmt`" );
+        // ── Events table migrations (v1.3.0) ──
+        $events_table = $prefix . 'events';
+        $exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $events_table ) );
+        if ( $exists ) {
+            $new_cols = array(
+                'description'      => "ADD COLUMN `description` text DEFAULT NULL AFTER `title`",
+                'location_name'    => "ADD COLUMN `location_name` varchar(255) DEFAULT NULL AFTER `venue_mode`",
+                'location_address' => "ADD COLUMN `location_address` text DEFAULT NULL AFTER `location_name`",
+                'online_url'       => "ADD COLUMN `online_url` varchar(500) DEFAULT NULL AFTER `location_address`",
+                'cover_img_url'    => "ADD COLUMN `cover_img_url` varchar(500) DEFAULT NULL AFTER `online_url`",
+                'seatmap_id'       => "ADD COLUMN `seatmap_id` bigint(20) unsigned DEFAULT NULL AFTER `cover_img_url`",
+                'created_by'       => "ADD COLUMN `created_by` bigint(20) unsigned DEFAULT NULL AFTER `lock_updated_at_gmt`",
+            );
+            foreach ( $new_cols as $col_name => $alter_sql ) {
+                $col = $wpdb->get_results( "SHOW COLUMNS FROM `{$events_table}` LIKE '{$col_name}'" );
+                if ( empty( $col ) ) {
+                    $wpdb->query( "ALTER TABLE `{$events_table}` {$alter_sql}" );
+                }
+            }
         }
     }
 }

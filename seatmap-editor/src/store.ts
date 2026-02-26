@@ -168,7 +168,7 @@ export const useEditorStore = create<EditorState>()(
         /* Always recompile on load so compiled positions
            match the current algorithm / constants rather
            than using potentially stale saved data. */
-        const compiled = compileLayout(layout, layout);
+        const compiled = compileLayout(layout);
         s.layout = compiled;
         s.compiledSeats = compiled.compiled.seats;
         s.compiledRowLabels = (compiled.compiled as any)?.rowLabels ?? [];
@@ -183,8 +183,7 @@ export const useEditorStore = create<EditorState>()(
     /* ── Recompile ── */
     recompile() {
       set((s) => {
-        const previousLayout = { ...s.layout };
-        const compiled = compileLayout(s.layout, previousLayout);
+        const compiled = compileLayout(s.layout);
         s.layout = compiled;
         s.compiledSeats = compiled.compiled.seats;
         s.compiledRowLabels = (compiled.compiled as any).rowLabels ?? [];

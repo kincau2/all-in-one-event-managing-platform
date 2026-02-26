@@ -5,15 +5,12 @@ import { describe, it, expect } from 'vitest';
 import { compileArc } from '../src/compile-arc.js';
 import type { SeatBlockArc } from '../src/types.js';
 import { SeatBlockArcSchema } from '../src/schema.js';
-import type { SeatKeyMap } from '../src/seat-key.js';
 
 /* -- Helpers -- */
 
 function parseArc(raw: Record<string, unknown>): SeatBlockArc {
   return SeatBlockArcSchema.parse(raw);
 }
-
-const EMPTY_MAP: SeatKeyMap = new Map();
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /* -- Tests -- */
@@ -27,7 +24,7 @@ describe('compileArc', () => {
       startAngleDeg: -60, endAngleDeg: 60,
       seatsPerRow: { start: 10, delta: 2 },
     });
-    const { seats } = compileArc(prim, EMPTY_MAP);
+    const { seats } = compileArc(prim);
     // Row 0: 10, Row 1: 12, Row 2: 14 -> 36
     expect(seats).toHaveLength(36);
   });
@@ -40,7 +37,7 @@ describe('compileArc', () => {
       startAngleDeg: -60, endAngleDeg: 60,
       seatsPerRow: [8, 10, 12],
     });
-    const { seats } = compileArc(prim, EMPTY_MAP);
+    const { seats } = compileArc(prim);
     expect(seats).toHaveLength(30);
   });
 
@@ -52,7 +49,7 @@ describe('compileArc', () => {
       startAngleDeg: 0, endAngleDeg: 90,
       seatsPerRow: [5],
     });
-    const { seats } = compileArc(prim, EMPTY_MAP);
+    const { seats } = compileArc(prim);
     expect(seats).toHaveLength(5);
 
     // First seat at 0deg: x = 100*cos(0) = 100, y = 100*sin(0) = 0
@@ -72,7 +69,7 @@ describe('compileArc', () => {
       startAngleDeg: 0, endAngleDeg: 0, // all seats at 0deg
       seatsPerRow: [1, 1, 1],
     });
-    const { seats } = compileArc(prim, EMPTY_MAP);
+    const { seats } = compileArc(prim);
 
     // Each seat is placed at angle 0deg (single seat -> midpoint = 0deg)
     // Row 0: r=100, Row 1: r=150, Row 2: r=200
@@ -89,7 +86,7 @@ describe('compileArc', () => {
       startAngleDeg: -45, endAngleDeg: 45,
       seatsPerRow: [8, 10],
     });
-    const { seats } = compileArc(prim, EMPTY_MAP);
+    const { seats } = compileArc(prim);
     for (const s of seats) {
       expect(s.seat_key).toMatch(UUID_RE);
     }
@@ -103,7 +100,7 @@ describe('compileArc', () => {
       startAngleDeg: 0, endAngleDeg: 90,
       seatsPerRow: [2, 2, 2],
     });
-    const { seats } = compileArc(prim, EMPTY_MAP);
+    const { seats } = compileArc(prim);
     expect(seats[0].row).toBe('A');
     expect(seats[2].row).toBe('B');
     expect(seats[4].row).toBe('C');
@@ -119,7 +116,7 @@ describe('compileArc', () => {
       seatsPerRow: [5],
       aisleGaps: [{ afterSeatIndex: 2, gapAngleDeg: 20 }],
     });
-    const { seats } = compileArc(prim, EMPTY_MAP);
+    const { seats } = compileArc(prim);
 
     // Usable angle = 100 - 20 = 80
     // Step = 80 / 4 = 20
@@ -146,7 +143,7 @@ describe('compileArc', () => {
       seatsPerRow: [3],
       aisleGaps: [{ afterSeatIndex: 0, gapPx: 10 }],
     });
-    const { seats } = compileArc(prim, EMPTY_MAP);
+    const { seats } = compileArc(prim);
 
     const expectedGapDeg = (10 / 100) * (180 / Math.PI);
     const usable = 90 - expectedGapDeg;
@@ -169,7 +166,7 @@ describe('compileArc', () => {
       seatsPerRow: [1],
       transform: { x: 50, y: 75 },
     });
-    const { seats } = compileArc(prim, EMPTY_MAP);
+    const { seats } = compileArc(prim);
     // Single seat at 0deg: base (100, 0) + transform (50, 75) = (150, 75)
     expect(seats[0].x).toBeCloseTo(150, 1);
     expect(seats[0].y).toBeCloseTo(75, 1);
@@ -183,7 +180,7 @@ describe('compileArc', () => {
       startAngleDeg: 0, endAngleDeg: 90,
       seatsPerRow: [3],
     });
-    const { seats } = compileArc(prim, EMPTY_MAP);
+    const { seats } = compileArc(prim);
     // Seat at 0deg: rotation = 0 + 90 = 90
     expect(seats[0].rotation).toBeCloseTo(90, 1);
     // Seat at 90deg: rotation = 90 + 90 = 180
@@ -198,7 +195,7 @@ describe('compileArc', () => {
       startAngleDeg: 0, endAngleDeg: 90,
       seatsPerRow: [3, 4],
     });
-    const { seats } = compileArc(prim, EMPTY_MAP);
+    const { seats } = compileArc(prim);
     expect(seats[0].meta).toEqual({ primitiveId: 'arc1', logicalRow: 0, logicalSeat: 0 });
     // Row 1 starts at index 3 (after 3 seats in row 0)
     expect(seats[3].meta).toEqual({ primitiveId: 'arc1', logicalRow: 1, logicalSeat: 0 });

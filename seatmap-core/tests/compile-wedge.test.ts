@@ -5,15 +5,12 @@ import { describe, it, expect } from 'vitest';
 import { compileWedge } from '../src/compile-wedge.js';
 import type { SeatBlockWedge } from '../src/types.js';
 import { SeatBlockWedgeSchema } from '../src/schema.js';
-import type { SeatKeyMap } from '../src/seat-key.js';
 
 /* ── Helpers ── */
 
 function parseWedge(raw: Record<string, unknown>): SeatBlockWedge {
   return SeatBlockWedgeSchema.parse(raw);
 }
-
-const EMPTY_MAP: SeatKeyMap = new Map();
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /* ── Tests ── */
@@ -28,7 +25,7 @@ describe('compileWedge', () => {
       rowCount: 3,
       seatsPerRow: { start: 6, delta: 2 },
     });
-    const seats = compileWedge(prim, EMPTY_MAP);
+    const seats = compileWedge(prim);
     // Row 0: 6, Row 1: 8, Row 2: 10 → 24
     expect(seats).toHaveLength(24);
   });
@@ -42,7 +39,7 @@ describe('compileWedge', () => {
       rowCount: 3,
       seatsPerRow: [1, 1, 1],
     });
-    const seats = compileWedge(prim, EMPTY_MAP);
+    const seats = compileWedge(prim);
 
     // Row 0: r = 100, Row 1: r = 200, Row 2: r = 300
     expect(seats[0].x).toBeCloseTo(100, 1);
@@ -59,7 +56,7 @@ describe('compileWedge', () => {
       rowCount: 1,
       seatsPerRow: [1],
     });
-    const seats = compileWedge(prim, EMPTY_MAP);
+    const seats = compileWedge(prim);
     // (100 + 200) / 2 = 150
     expect(seats[0].x).toBeCloseTo(150, 1);
   });
@@ -73,7 +70,7 @@ describe('compileWedge', () => {
       rowCount: 1,
       seatsPerRow: [3],
     });
-    const seats = compileWedge(prim, EMPTY_MAP);
+    const seats = compileWedge(prim);
 
     // 3 seats at 0°, 45°, 90° on radius 100
     expect(seats[0].x).toBeCloseTo(100, 1);          // cos(0°) = 1
@@ -93,7 +90,7 @@ describe('compileWedge', () => {
       rowCount: 2,
       seatsPerRow: [5, 7],
     });
-    const seats = compileWedge(prim, EMPTY_MAP);
+    const seats = compileWedge(prim);
     for (const s of seats) {
       expect(s.seat_key).toMatch(UUID_RE);
     }
@@ -109,7 +106,7 @@ describe('compileWedge', () => {
       seatsPerRow: [1],
       transform: { x: 10, y: 20 },
     });
-    const seats = compileWedge(prim, EMPTY_MAP);
+    const seats = compileWedge(prim);
     // Base: (100, 0) + transform → (110, 20)
     expect(seats[0].x).toBeCloseTo(110, 1);
     expect(seats[0].y).toBeCloseTo(20, 1);
@@ -124,7 +121,7 @@ describe('compileWedge', () => {
       rowCount: 2,
       seatsPerRow: [3, 4],
     });
-    const seats = compileWedge(prim, EMPTY_MAP);
+    const seats = compileWedge(prim);
     expect(seats[0].meta).toEqual({ primitiveId: 'wedge1', logicalRow: 0, logicalSeat: 0 });
     expect(seats[3].meta).toEqual({ primitiveId: 'wedge1', logicalRow: 1, logicalSeat: 0 });
   });

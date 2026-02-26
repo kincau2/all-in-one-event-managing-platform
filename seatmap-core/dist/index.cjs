@@ -46,13 +46,13 @@ __export(index_exports, {
   StagePrimitiveSchema: () => StagePrimitiveSchema,
   TransformSchema: () => TransformSchema,
   arcPivotOffset: () => arcPivotOffset,
-  buildSeatKeyMap: () => buildSeatKeyMap,
   compileArc: () => compileArc,
   compileGrid: () => compileGrid,
   compileLayout: () => compileLayout,
   compileWedge: () => compileWedge,
   computeBounds: () => computeBounds,
   degToRad: () => degToRad,
+  deterministicSeatKey: () => deterministicSeatKey,
   generateRowLabel: () => generateRowLabel,
   generateUUID: () => generateUUID,
   getSeatsPerRow: () => getSeatsPerRow,
@@ -256,6 +256,30 @@ var LayoutSchema = import_zod.z.object({
   })
 });
 
+// src/seat-key.ts
+function fnv1a(str, seed) {
+  let h = seed;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+function deterministicSeatKey(primitiveId, logicalRow, logicalSeat) {
+  const input = `${primitiveId}:${logicalRow}:${logicalSeat}`;
+  const h1 = fnv1a(input, 2166136261);
+  const h2 = fnv1a(input, 84696351);
+  const h3 = fnv1a(input, 439041101);
+  const h4 = fnv1a(input, 2137939276);
+  const hex = (n) => (n >>> 0).toString(16).padStart(8, "0");
+  const a = hex(h1);
+  const b = hex(h2);
+  const c = hex(h3);
+  const d = hex(h4);
+  const variant = "89ab"[parseInt(c[0], 16) & 3];
+  return a + "-" + b.slice(0, 4) + "-4" + b.slice(5, 8) + "-" + variant + c.slice(1, 4) + "-" + c.slice(4, 8) + d;
+}
+
 // src/utils.ts
 function degToRad(deg) {
   return deg * Math.PI / 180;
@@ -359,7 +383,7 @@ function arcPivotOffset(startRadius, rowCount, radiusStep, radiusRatio, startAng
 }
 
 // src/compile-grid.ts
-function compileGrid(primitive, keyMap, globalSeatRadius = 10) {
+function compileGrid(primitive, globalSeatRadius = 10) {
   const {
     id,
     origin = { x: 0, y: 0 },
@@ -413,8 +437,7 @@ function compileGrid(primitive, keyMap, globalSeatRadius = 10) {
       y += transform?.y ?? 0;
       const seatNumber = numbering === "R2L" ? cols - c + (startNum - 1) : c + startNum;
       const label = `${rowLabelStr}-${String(seatNumber).padStart(2, "0")}`;
-      const logicalKey = `${id}:${r}:${c}`;
-      const seat_key = keyMap.get(logicalKey) ?? generateUUID();
+      const seat_key = deterministicSeatKey(id, r, c);
       seats.push({
         seat_key,
         label,
@@ -478,7 +501,7 @@ function resolveGaps(aisleGaps, radius) {
     return { afterSeatIndex: g.afterSeatIndex, angleDeg: angleDeg ?? 0 };
   });
 }
-function compileArc(primitive, keyMap, globalSeatRadius = 10) {
+function compileArc(primitive, globalSeatRadius = 10) {
   const {
     id,
     center,
@@ -538,8 +561,7 @@ function compileArc(primitive, keyMap, globalSeatRadius = 10) {
       y += transform?.y ?? 0;
       const seatNumber = numbering === "R2L" ? n - s + (startNum - 1) : s + startNum;
       const label = `${rowLabelStr}-${String(seatNumber).padStart(2, "0")}`;
-      const logicalKey = `${id}:${r}:${s}`;
-      const seat_key = keyMap.get(logicalKey) ?? generateUUID();
+      const seat_key = deterministicSeatKey(id, r, s);
       seats.push({
         seat_key,
         label,
@@ -600,7 +622,7 @@ function compileArc(primitive, keyMap, globalSeatRadius = 10) {
 }
 
 // src/compile-wedge.ts
-function compileWedge(primitive, keyMap, globalSeatRadius = 10) {
+function compileWedge(primitive, globalSeatRadius = 10) {
   const {
     id,
     center,
@@ -644,8 +666,7 @@ function compileWedge(primitive, keyMap, globalSeatRadius = 10) {
       y += transform?.y ?? 0;
       const seatNumber = numbering === "R2L" ? n - s : s + 1;
       const label = `${rowLabelStr}-${String(seatNumber).padStart(2, "0")}`;
-      const logicalKey = `${id}:${r}:${s}`;
-      const seat_key = keyMap.get(logicalKey) ?? generateUUID();
+      const seat_key = deterministicSeatKey(id, r, s);
       seats.push({
         seat_key,
         label,
@@ -664,41 +685,27 @@ function compileWedge(primitive, keyMap, globalSeatRadius = 10) {
   return seats;
 }
 
-// src/seat-key.ts
-function buildSeatKeyMap(existingSeats) {
-  const map = /* @__PURE__ */ new Map();
-  for (const seat of existingSeats) {
-    const m = seat.meta;
-    if (m && typeof m.primitiveId === "string" && typeof m.logicalRow === "number" && typeof m.logicalSeat === "number") {
-      const key = `${m.primitiveId}:${m.logicalRow}:${m.logicalSeat}`;
-      map.set(key, seat.seat_key);
-    }
-  }
-  return map;
-}
-
 // src/compile-layout.ts
-function compileLayout(layout, existingLayout) {
-  const keyMap = existingLayout?.compiled?.seats ? buildSeatKeyMap(existingLayout.compiled.seats) : /* @__PURE__ */ new Map();
+function compileLayout(layout) {
   const allSeats = [];
   const allRowLabels = [];
   const globalSeatRadius = layout.seatRadius ?? 10;
   for (const primitive of layout.primitives) {
     switch (primitive.type) {
       case "seatBlockGrid": {
-        const result = compileGrid(primitive, keyMap, globalSeatRadius);
+        const result = compileGrid(primitive, globalSeatRadius);
         allSeats.push(...result.seats);
         allRowLabels.push(...result.rowLabels);
         break;
       }
       case "seatBlockArc": {
-        const result = compileArc(primitive, keyMap, globalSeatRadius);
+        const result = compileArc(primitive, globalSeatRadius);
         allSeats.push(...result.seats);
         allRowLabels.push(...result.rowLabels);
         break;
       }
       case "seatBlockWedge":
-        allSeats.push(...compileWedge(primitive, keyMap, globalSeatRadius));
+        allSeats.push(...compileWedge(primitive, globalSeatRadius));
         break;
     }
   }
@@ -708,12 +715,12 @@ function compileLayout(layout, existingLayout) {
     compiled: { seats: allSeats, rowLabels: allRowLabels, bounds }
   };
 }
-function validateAndCompile(rawLayout, existingLayout) {
+function validateAndCompile(rawLayout) {
   const result = LayoutSchema.safeParse(rawLayout);
   if (!result.success) {
     return { success: false, errors: result.error };
   }
-  const compiled = compileLayout(result.data, existingLayout);
+  const compiled = compileLayout(result.data);
   return { success: true, layout: compiled };
 }
 function computeBounds(seats) {
@@ -765,13 +772,13 @@ function computeBounds(seats) {
   StagePrimitiveSchema,
   TransformSchema,
   arcPivotOffset,
-  buildSeatKeyMap,
   compileArc,
   compileGrid,
   compileLayout,
   compileWedge,
   computeBounds,
   degToRad,
+  deterministicSeatKey,
   generateRowLabel,
   generateUUID,
   getSeatsPerRow,

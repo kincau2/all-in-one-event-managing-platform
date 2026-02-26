@@ -207,6 +207,10 @@ function aioemp_register_rest_routes(): void {
     require_once AIOEMP_PLUGIN_DIR . 'includes/rest-api/class-aioemp-seatmap-upload-controller.php';
     ( new AIOEMP_Seatmap_Upload_Controller() )->register_routes();
 
+    // Seating (assign / unassign / swap / block / unblock / finalize).
+    require_once AIOEMP_PLUGIN_DIR . 'includes/rest-api/class-aioemp-seating-controller.php';
+    ( new AIOEMP_Seating_Controller() )->register_routes();
+
     // Locking (acquire / heartbeat / release / takeover).
     require_once AIOEMP_PLUGIN_DIR . 'includes/rest-api/class-aioemp-locking-controller.php';
     ( new AIOEMP_Locking_Controller() )->register_routes();

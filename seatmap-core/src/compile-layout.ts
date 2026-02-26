@@ -10,7 +10,6 @@ import { LayoutSchema } from './schema.js';
 import { compileGrid } from './compile-grid.js';
 import { compileArc } from './compile-arc.js';
 import { compileWedge } from './compile-wedge.js';
-import { buildSeatKeyMap, type SeatKeyMap } from './seat-key.js';
 import { round2 } from './utils.js';
 
 /* ──────────────────────────────────────────────
@@ -20,20 +19,13 @@ import { round2 } from './utils.js';
 /**
  * Compile all seat-producing primitives within a Layout.
  *
- * @param layout         - A **parsed** Layout object (already validated).
- * @param existingLayout - Previous layout whose compiled.seats are used
- *                         to preserve seat_keys.
+ * Seat keys are deterministic (derived from primitiveId + row + seat index),
+ * so no previous layout is needed for key preservation.
+ *
+ * @param layout - A **parsed** Layout object (already validated).
  * @returns A new Layout with `compiled.seats` and `compiled.bounds` populated.
  */
-export function compileLayout(
-  layout: Layout,
-  existingLayout?: Layout,
-): Layout {
-  // Build key map from existing compiled seats for preservation
-  const keyMap: SeatKeyMap = existingLayout?.compiled?.seats
-    ? buildSeatKeyMap(existingLayout.compiled.seats)
-    : new Map();
-
+export function compileLayout(layout: Layout): Layout {
   const allSeats: CompiledSeat[] = [];
   const allRowLabels: CompiledRowLabel[] = [];
   const globalSeatRadius = layout.seatRadius ?? 10;
@@ -41,19 +33,19 @@ export function compileLayout(
   for (const primitive of layout.primitives) {
     switch (primitive.type) {
       case 'seatBlockGrid': {
-        const result = compileGrid(primitive, keyMap, globalSeatRadius);
+        const result = compileGrid(primitive, globalSeatRadius);
         allSeats.push(...result.seats);
         allRowLabels.push(...result.rowLabels);
         break;
       }
       case 'seatBlockArc': {
-        const result = compileArc(primitive, keyMap, globalSeatRadius);
+        const result = compileArc(primitive, globalSeatRadius);
         allSeats.push(...result.seats);
         allRowLabels.push(...result.rowLabels);
         break;
       }
       case 'seatBlockWedge':
-        allSeats.push(...compileWedge(primitive, keyMap, globalSeatRadius));
+        allSeats.push(...compileWedge(primitive, globalSeatRadius));
         break;
       // stage, label, obstacle — decorative, produce no seats
     }
@@ -78,20 +70,16 @@ export type CompileResult =
 /**
  * Parse raw JSON with Zod, then compile if valid.
  *
- * @param rawLayout      - Untrusted input (e.g. from REST body / localStorage).
- * @param existingLayout - Previous layout for seat_key preservation.
+ * @param rawLayout - Untrusted input (e.g. from REST body / localStorage).
  */
-export function validateAndCompile(
-  rawLayout: unknown,
-  existingLayout?: Layout,
-): CompileResult {
+export function validateAndCompile(rawLayout: unknown): CompileResult {
   const result = LayoutSchema.safeParse(rawLayout);
 
   if (!result.success) {
     return { success: false, errors: result.error };
   }
 
-  const compiled = compileLayout(result.data, existingLayout);
+  const compiled = compileLayout(result.data);
   return { success: true, layout: compiled };
 }
 

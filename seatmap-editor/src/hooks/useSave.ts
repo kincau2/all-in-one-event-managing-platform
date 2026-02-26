@@ -7,10 +7,27 @@
  */
 
 import { useCallback, useEffect, useRef } from 'react';
-import { validateAndCompile } from '@aioemp/seatmap-core';
+import { validateAndCompile, type CompiledSeat } from '@aioemp/seatmap-core';
 import { seatmapApi } from '../api';
 import { useEditorStore } from '../store';
 import { clearDraft } from './useDraftPersistence';
+
+/**
+ * Client-side seat integrity check.
+ * Mirrors the server-side logic: duplicate row+number ⇒ fail (false).
+ */
+function checkSeatIntegrity(seats: CompiledSeat[]): boolean {
+  const seen = new Set<string>();
+  for (const seat of seats) {
+    const row = seat.row ?? '';
+    const num = seat.number != null ? String(seat.number) : '';
+    if (row === '' && num === '') continue; // non-addressable
+    const key = `${row}||${num}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+  }
+  return true;
+}
 
 interface SaveResult {
   ok: boolean;
@@ -50,12 +67,21 @@ export function useSave() {
         return { ok: false, error: errors || 'Validation failed' };
       }
 
-      /* 2) PUT to server */
+      /* 2) Compute integrity on the compiled seats (client-side). */
+      const integrityPass = checkSeatIntegrity(
+        result.layout.compiled?.seats ?? [],
+      );
+
+      /* 3) PUT to server — send primitives only (strip compiled data).
+       *    Compiled data is regenerated client-side on every load;
+       *    storing it would bloat the DB and cause 504 timeouts. */
+      const { compiled: _strip, ...rawLayout } = result.layout as any;
       await seatmapApi.update(seatmapId, {
-        layout: JSON.stringify(layout),
+        layout: JSON.stringify(rawLayout),
+        integrity_pass: integrityPass ? 1 : 0,
       });
 
-      /* 3) Success */
+      /* 4) Success */
       setSaveStatus('saved');
       markClean();
       clearDraft(seatmapId);

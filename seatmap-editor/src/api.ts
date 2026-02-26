@@ -33,7 +33,7 @@ export const seatmapApi = {
     return api().post('seatmaps', { title, layout }) as Promise<SeatmapRecord>;
   },
 
-  update(id: number, data: { title?: string; layout?: string }) {
+  update(id: number, data: { title?: string; layout?: string; integrity_pass?: number }) {
     return api().put(`seatmaps/${id}`, data) as Promise<SeatmapRecord>;
   },
 

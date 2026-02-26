@@ -12,8 +12,8 @@
  */
 
 import type { SeatBlockGrid, CompiledSeat, CompiledRowLabel } from './types.js';
-import type { SeatKeyMap } from './seat-key.js';
-import { generateRowLabel, generateUUID, rotatePoint, round2 } from './utils.js';
+import { deterministicSeatKey } from './seat-key.js';
+import { generateRowLabel, rotatePoint, round2 } from './utils.js';
 import { gridPivotOffset, GRID_PAD, GRID_LBL_W } from './pivot.js';
 
 export interface GridCompileResult {
@@ -23,7 +23,6 @@ export interface GridCompileResult {
 
 export function compileGrid(
   primitive: SeatBlockGrid,
-  keyMap: SeatKeyMap,
   globalSeatRadius: number = 10,
 ): GridCompileResult {
   const {
@@ -95,8 +94,7 @@ export function compileGrid(
       const seatNumber = numbering === 'R2L' ? (cols - c) + (startNum - 1) : c + startNum;
       const label = `${rowLabelStr}-${String(seatNumber).padStart(2, '0')}`;
 
-      const logicalKey = `${id}:${r}:${c}`;
-      const seat_key = keyMap.get(logicalKey) ?? generateUUID();
+      const seat_key = deterministicSeatKey(id, r, c);
 
       seats.push({
         seat_key,

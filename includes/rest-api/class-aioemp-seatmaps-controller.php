@@ -126,14 +126,19 @@ class AIOEMP_Seatmaps_Controller extends AIOEMP_REST_Controller {
         // Accept optional layout JSON on create (for imports / duplicates).
         $layout = $request->get_param( 'layout' );
         if ( null !== $layout ) {
-            $decoded = AIOEMP_Security::decode_json( $layout );
-            if ( is_wp_error( $decoded ) ) {
+            // Validate JSON syntax only — store the raw string directly
+            // to avoid expensive decode + re-encode for large layouts.
+            json_decode( $layout );
+            if ( json_last_error() !== JSON_ERROR_NONE ) {
                 return $this->error( 'invalid_layout', __( 'layout must be valid JSON.', 'aioemp' ) );
             }
-            $data['layout'] = wp_json_encode( $decoded );
+            $data['layout'] = $layout;
+        }
 
-            // Server-side seat integrity check.
-            $data['integrity_pass'] = self::check_seat_integrity( $decoded ) ? 1 : 0;
+        // Integrity flag computed client-side (duplicate row+number check).
+        $integrity = $request->get_param( 'integrity_pass' );
+        if ( null !== $integrity ) {
+            $data['integrity_pass'] = absint( $integrity ) ? 1 : 0;
         }
 
         $id = $this->model->create( $data );
@@ -180,14 +185,19 @@ class AIOEMP_Seatmaps_Controller extends AIOEMP_REST_Controller {
 
         $layout = $request->get_param( 'layout' );
         if ( null !== $layout ) {
-            $decoded = AIOEMP_Security::decode_json( $layout );
-            if ( is_wp_error( $decoded ) ) {
+            // Validate JSON syntax only — store the raw string directly
+            // to avoid expensive decode + re-encode for large layouts.
+            json_decode( $layout );
+            if ( json_last_error() !== JSON_ERROR_NONE ) {
                 return $this->error( 'invalid_layout', __( 'layout must be valid JSON.', 'aioemp' ) );
             }
-            $data['layout'] = wp_json_encode( $decoded );
+            $data['layout'] = $layout;
+        }
 
-            // Server-side seat integrity check.
-            $data['integrity_pass'] = self::check_seat_integrity( $decoded ) ? 1 : 0;
+        // Integrity flag computed client-side (duplicate row+number check).
+        $integrity = $request->get_param( 'integrity_pass' );
+        if ( null !== $integrity ) {
+            $data['integrity_pass'] = absint( $integrity ) ? 1 : 0;
         }
 
         if ( empty( $data ) ) {
@@ -254,19 +264,21 @@ class AIOEMP_Seatmaps_Controller extends AIOEMP_REST_Controller {
      * @return bool True if integrity passes (no duplicate row+number pairs).
      */
     public static function check_seat_integrity( $layout ): bool {
-        $layout = is_array( $layout ) ? (object) $layout : $layout;
+        // decode_json returns associative arrays, so use array access throughout.
+        if ( is_object( $layout ) ) {
+            $layout = json_decode( wp_json_encode( $layout ), true );
+        }
 
-        if ( ! isset( $layout->compiled->seats ) || ! is_array( $layout->compiled->seats ) ) {
+        $seats = $layout['compiled']['seats'] ?? null;
+        if ( ! is_array( $seats ) || empty( $seats ) ) {
             // No compiled seats — passes by default (empty layout).
             return true;
         }
 
         $seen = array();
-        foreach ( $layout->compiled->seats as $seat ) {
-            $seat = is_array( $seat ) ? (object) $seat : $seat;
-
-            $row    = isset( $seat->row )    ? (string) $seat->row    : '';
-            $number = isset( $seat->number ) ? (string) $seat->number : '';
+        foreach ( $seats as $seat ) {
+            $row    = isset( $seat['row'] )    ? (string) $seat['row']    : '';
+            $number = isset( $seat['number'] ) ? (string) $seat['number'] : '';
 
             // Skip seats with no row or number (non-addressable).
             if ( '' === $row && '' === $number ) {

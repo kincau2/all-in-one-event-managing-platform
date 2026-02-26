@@ -112,11 +112,21 @@ class AIOEMP_Admin {
             true
         );
 
-        // Events module (depends on core admin script).
+        // Seatmap compiler (IIFE) — compiles layout primitives → seats
+        // in the browser. Required by the Events seating tab.
+        wp_enqueue_script(
+            'aioemp-seatmap-compiler',
+            AIOEMP_PLUGIN_URL . 'admin/js/seatmap-compiler.js',
+            array(),
+            AIOEMP_VERSION,
+            true
+        );
+
+        // Events module (depends on core admin script + seatmap compiler).
         wp_enqueue_script(
             'aioemp-events',
             AIOEMP_PLUGIN_URL . 'admin/js/aioemp-events.js',
-            array( 'jquery', 'aioemp-admin' ),
+            array( 'jquery', 'aioemp-admin', 'aioemp-seatmap-compiler' ),
             AIOEMP_VERSION,
             true
         );
@@ -151,7 +161,7 @@ class AIOEMP_Admin {
         $logo_url = AIOEMP_Settings_Service::get( 'logo_url' );
 
         wp_localize_script( 'aioemp-admin', 'aioemp', array(
-            'rest_url' => esc_url_raw( rest_url( 'aioemp/v1/' ) ),
+            'rest_url' => esc_url_raw( set_url_scheme( rest_url( 'aioemp/v1/' ), 'https' ) ),
             'nonce'    => wp_create_nonce( 'wp_rest' ),
             'user_id'  => get_current_user_id(),
             'version'  => AIOEMP_VERSION,

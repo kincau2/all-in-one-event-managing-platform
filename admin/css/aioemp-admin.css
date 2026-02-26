@@ -839,3 +839,349 @@ body.aioemp-active {
 .evt-link-title:hover {
     text-decoration: underline;
 }
+
+/* ===================================================================
+   23. Seating Allocation Dashboard
+   =================================================================== */
+
+/* Full-screen overlay */
+.aioemp-seating-fullscreen {
+    position: fixed;
+    inset: 0;
+    z-index: 100000;
+    background: var(--sa-body-bg, #f4f5f7);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.aioemp-seating-fullscreen__header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 10px 20px;
+    background: var(--sa-card-bg, #fff);
+    border-bottom: 1px solid var(--sa-border);
+    flex-shrink: 0;
+}
+
+.aioemp-seating-fullscreen__back {
+    background: none;
+    border: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 13px;
+    color: var(--sa-primary);
+    font-weight: 500;
+    padding: 4px 0;
+}
+.aioemp-seating-fullscreen__back:hover {
+    text-decoration: underline;
+}
+
+.aioemp-seating-fullscreen__title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--sa-text);
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.aioemp-seating-fullscreen__body {
+    flex: 1;
+    overflow: hidden;
+    padding: 12px;
+    display: flex;
+}
+
+.aioemp-seating-fullscreen__body .aioemp-seating-dashboard {
+    flex: 1;
+    min-height: 0;
+}
+
+.aioemp-seating-dashboard {
+    display: flex;
+    gap: 16px;
+    min-height: 500px;
+}
+
+.aioemp-seating-sidebar {
+    width: 280px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    max-height: 100%;
+    overflow: hidden;
+}
+
+.aioemp-seating-sidebar__card {
+    margin: 0;
+}
+
+/* Candidates card fills the entire sidebar height */
+.aioemp-seating-sidebar__card--cands {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+/* Candidate header row: title + unselect button */
+.aioemp-seating-cand-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.aioemp-seating-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--sa-card-bg);
+    border-radius: 8px;
+    border: 1px solid var(--sa-border);
+}
+
+/* Toolbar */
+.aioemp-seating-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--sa-border);
+    flex-wrap: wrap;
+}
+
+.aioemp-seating-modes {
+    display: flex;
+    gap: 4px;
+}
+
+.aioemp-seating-zoom {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+#seat-zoom-level {
+    font-size: 12px;
+    min-width: 40px;
+    text-align: center;
+    color: var(--sa-muted);
+}
+
+.aioemp-seating-legend {
+    display: flex;
+    gap: 12px;
+    font-size: 11px;
+    color: var(--sa-muted);
+}
+
+.aioemp-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.aioemp-legend-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+}
+.aioemp-legend-dot--empty {
+    background: #4B49AC;
+    border: 1px solid #3a389a;
+}
+.aioemp-legend-dot--assigned {
+    background: #28a745;
+    border: 1px solid #1e7e34;
+}
+.aioemp-legend-dot--blocked {
+    background: #dc3545;
+    border: 1px solid #a71d2a;
+}
+.aioemp-legend-dot--pending {
+    background: #f59e0b;
+    border: 1px solid #ff9800;
+}
+
+/* SVG canvas */
+.aioemp-seating-canvas-wrap {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+    min-height: 400px;
+    background: #e8e8e8;
+}
+
+.aioemp-seating-canvas-wrap.is-panning {
+    cursor: grab;
+}
+.aioemp-seating-canvas-wrap.is-panning:active {
+    cursor: grabbing;
+}
+
+.aioemp-seating-svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.aioemp-seating-svg .seat-dot {
+    transition: opacity 0.12s;
+}
+.aioemp-seating-svg .seat-dot:hover {
+    opacity: 0.8;
+    filter: brightness(1.15);
+}
+
+/* Info bar */
+.aioemp-seating-info-bar {
+    padding: 8px 14px;
+    border-top: 1px solid var(--sa-border);
+    font-size: 12px;
+    color: var(--sa-muted);
+    min-height: 32px;
+}
+
+/* Candidate list in sidebar */
+.aioemp-seating-cand-list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    margin-top: 8px;
+    border: 1px solid var(--sa-border);
+    border-radius: 4px;
+}
+
+.aioemp-seating-fullscreen .aioemp-seating-cand-list {
+    max-height: none;
+}
+
+.aioemp-seating-fullscreen .aioemp-seating-sidebar__card {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.aioemp-seating-fullscreen .aioemp-seating-sidebar {
+    max-height: 100%;
+    overflow: hidden;
+}
+
+.aioemp-seating-cand-item {
+    padding: 8px 10px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--sa-border);
+    transition: background 0.12s;
+    user-select: none;
+    -webkit-user-select: none;
+}
+.aioemp-seating-cand-item:last-child {
+    border-bottom: none;
+}
+.aioemp-seating-cand-item:hover {
+    background: rgba(75, 73, 172, 0.06);
+}
+.aioemp-seating-cand-item.is-selected {
+    background: rgba(75, 73, 172, 0.12);
+    border-left: 3px solid var(--sa-primary);
+}
+.aioemp-seating-cand-item.is-assigned {
+    opacity: 0.7;
+}
+
+.aioemp-seating-cand-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--sa-text);
+}
+.aioemp-seating-cand-meta {
+    font-size: 11px;
+    color: var(--sa-muted);
+    margin-top: 2px;
+}
+
+/* Seat stats (inline in toolbar) */
+.aioemp-seating-stats-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-left: auto;
+    font-size: 12px;
+    color: var(--sa-muted);
+}
+
+.aioemp-stat-pill {
+    white-space: nowrap;
+}
+.aioemp-stat-pill strong {
+    margin-right: 2px;
+}
+.aioemp-stat-pill--assigned strong { color: #28a745; }
+.aioemp-stat-pill--blocked strong  { color: #dc3545; }
+.aioemp-stat-pill--available strong { color: var(--sa-primary); }
+
+/* Selected-count label under Candidates heading */
+.aioemp-selected-count {
+    display: block;
+    font-size: 11px;
+    color: var(--sa-primary);
+    font-weight: 500;
+    margin-top: 2px;
+}
+
+/* Pending info + confirm in toolbar */
+.aioemp-pending-info {
+    font-size: 12px;
+    color: var(--sa-text);
+    white-space: nowrap;
+    max-width: 280px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.aioemp-btn--success {
+    background: #28a745 !important;
+    color: #fff !important;
+    border-color: #1e7e34 !important;
+}
+.aioemp-btn--success:hover {
+    background: #218838 !important;
+}
+.aioemp-btn--success .dashicons {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
+    vertical-align: middle;
+    margin-right: 2px;
+}
+
+/* Mode button active state */
+.seat-mode-btn.is-active {
+    pointer-events: none;
+}
+
+/* Responsive: stack sidebar below on small screens */
+@media (max-width: 900px) {
+    .aioemp-seating-dashboard {
+        flex-direction: column;
+    }
+    .aioemp-seating-sidebar {
+        width: 100%;
+        max-height: 250px;
+    }
+    .aioemp-seating-canvas-wrap {
+        min-height: 300px;
+    }
+    .aioemp-seating-stats-bar {
+        display: none;
+    }
+}

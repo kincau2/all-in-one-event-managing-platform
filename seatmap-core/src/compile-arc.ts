@@ -6,11 +6,10 @@
  */
 
 import type { SeatBlockArc, CompiledSeat, ArcAisleGap, CompiledRowLabel } from './types.js';
-import type { SeatKeyMap } from './seat-key.js';
+import { deterministicSeatKey } from './seat-key.js';
 import {
   degToRad,
   generateRowLabel,
-  generateUUID,
   getSeatsPerRow,
   rotatePoint,
   round2,
@@ -46,7 +45,6 @@ export interface ArcCompileResult {
 
 export function compileArc(
   primitive: SeatBlockArc,
-  keyMap: SeatKeyMap,
   globalSeatRadius: number = 10,
 ): ArcCompileResult {
   const {
@@ -129,8 +127,7 @@ export function compileArc(
       const seatNumber = numbering === 'R2L' ? (n - s) + (startNum - 1) : s + startNum;
       const label = `${rowLabelStr}-${String(seatNumber).padStart(2, '0')}`;
 
-      const logicalKey = `${id}:${r}:${s}`;
-      const seat_key = keyMap.get(logicalKey) ?? generateUUID();
+      const seat_key = deterministicSeatKey(id, r, s);
 
       seats.push({
         seat_key,

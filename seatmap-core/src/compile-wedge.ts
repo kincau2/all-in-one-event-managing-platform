@@ -18,11 +18,10 @@
  */
 
 import type { SeatBlockWedge, CompiledSeat } from './types.js';
-import type { SeatKeyMap } from './seat-key.js';
+import { deterministicSeatKey } from './seat-key.js';
 import {
   degToRad,
   generateRowLabel,
-  generateUUID,
   getSeatsPerRow,
   rotatePoint,
   round2,
@@ -30,7 +29,6 @@ import {
 
 export function compileWedge(
   primitive: SeatBlockWedge,
-  keyMap: SeatKeyMap,
   globalSeatRadius: number = 10,
 ): CompiledSeat[] {
   const {
@@ -100,8 +98,7 @@ export function compileWedge(
       const seatNumber = numbering === 'R2L' ? n - s : s + 1;
       const label = `${rowLabelStr}-${String(seatNumber).padStart(2, '0')}`;
 
-      const logicalKey = `${id}:${r}:${s}`;
-      const seat_key = keyMap.get(logicalKey) ?? generateUUID();
+      const seat_key = deterministicSeatKey(id, r, s);
 
       seats.push({
         seat_key,

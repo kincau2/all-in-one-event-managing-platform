@@ -66,7 +66,7 @@ export { compileArc, type ArcCompileResult } from './compile-arc.js';
 export { compileWedge } from './compile-wedge.js';
 
 /* ── seat_key utilities ── */
-export { buildSeatKeyMap, type SeatKeyMap } from './seat-key.js';
+export { deterministicSeatKey } from './seat-key.js';
 
 /* ── Rotation pivot ── */
 export {

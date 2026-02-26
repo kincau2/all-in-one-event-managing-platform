@@ -20,6 +20,7 @@ require_once __DIR__ . '/class-aioemp-rest-controller.php';
 require_once AIOEMP_PLUGIN_DIR . 'includes/models/class-aioemp-events-model.php';
 require_once AIOEMP_PLUGIN_DIR . 'includes/models/class-aioemp-event-log-model.php';
 require_once AIOEMP_PLUGIN_DIR . 'includes/models/class-aioemp-seatmap-model.php';
+require_once AIOEMP_PLUGIN_DIR . 'includes/models/class-aioemp-seat-assignment-model.php';
 
 class AIOEMP_Events_Controller extends AIOEMP_REST_Controller {
 
@@ -153,6 +154,15 @@ class AIOEMP_Events_Controller extends AIOEMP_REST_Controller {
 
         $data['created_by'] = get_current_user_id();
 
+        // Snapshot: copy seatmap layout when seatmap_id is assigned.
+        if ( ! empty( $data['seatmap_id'] ) ) {
+            $snapshot = $this->copy_seatmap_snapshot( (int) $data['seatmap_id'] );
+            if ( is_wp_error( $snapshot ) ) {
+                return $snapshot;
+            }
+            $data['seatmap_layout_snapshot'] = $snapshot;
+        }
+
         $id = $this->model->create( $data );
         if ( false === $id ) {
             return $this->error( 'create_failed', __( 'Could not create event.', 'aioemp' ), 500 );
@@ -197,6 +207,32 @@ class AIOEMP_Events_Controller extends AIOEMP_REST_Controller {
 
         if ( empty( $data ) ) {
             return $this->error( 'no_changes', __( 'No valid fields to update.', 'aioemp' ) );
+        }
+
+        // ── Snapshot freeze enforcement ──
+        // If seatmap_id is being changed, check freeze conditions.
+        if ( array_key_exists( 'seatmap_id', $data ) ) {
+            $old_sm = $event->seatmap_id ? (int) $event->seatmap_id : null;
+            $new_sm = $data['seatmap_id'] ? (int) $data['seatmap_id'] : null;
+
+            if ( $old_sm !== $new_sm ) {
+                $freeze_check = $this->check_snapshot_freeze( $id, $event );
+                if ( is_wp_error( $freeze_check ) ) {
+                    return $freeze_check;
+                }
+
+                // Copy new snapshot or clear it.
+                if ( $new_sm ) {
+                    $snapshot = $this->copy_seatmap_snapshot( $new_sm );
+                    if ( is_wp_error( $snapshot ) ) {
+                        return $snapshot;
+                    }
+                    $data['seatmap_layout_snapshot'] = $snapshot;
+                } else {
+                    $data['seatmap_layout_snapshot']    = null;
+                    $data['seatmap_finalized_at_gmt']   = null;
+                }
+            }
         }
 
         $previous = (array) $event;
@@ -411,5 +447,78 @@ class AIOEMP_Events_Controller extends AIOEMP_REST_Controller {
                 'sanitize_callback' => 'absint',
             ),
         );
+    }
+
+    /*--------------------------------------------------------------
+     * Snapshot helpers
+     *------------------------------------------------------------*/
+
+    /**
+     * Copy a seatmap's layout JSON as the event snapshot.
+     *
+     * @param int $seatmap_id Seatmap template ID.
+     * @return string|\WP_Error Layout JSON string or error.
+     */
+    private function copy_seatmap_snapshot( int $seatmap_id ): string|\WP_Error {
+        $sm_model = new AIOEMP_Seatmap_Model();
+        $seatmap  = $sm_model->find( $seatmap_id );
+
+        if ( ! $seatmap ) {
+            return $this->error( 'seatmap_not_found', __( 'Seatmap not found.', 'aioemp' ), 404 );
+        }
+        if ( empty( $seatmap->integrity_pass ) ) {
+            return $this->error(
+                'seatmap_integrity_fail',
+                __( 'This seatmap has duplicate seat assignments and cannot be used.', 'aioemp' )
+            );
+        }
+
+        return $seatmap->layout ?: '{}';
+    }
+
+    /**
+     * Check snapshot freeze conditions.
+     *
+     * The snapshot CANNOT change if any of these are true:
+     * 1. seatmap_finalized_at_gmt is set
+     * 2. Seat assignments exist for this event
+     * 3. Attendance logs exist for this event
+     *
+     * @param int    $event_id Event ID.
+     * @param object $event    Event row.
+     * @return bool|\WP_Error
+     */
+    private function check_snapshot_freeze( int $event_id, object $event ): bool|\WP_Error {
+        // Condition 1: already finalized.
+        if ( ! empty( $event->seatmap_finalized_at_gmt ) ) {
+            return $this->error(
+                'snapshot_frozen',
+                __( 'Cannot change seatmap: the seating layout has been finalized.', 'aioemp' )
+            );
+        }
+
+        // Condition 2: seat assignments exist.
+        $assign_model = new AIOEMP_Seat_Assignment_Model();
+        if ( $assign_model->count_for_event( $event_id ) > 0 ) {
+            return $this->error(
+                'snapshot_frozen',
+                __( 'Cannot change seatmap: seat assignments already exist. Remove all assignments first.', 'aioemp' )
+            );
+        }
+
+        // Condition 3: attendance logs exist.
+        global $wpdb;
+        $att_table = $wpdb->prefix . 'aioemp_attendance';
+        $att_count = (int) $wpdb->get_var(
+            $wpdb->prepare( "SELECT COUNT(*) FROM {$att_table} WHERE event_id = %d", $event_id )
+        );
+        if ( $att_count > 0 ) {
+            return $this->error(
+                'snapshot_frozen',
+                __( 'Cannot change seatmap: attendance records already exist.', 'aioemp' )
+            );
+        }
+
+        return true;
     }
 }

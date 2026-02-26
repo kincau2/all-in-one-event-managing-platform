@@ -141,7 +141,7 @@ describe('validateAndCompile', () => {
     }
   });
 
-  it('preserves keys when passing existingLayout', () => {
+  it('produces deterministic keys across independent calls', () => {
     const raw = minLayout([
       { id: 'g1', type: 'seatBlockGrid', rows: 2, cols: 2, seatSpacingX: 30, seatSpacingY: 35 },
     ]);
@@ -149,7 +149,7 @@ describe('validateAndCompile', () => {
     expect(first.success).toBe(true);
     if (!first.success) return;
 
-    const second = validateAndCompile(raw, first.layout);
+    const second = validateAndCompile(raw);
     expect(second.success).toBe(true);
     if (!second.success) return;
 

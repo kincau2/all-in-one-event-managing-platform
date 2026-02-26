@@ -2696,12 +2696,13 @@ type PrimitiveInput = z.input<typeof PrimitiveSchema>;
 /**
  * Compile all seat-producing primitives within a Layout.
  *
- * @param layout         - A **parsed** Layout object (already validated).
- * @param existingLayout - Previous layout whose compiled.seats are used
- *                         to preserve seat_keys.
+ * Seat keys are deterministic (derived from primitiveId + row + seat index),
+ * so no previous layout is needed for key preservation.
+ *
+ * @param layout - A **parsed** Layout object (already validated).
  * @returns A new Layout with `compiled.seats` and `compiled.bounds` populated.
  */
-declare function compileLayout(layout: Layout, existingLayout?: Layout): Layout;
+declare function compileLayout(layout: Layout): Layout;
 type CompileResult = {
     success: true;
     layout: Layout;
@@ -2712,28 +2713,10 @@ type CompileResult = {
 /**
  * Parse raw JSON with Zod, then compile if valid.
  *
- * @param rawLayout      - Untrusted input (e.g. from REST body / localStorage).
- * @param existingLayout - Previous layout for seat_key preservation.
+ * @param rawLayout - Untrusted input (e.g. from REST body / localStorage).
  */
-declare function validateAndCompile(rawLayout: unknown, existingLayout?: Layout): CompileResult;
+declare function validateAndCompile(rawLayout: unknown): CompileResult;
 declare function computeBounds(seats: CompiledSeat[]): Bounds;
-
-/**
- * @aioemp/seatmap-core — seat_key preservation strategy
- *
- * Deterministic map: (primitiveId, logicalRow, logicalSeat) → seat_key.
- * On re-compile the same logical seat keeps its key; new seats get new keys;
- * removed seats simply drop out.
- */
-
-/** Map key format: "primitiveId:logicalRow:logicalSeat" → UUID seat_key */
-type SeatKeyMap = Map<string, string>;
-/**
- * Build a lookup map from previously compiled seats.
- * Seats MUST carry `meta.primitiveId`, `meta.logicalRow`, `meta.logicalSeat`
- * (all compile functions in this library set those fields).
- */
-declare function buildSeatKeyMap(existingSeats: CompiledSeat[]): SeatKeyMap;
 
 /**
  * @aioemp/seatmap-core - Grid block compiler
@@ -2752,7 +2735,7 @@ interface GridCompileResult {
     seats: CompiledSeat[];
     rowLabels: CompiledRowLabel[];
 }
-declare function compileGrid(primitive: SeatBlockGrid, keyMap: SeatKeyMap, globalSeatRadius?: number): GridCompileResult;
+declare function compileGrid(primitive: SeatBlockGrid, globalSeatRadius?: number): GridCompileResult;
 
 /**
  * @aioemp/seatmap-core — Arc block compiler
@@ -2765,7 +2748,7 @@ interface ArcCompileResult {
     seats: CompiledSeat[];
     rowLabels: CompiledRowLabel[];
 }
-declare function compileArc(primitive: SeatBlockArc, keyMap: SeatKeyMap, globalSeatRadius?: number): ArcCompileResult;
+declare function compileArc(primitive: SeatBlockArc, globalSeatRadius?: number): ArcCompileResult;
 
 /**
  * @aioemp/seatmap-core — Wedge block compiler
@@ -2786,7 +2769,28 @@ declare function compileArc(primitive: SeatBlockArc, keyMap: SeatKeyMap, globalS
  *   → translate by (transform.x, transform.y)
  */
 
-declare function compileWedge(primitive: SeatBlockWedge, keyMap: SeatKeyMap, globalSeatRadius?: number): CompiledSeat[];
+declare function compileWedge(primitive: SeatBlockWedge, globalSeatRadius?: number): CompiledSeat[];
+
+/**
+ * @aioemp/seatmap-core — Deterministic seat_key generation
+ *
+ * Produces a stable UUID-formatted key from (primitiveId, logicalRow, logicalSeat).
+ * The same logical seat always produces the same key — no need to store compiled
+ * data for key preservation.  Keys survive recompilation, layout edits, and
+ * server round-trips as long as the primitive ID and seat coordinates are unchanged.
+ */
+/**
+ * Generate a deterministic UUID-formatted seat key from logical coordinates.
+ *
+ * Uses four independent FNV-1a passes (different seeds) to produce 128 bits,
+ * then formats them as a valid UUID v4 string.
+ *
+ * @param primitiveId - The parent primitive's ID (a UUID string).
+ * @param logicalRow  - 0-based row index within the primitive.
+ * @param logicalSeat - 0-based seat/column index within the row.
+ * @returns A valid UUID v4 string, deterministic for the same inputs.
+ */
+declare function deterministicSeatKey(primitiveId: string, logicalRow: number, logicalSeat: number): string;
 
 /**
  * @aioemp/seatmap-core — Rotation pivot helpers
@@ -2869,4 +2873,4 @@ declare function generateUUID(): string;
 /** Round to 2 decimal places to avoid floating-point noise. */
 declare function round2(n: number): number;
 
-export { ARC_LBL_ANG, ARC_PAD, type ArcAisleGap, ArcAisleGapSchema, type ArcCompileResult, type Bounds, BoundsSchema, type Canvas, CanvasSchema, type CompileResult, type Compiled, type CompiledRowLabel, CompiledRowLabelSchema, CompiledSchema, type CompiledSeat, CompiledSeatSchema, GRID_LBL_W, GRID_PAD, type GridAisleGap, GridAisleGapSchema, type GridCompileResult, type ImagePrimitive, ImagePrimitiveSchema, type LabelPrimitive, LabelPrimitiveSchema, type Layout, type LayoutInput, LayoutSchema, type ObstaclePrimitive, ObstaclePrimitiveSchema, type Point, PointSchema, type Primitive, type PrimitiveInput, PrimitiveSchema, type RowLabel, type RowLabelDisplay, RowLabelDisplaySchema, RowLabelSchema, type SeatBlockArc, SeatBlockArcSchema, type SeatBlockGrid, SeatBlockGridSchema, type SeatBlockWedge, SeatBlockWedgeSchema, type SeatKeyMap, type SeatsPerRow, SeatsPerRowSchema, type StagePrimitive, StagePrimitiveSchema, type Transform, TransformSchema, arcPivotOffset, buildSeatKeyMap, compileArc, compileGrid, compileLayout, compileWedge, computeBounds, degToRad, generateRowLabel, generateUUID, getSeatsPerRow, gridPivotOffset, indexToLabel, labelToIndex, rotatePoint, round2, validateAndCompile };
+export { ARC_LBL_ANG, ARC_PAD, type ArcAisleGap, ArcAisleGapSchema, type ArcCompileResult, type Bounds, BoundsSchema, type Canvas, CanvasSchema, type CompileResult, type Compiled, type CompiledRowLabel, CompiledRowLabelSchema, CompiledSchema, type CompiledSeat, CompiledSeatSchema, GRID_LBL_W, GRID_PAD, type GridAisleGap, GridAisleGapSchema, type GridCompileResult, type ImagePrimitive, ImagePrimitiveSchema, type LabelPrimitive, LabelPrimitiveSchema, type Layout, type LayoutInput, LayoutSchema, type ObstaclePrimitive, ObstaclePrimitiveSchema, type Point, PointSchema, type Primitive, type PrimitiveInput, PrimitiveSchema, type RowLabel, type RowLabelDisplay, RowLabelDisplaySchema, RowLabelSchema, type SeatBlockArc, SeatBlockArcSchema, type SeatBlockGrid, SeatBlockGridSchema, type SeatBlockWedge, SeatBlockWedgeSchema, type SeatsPerRow, SeatsPerRowSchema, type StagePrimitive, StagePrimitiveSchema, type Transform, TransformSchema, arcPivotOffset, compileArc, compileGrid, compileLayout, compileWedge, computeBounds, degToRad, deterministicSeatKey, generateRowLabel, generateUUID, getSeatsPerRow, gridPivotOffset, indexToLabel, labelToIndex, rotatePoint, round2, validateAndCompile };

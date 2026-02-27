@@ -7,6 +7,7 @@
  * GET    /events/<id>/seating              — list assignments + blocked
  * POST   /events/<id>/seating/assign       — assign seat to candidate
  * POST   /events/<id>/seating/unassign     — unassign a seat
+ * POST   /events/<id>/seating/assign-batch — batch assign seats to candidates
  * POST   /events/<id>/seating/swap         — swap two occupied seats
  * POST   /events/<id>/seating/block        — block a seat
  * POST   /events/<id>/seating/unblock      — unblock a seat
@@ -87,6 +88,27 @@ class AIOEMP_Seating_Controller extends AIOEMP_REST_Controller {
             ),
         ) );
 
+        // POST /events/<id>/seating/assign-batch
+        register_rest_route( $this->namespace, '/' . $this->rest_base . '/(?P<event_id>[\d]+)/seating/assign-batch', array(
+            'methods'             => \WP_REST_Server::CREATABLE,
+            'callback'            => array( $this, 'assign_batch' ),
+            'permission_callback' => array( $this, 'permissions' ),
+            'args'                => array(
+                'event_id' => $event_id_arg,
+                'pairs'    => array(
+                    'type'     => 'array',
+                    'required' => true,
+                    'items'    => array(
+                        'type'       => 'object',
+                        'properties' => array(
+                            'attender_id' => array( 'type' => 'integer', 'required' => true ),
+                            'seat_key'    => array( 'type' => 'string',  'required' => true ),
+                        ),
+                    ),
+                ),
+            ),
+        ) );
+
         // POST /events/<id>/seating/swap
         register_rest_route( $this->namespace, '/' . $this->rest_base . '/(?P<event_id>[\d]+)/seating/swap', array(
             'methods'             => \WP_REST_Server::CREATABLE,
@@ -118,6 +140,60 @@ class AIOEMP_Seating_Controller extends AIOEMP_REST_Controller {
             'args'                => array(
                 'event_id' => $event_id_arg,
                 'seat_key' => array( 'type' => 'string', 'required' => true, 'sanitize_callback' => 'sanitize_text_field' ),
+            ),
+        ) );
+
+        // POST /events/<id>/seating/block-batch
+        register_rest_route( $this->namespace, '/' . $this->rest_base . '/(?P<event_id>[\d]+)/seating/block-batch', array(
+            'methods'             => \WP_REST_Server::CREATABLE,
+            'callback'            => array( $this, 'block_batch' ),
+            'permission_callback' => array( $this, 'permissions' ),
+            'args'                => array(
+                'event_id'  => $event_id_arg,
+                'seat_keys' => array(
+                    'type'     => 'array',
+                    'required' => true,
+                    'items'    => array( 'type' => 'string' ),
+                    'sanitize_callback' => function ( $v ) {
+                        return array_map( 'sanitize_text_field', (array) $v );
+                    },
+                ),
+            ),
+        ) );
+
+        // POST /events/<id>/seating/unblock-batch
+        register_rest_route( $this->namespace, '/' . $this->rest_base . '/(?P<event_id>[\d]+)/seating/unblock-batch', array(
+            'methods'             => \WP_REST_Server::CREATABLE,
+            'callback'            => array( $this, 'unblock_batch' ),
+            'permission_callback' => array( $this, 'permissions' ),
+            'args'                => array(
+                'event_id'  => $event_id_arg,
+                'seat_keys' => array(
+                    'type'     => 'array',
+                    'required' => true,
+                    'items'    => array( 'type' => 'string' ),
+                    'sanitize_callback' => function ( $v ) {
+                        return array_map( 'sanitize_text_field', (array) $v );
+                    },
+                ),
+            ),
+        ) );
+
+        // POST /events/<id>/seating/unassign-batch
+        register_rest_route( $this->namespace, '/' . $this->rest_base . '/(?P<event_id>[\d]+)/seating/unassign-batch', array(
+            'methods'             => \WP_REST_Server::CREATABLE,
+            'callback'            => array( $this, 'unassign_batch' ),
+            'permission_callback' => array( $this, 'permissions' ),
+            'args'                => array(
+                'event_id'  => $event_id_arg,
+                'seat_keys' => array(
+                    'type'     => 'array',
+                    'required' => true,
+                    'items'    => array( 'type' => 'string' ),
+                    'sanitize_callback' => function ( $v ) {
+                        return array_map( 'sanitize_text_field', (array) $v );
+                    },
+                ),
             ),
         ) );
 
@@ -356,6 +432,169 @@ class AIOEMP_Seating_Controller extends AIOEMP_REST_Controller {
         $this->seat_log->log( $event_id, null, $seat_key, null, 'unblock', get_current_user_id() );
 
         return $this->success( array( 'unblocked' => true, 'seat_key' => $seat_key ) );
+    }
+
+    /**
+     * POST /events/<id>/seating/assign-batch — batch assign seats to candidates.
+     *
+     * Accepts { pairs: [ { attender_id, seat_key }, … ] }.
+     * Handles unassign-old + assign-new per candidate in a single DB transaction.
+     */
+    public function assign_batch( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
+        $event_id = absint( $request->get_param( 'event_id' ) );
+        $pairs    = (array) $request->get_param( 'pairs' );
+
+        $event = $this->events->find( $event_id );
+        if ( ! $event ) {
+            return $this->error( 'event_not_found', __( 'Event not found.', 'aioemp' ), 404 );
+        }
+        if ( empty( $event->seatmap_layout_snapshot ) ) {
+            return $this->error( 'no_snapshot', __( 'Event has no seatmap snapshot.', 'aioemp' ) );
+        }
+        if ( empty( $pairs ) ) {
+            return $this->error( 'empty_pairs', __( 'No assignment pairs provided.', 'aioemp' ) );
+        }
+
+        // Validate all seat keys and attenders up front.
+        foreach ( $pairs as $pair ) {
+            $seat_key    = sanitize_text_field( $pair['seat_key'] ?? '' );
+            $attender_id = absint( $pair['attender_id'] ?? 0 );
+
+            if ( ! $seat_key || ! $attender_id ) {
+                return $this->error( 'invalid_pair', __( 'Each pair must have attender_id and seat_key.', 'aioemp' ) );
+            }
+            if ( ! $this->seat_exists_in_snapshot( $event->seatmap_layout_snapshot, $seat_key ) ) {
+                return $this->error( 'invalid_seat', sprintf( __( 'Seat key %s does not exist.', 'aioemp' ), $seat_key ) );
+            }
+            if ( $this->blocked->is_blocked( $event_id, $seat_key ) ) {
+                return $this->error( 'seat_blocked', sprintf( __( 'Seat %s is blocked.', 'aioemp' ), $seat_key ) );
+            }
+
+            $attender = $this->attenders->find( $attender_id );
+            if ( ! $attender || (int) $attender->event_id !== $event_id ) {
+                return $this->error( 'attender_not_found', sprintf( __( 'Candidate %d not found for this event.', 'aioemp' ), $attender_id ), 404 );
+            }
+        }
+
+        // Sanitize pairs for the model.
+        $clean_pairs = array_map( function ( $p ) {
+            return array(
+                'attender_id' => absint( $p['attender_id'] ),
+                'seat_key'    => sanitize_text_field( $p['seat_key'] ),
+            );
+        }, $pairs );
+
+        // Auto-finalize on first assignment.
+        $this->maybe_finalize( $event_id, $event );
+
+        $user_id = get_current_user_id();
+        $result  = $this->assignments->assign_batch( $event_id, $clean_pairs, $user_id );
+
+        // Log each assignment and unassignment.
+        foreach ( $result['unassigned'] as $un ) {
+            $this->seat_log->log( $event_id, $un['attender_id'], $un['old_seat_key'], null, 'unassign', $user_id );
+        }
+        foreach ( $result['assigned'] as $a ) {
+            $this->seat_log->log( $event_id, $a['attender_id'], null, $a['seat_key'], 'assign', $user_id );
+        }
+
+        return $this->success( $result, 201 );
+    }
+
+    /**
+     * POST /events/<id>/seating/block-batch — block multiple seats in one call.
+     */
+    public function block_batch( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
+        $event_id  = absint( $request->get_param( 'event_id' ) );
+        $seat_keys = (array) $request->get_param( 'seat_keys' );
+
+        $event = $this->events->find( $event_id );
+        if ( ! $event ) {
+            return $this->error( 'event_not_found', __( 'Event not found.', 'aioemp' ), 404 );
+        }
+        if ( empty( $event->seatmap_layout_snapshot ) ) {
+            return $this->error( 'no_snapshot', __( 'Event has no seatmap snapshot.', 'aioemp' ) );
+        }
+        if ( empty( $seat_keys ) ) {
+            return $this->error( 'empty_seat_keys', __( 'No seat keys provided.', 'aioemp' ) );
+        }
+
+        // Validate all seat keys exist in the snapshot.
+        foreach ( $seat_keys as $key ) {
+            if ( ! $this->seat_exists_in_snapshot( $event->seatmap_layout_snapshot, $key ) ) {
+                return $this->error( 'invalid_seat', sprintf( __( 'Seat key %s does not exist.', 'aioemp' ), $key ) );
+            }
+        }
+
+        // Filter out any assigned seats.
+        $clean_keys = array();
+        foreach ( $seat_keys as $key ) {
+            if ( ! $this->assignments->find_by_seat( $event_id, $key ) ) {
+                $clean_keys[] = $key;
+            }
+        }
+
+        $user_id = get_current_user_id();
+        $result  = $this->blocked->block_batch( $event_id, $clean_keys, $user_id );
+
+        // Log each blocked seat.
+        foreach ( $result['blocked'] as $key ) {
+            $this->seat_log->log( $event_id, null, null, $key, 'block', $user_id );
+        }
+
+        return $this->success( $result, 201 );
+    }
+
+    /**
+     * POST /events/<id>/seating/unblock-batch — unblock multiple seats in one call.
+     */
+    public function unblock_batch( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
+        $event_id  = absint( $request->get_param( 'event_id' ) );
+        $seat_keys = (array) $request->get_param( 'seat_keys' );
+
+        $event = $this->events->find( $event_id );
+        if ( ! $event ) {
+            return $this->error( 'event_not_found', __( 'Event not found.', 'aioemp' ), 404 );
+        }
+        if ( empty( $seat_keys ) ) {
+            return $this->error( 'empty_seat_keys', __( 'No seat keys provided.', 'aioemp' ) );
+        }
+
+        $user_id = get_current_user_id();
+        $result  = $this->blocked->unblock_batch( $event_id, $seat_keys );
+
+        // Log each unblocked seat.
+        foreach ( $result['unblocked'] as $key ) {
+            $this->seat_log->log( $event_id, null, $key, null, 'unblock', $user_id );
+        }
+
+        return $this->success( $result );
+    }
+
+    /**
+     * POST /events/<id>/seating/unassign-batch — unassign multiple seats in one call.
+     */
+    public function unassign_batch( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
+        $event_id  = absint( $request->get_param( 'event_id' ) );
+        $seat_keys = (array) $request->get_param( 'seat_keys' );
+
+        $event = $this->events->find( $event_id );
+        if ( ! $event ) {
+            return $this->error( 'event_not_found', __( 'Event not found.', 'aioemp' ), 404 );
+        }
+        if ( empty( $seat_keys ) ) {
+            return $this->error( 'empty_seat_keys', __( 'No seat keys provided.', 'aioemp' ) );
+        }
+
+        $user_id = get_current_user_id();
+        $result  = $this->assignments->unassign_batch( $event_id, $seat_keys );
+
+        // Log each unassigned seat.
+        foreach ( $result['unassigned'] as $item ) {
+            $this->seat_log->log( $event_id, $item['attender_id'], $item['seat_key'], null, 'unassign', $user_id );
+        }
+
+        return $this->success( $result );
     }
 
     /**

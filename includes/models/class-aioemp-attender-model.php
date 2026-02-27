@@ -69,11 +69,20 @@ class AIOEMP_Attender_Model extends AIOEMP_Model {
             'search'   => '',
             'per_page' => 20,
             'page'     => 1,
+            'ids'      => array(),
         );
         $args = wp_parse_args( $args, $defaults );
 
         $where  = array( 'event_id = %d' );
         $values = array( $event_id );
+
+        // Filter by specific IDs (skips pagination when used).
+        $ids = array_filter( array_map( 'absint', (array) $args['ids'] ) );
+        if ( ! empty( $ids ) ) {
+            $placeholders = implode( ',', array_fill( 0, count( $ids ), '%d' ) );
+            $where[]      = "id IN ($placeholders)";
+            $values       = array_merge( $values, $ids );
+        }
 
         if ( '' !== $args['status'] && in_array( $args['status'], self::STATUSES, true ) ) {
             $where[]  = 'status = %s';
@@ -98,18 +107,28 @@ class AIOEMP_Attender_Model extends AIOEMP_Model {
         );
         $total = (int) $this->db->get_var( $count_sql );
 
-        // Paginated results.
-        $per_page = max( 1, (int) $args['per_page'] );
-        $page     = max( 1, (int) $args['page'] );
-        $offset   = ( $page - 1 ) * $per_page;
+        // When filtering by IDs, skip pagination — return all matches.
+        if ( ! empty( $ids ) ) {
+            $items = $this->db->get_results(
+                $this->db->prepare(
+                    "SELECT * FROM {$this->table} WHERE {$where_clause} ORDER BY created_at_gmt DESC",
+                    ...$values
+                )
+            );
+        } else {
+            // Paginated results.
+            $per_page = max( 1, (int) $args['per_page'] );
+            $page     = max( 1, (int) $args['page'] );
+            $offset   = ( $page - 1 ) * $per_page;
 
-        $query_values = array_merge( $values, array( $per_page, $offset ) );
-        $items = $this->db->get_results(
-            $this->db->prepare(
-                "SELECT * FROM {$this->table} WHERE {$where_clause} ORDER BY created_at_gmt DESC LIMIT %d OFFSET %d",
-                ...$query_values
-            )
-        );
+            $query_values = array_merge( $values, array( $per_page, $offset ) );
+            $items = $this->db->get_results(
+                $this->db->prepare(
+                    "SELECT * FROM {$this->table} WHERE {$where_clause} ORDER BY created_at_gmt DESC LIMIT %d OFFSET %d",
+                    ...$query_values
+                )
+            );
+        }
 
         return (object) array(
             'items' => $items ?: array(),

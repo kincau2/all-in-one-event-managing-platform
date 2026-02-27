@@ -122,7 +122,8 @@ class AIOEMP_Admin {
             true
         );
 
-        // Events module (depends on core admin script + seatmap compiler).
+        // Events module — split into sub-modules under admin/js/events/.
+        // 1. Entry file: creates shared context (window.AIOEMP_Events).
         wp_enqueue_script(
             'aioemp-events',
             AIOEMP_PLUGIN_URL . 'admin/js/aioemp-events.js',
@@ -130,6 +131,27 @@ class AIOEMP_Admin {
             AIOEMP_VERSION,
             true
         );
+
+        // 2-7. Sub-modules (each extends ctx).
+        $events_modules = array(
+            'aioemp-events-helpers'    => 'events/_helpers.js',
+            'aioemp-events-list'       => 'events/_list.js',
+            'aioemp-events-form'       => 'events/_form.js',
+            'aioemp-events-detail'     => 'events/_detail.js',
+            'aioemp-events-candidates' => 'events/_candidates.js',
+            'aioemp-events-seating'    => 'events/_seating.js',
+        );
+        $prev_handle = 'aioemp-events';
+        foreach ( $events_modules as $handle => $file ) {
+            wp_enqueue_script(
+                $handle,
+                AIOEMP_PLUGIN_URL . 'admin/js/' . $file,
+                array( 'jquery', $prev_handle ),
+                AIOEMP_VERSION,
+                true
+            );
+            $prev_handle = $handle;
+        }
 
         // Seatmaps list module (depends on core admin script).
         wp_enqueue_script(

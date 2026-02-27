@@ -45,6 +45,22 @@
             });
         },
         get(endpoint) { return this.request(endpoint); },
+        /** GET that returns { data, headers } so callers can read pagination headers. */
+        getWithHeaders(endpoint) {
+            const url = cfg.rest_url + endpoint;
+            const opts = {
+                headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': cfg.nonce },
+                credentials: 'same-origin',
+            };
+            return fetch(url, opts).then(res => {
+                if (!res.ok) return res.json().then(err => Promise.reject(err));
+                return res.json().then(data => ({
+                    data: data,
+                    total: parseInt(res.headers.get('X-WP-Total') || '0', 10),
+                    totalPages: parseInt(res.headers.get('X-WP-TotalPages') || '0', 10),
+                }));
+            });
+        },
         post(endpoint, body) { return this.request(endpoint, { method: 'POST', body: JSON.stringify(body) }); },
         put(endpoint, body) { return this.request(endpoint, { method: 'PUT', body: JSON.stringify(body) }); },
         del(endpoint) { return this.request(endpoint, { method: 'DELETE' }); },

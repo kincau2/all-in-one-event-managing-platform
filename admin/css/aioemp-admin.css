@@ -254,9 +254,8 @@ body.aioemp-active {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 6px 14px;
+    padding: 6px 14px 6px 0;
     background: transparent;
-    border: 1px solid var(--sa-border);
     border-radius: var(--sa-radius);
     color: var(--sa-muted);
     font-size: 13px;
@@ -307,7 +306,7 @@ body.aioemp-active {
     font-size: 13px;
     font-weight: 500;
     border-radius: var(--sa-radius);
-    border: none;
+    border: 1px solid transparent;
     cursor: pointer;
     transition: opacity .15s;
     text-decoration: none;
@@ -877,9 +876,6 @@ body.aioemp-active {
     font-weight: 500;
     padding: 4px 0;
 }
-.aioemp-seating-fullscreen__back:hover {
-    text-decoration: underline;
-}
 
 .aioemp-seating-fullscreen__title {
     font-size: 16px;
@@ -969,6 +965,10 @@ body.aioemp-active {
     gap: 6px;
 }
 
+.aioemp-toolbar-spacer {
+    flex: 1;
+}
+
 #seat-zoom-level {
     font-size: 12px;
     min-width: 40px;
@@ -1019,6 +1019,8 @@ body.aioemp-active {
     position: relative;
     min-height: 400px;
     background: #e8e8e8;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 .aioemp-seating-canvas-wrap.is-panning {
@@ -1032,6 +1034,26 @@ body.aioemp-active {
     width: 100%;
     height: 100%;
     display: block;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.aioemp-drag-rect {
+    position: absolute;
+    border: 2px dashed var(--sa-primary, #4B49AC);
+    background: rgba(75, 73, 172, 0.08);
+    pointer-events: none;
+    z-index: 10;
+    display: none;
+}
+
+.aioemp-btn--warning {
+    background: #f59e0b;
+    color: #fff;
+    border: 1px solid #d97706;
+}
+.aioemp-btn--warning:hover {
+    background: #d97706;
 }
 
 .aioemp-seating-svg .seat-dot {
@@ -1049,6 +1071,11 @@ body.aioemp-active {
     font-size: 12px;
     color: var(--sa-muted);
     min-height: 32px;
+}
+
+/* Candidate filter select (own row above search) */
+.aioemp-seating-cand-filter-select {
+    margin-bottom: 6px;
 }
 
 /* Candidate list in sidebar */
@@ -1095,9 +1122,7 @@ body.aioemp-active {
     background: rgba(75, 73, 172, 0.12);
     border-left: 3px solid var(--sa-primary);
 }
-.aioemp-seating-cand-item.is-assigned {
-    opacity: 0.7;
-}
+
 
 .aioemp-seating-cand-name {
     font-size: 13px;
@@ -1110,7 +1135,140 @@ body.aioemp-active {
     margin-top: 2px;
 }
 
-/* Seat stats (inline in toolbar) */
+/* Candidate row inner layout (text + info badge) */
+.aioemp-seating-cand-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.aioemp-seating-cand-text {
+    flex: 1;
+    min-width: 0;
+}
+
+/* Info badge button on candidate rows */
+.aioemp-cand-info-btn {
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--sa-muted);
+    cursor: pointer;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.12s, background 0.12s;
+    opacity: 0;
+}
+.aioemp-seating-cand-item:hover .aioemp-cand-info-btn,
+.aioemp-cand-info-btn:focus {
+    opacity: 1;
+}
+.aioemp-cand-info-btn:hover {
+    opacity: 1;
+    color: var(--sa-primary);
+    background: rgba(75, 73, 172, 0.08);
+}
+.aioemp-cand-info-btn .dashicons {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+}
+
+/* Candidate info popup overlay */
+.aioemp-cand-info-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000100;
+    background: rgba(0, 0, 0, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: aioemp-fade-in 0.15s ease;
+}
+@keyframes aioemp-fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+.aioemp-cand-info-popup {
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.22);
+    width: 380px;
+    max-width: 90vw;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+.aioemp-cand-info-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px 10px;
+    border-bottom: 1px solid var(--sa-border);
+}
+.aioemp-cand-info-header h4 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--sa-text);
+}
+.aioemp-cand-info-close {
+    border: none;
+    background: transparent;
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+    color: var(--sa-muted);
+    padding: 0 2px;
+    transition: color 0.12s;
+}
+.aioemp-cand-info-close:hover {
+    color: var(--sa-text);
+}
+.aioemp-cand-info-body {
+    padding: 14px 18px 18px;
+}
+.aioemp-cand-info-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+.aioemp-cand-info-table th,
+.aioemp-cand-info-table td {
+    padding: 6px 0;
+    font-size: 13px;
+    text-align: left;
+    border-bottom: 1px solid var(--sa-border);
+    vertical-align: top;
+}
+.aioemp-cand-info-table tr:last-child th,
+.aioemp-cand-info-table tr:last-child td {
+    border-bottom: none;
+}
+.aioemp-cand-info-table th {
+    width: 100px;
+    font-weight: 600;
+    color: var(--sa-muted);
+    padding-right: 12px;
+}
+.aioemp-cand-info-table td {
+    color: var(--sa-text);
+    word-break: break-word;
+}
+
+/* Candidate list pagination (seating sidebar) */
+.aioemp-seating-cand-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 0 4px;
+    flex-shrink: 0;
+}
+
+/* Seat stats (inline in header top bar) */
 .aioemp-seating-stats-bar {
     display: flex;
     align-items: center;
@@ -1118,6 +1276,7 @@ body.aioemp-active {
     margin-left: auto;
     font-size: 12px;
     color: var(--sa-muted);
+    flex-shrink: 0;
 }
 
 .aioemp-stat-pill {
@@ -1157,6 +1316,21 @@ body.aioemp-active {
     background: #218838 !important;
 }
 .aioemp-btn--success .dashicons {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
+    vertical-align: middle;
+    margin-right: 2px;
+}
+.aioemp-btn--danger {
+    background: #dc3545 !important;
+    color: #fff !important;
+    border-color: #a71d2a !important;
+}
+.aioemp-btn--danger:hover {
+    background: #c82333 !important;
+}
+.aioemp-btn--danger .dashicons {
     font-size: 14px;
     width: 14px;
     height: 14px;

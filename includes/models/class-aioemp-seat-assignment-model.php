@@ -201,4 +201,112 @@ class AIOEMP_Seat_Assignment_Model extends AIOEMP_Model {
         $this->db->query( 'ROLLBACK' );
         return false;
     }
+
+    /**
+     * Batch-assign seats to candidates in a single DB transaction.
+     *
+     * Each pair is { attender_id, seat_key }.  If the candidate already has a
+     * seat the old assignment is removed first (re-assignment).  If the target
+     * seat is taken by someone else or blocked the pair is skipped.
+     *
+     * @param int    $event_id    Event ID.
+     * @param array  $pairs       Array of [ 'attender_id' => int, 'seat_key' => string ].
+     * @param int    $assigned_by WP user ID.
+     * @return array { assigned: array, unassigned: array, skipped: array, failed: array }
+     */
+    public function assign_batch( int $event_id, array $pairs, int $assigned_by = 0 ): array {
+        $result = array(
+            'assigned'   => array(),
+            'unassigned' => array(),
+            'skipped'    => array(),
+            'failed'     => array(),
+        );
+
+        if ( empty( $pairs ) ) {
+            return $result;
+        }
+
+        $now = $this->now_gmt();
+        $this->db->query( 'START TRANSACTION' );
+
+        foreach ( $pairs as $pair ) {
+            $attender_id = (int) $pair['attender_id'];
+            $seat_key    = (string) $pair['seat_key'];
+
+            // If the target seat is already taken by someone else, skip.
+            $current_holder = $this->find_by_seat( $event_id, $seat_key );
+            if ( $current_holder && (int) $current_holder->attender_id !== $attender_id ) {
+                $result['skipped'][] = array( 'attender_id' => $attender_id, 'seat_key' => $seat_key, 'reason' => 'seat_taken' );
+                continue;
+            }
+
+            // If the candidate already sits in the target seat, nothing to do.
+            if ( $current_holder && (int) $current_holder->attender_id === $attender_id ) {
+                $result['skipped'][] = array( 'attender_id' => $attender_id, 'seat_key' => $seat_key, 'reason' => 'already_assigned' );
+                continue;
+            }
+
+            // If the candidate already has a different seat, unassign it first.
+            $existing = $this->find_by_attender( $event_id, $attender_id );
+            if ( $existing ) {
+                $this->db->delete( $this->table, array( 'id' => $existing->id ) );
+                $result['unassigned'][] = array( 'attender_id' => $attender_id, 'old_seat_key' => $existing->seat_key );
+            }
+
+            // Insert new assignment.
+            $ok = $this->db->insert( $this->table, array(
+                'event_id'        => $event_id,
+                'attender_id'     => $attender_id,
+                'seat_key'        => $seat_key,
+                'assigned_by'     => $assigned_by ?: null,
+                'assigned_at_gmt' => $now,
+            ) );
+
+            if ( $ok ) {
+                $result['assigned'][] = array( 'attender_id' => $attender_id, 'seat_key' => $seat_key );
+            } else {
+                $result['failed'][] = array( 'attender_id' => $attender_id, 'seat_key' => $seat_key );
+            }
+        }
+
+        $this->db->query( 'COMMIT' );
+        return $result;
+    }
+
+    /**
+     * Batch-unassign multiple seats in a single DB transaction.
+     *
+     * @param int   $event_id  Event ID.
+     * @param array $seat_keys Array of seat key strings.
+     * @return array { unassigned: array, skipped: array, failed: array }
+     */
+    public function unassign_batch( int $event_id, array $seat_keys ): array {
+        $result = array( 'unassigned' => array(), 'skipped' => array(), 'failed' => array() );
+        if ( empty( $seat_keys ) ) {
+            return $result;
+        }
+
+        $this->db->query( 'START TRANSACTION' );
+
+        foreach ( $seat_keys as $seat_key ) {
+            $assignment = $this->find_by_seat( $event_id, $seat_key );
+            if ( ! $assignment ) {
+                $result['skipped'][] = $seat_key;
+                continue;
+            }
+
+            $ok = $this->db->delete( $this->table, array( 'id' => $assignment->id ) );
+            if ( false !== $ok && $this->db->rows_affected > 0 ) {
+                $result['unassigned'][] = array(
+                    'seat_key'    => $seat_key,
+                    'attender_id' => (int) $assignment->attender_id,
+                );
+            } else {
+                $result['failed'][] = $seat_key;
+            }
+        }
+
+        $this->db->query( 'COMMIT' );
+        return $result;
+    }
 }

@@ -143,11 +143,16 @@ class AIOEMP_Attenders_Controller extends AIOEMP_REST_Controller {
 
         $pagination = $this->get_pagination_params( $request );
 
+        // Optional ids filter — comma-separated attender IDs.
+        $ids_raw = $this->text_param( $request, 'ids' );
+        $ids     = $ids_raw ? array_filter( array_map( 'absint', explode( ',', $ids_raw ) ) ) : array();
+
         $result = $this->model->list_for_event( $event_id, array(
             'status'   => $this->text_param( $request, 'status' ),
             'search'   => $this->text_param( $request, 'search' ),
             'per_page' => $pagination['per_page'],
             'page'     => $pagination['page'],
+            'ids'      => $ids,
         ) );
 
         $response = $this->success( $result->items );
@@ -377,6 +382,11 @@ class AIOEMP_Attenders_Controller extends AIOEMP_REST_Controller {
             'search' => array(
                 'type'              => 'string',
                 'sanitize_callback' => 'sanitize_text_field',
+            ),
+            'ids' => array(
+                'type'              => 'string',
+                'sanitize_callback' => 'sanitize_text_field',
+                'description'       => 'Comma-separated attender IDs to fetch specific records.',
             ),
         );
     }

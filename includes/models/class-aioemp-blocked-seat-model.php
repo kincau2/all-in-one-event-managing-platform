@@ -102,4 +102,79 @@ class AIOEMP_Blocked_Seat_Model extends AIOEMP_Model {
             )
         );
     }
+
+    /**
+     * Block multiple seats in a single DB transaction.
+     *
+     * @param int    $event_id   Event ID.
+     * @param array  $seat_keys  Array of seat key strings.
+     * @param int    $blocked_by WP user ID.
+     * @return array { blocked: string[], skipped: string[], failed: string[] }
+     */
+    public function block_batch( int $event_id, array $seat_keys, int $blocked_by = 0 ): array {
+        $result = array( 'blocked' => array(), 'skipped' => array(), 'failed' => array() );
+        if ( empty( $seat_keys ) ) {
+            return $result;
+        }
+
+        $now = $this->now_gmt();
+        $this->db->query( 'START TRANSACTION' );
+
+        foreach ( $seat_keys as $seat_key ) {
+            // Skip if already blocked.
+            if ( $this->is_blocked( $event_id, $seat_key ) ) {
+                $result['skipped'][] = $seat_key;
+                continue;
+            }
+            $ok = $this->db->insert( $this->table, array(
+                'event_id'       => $event_id,
+                'seat_key'       => $seat_key,
+                'blocked_by'     => $blocked_by ?: null,
+                'blocked_at_gmt' => $now,
+            ) );
+            if ( $ok ) {
+                $result['blocked'][] = $seat_key;
+            } else {
+                $result['failed'][] = $seat_key;
+            }
+        }
+
+        $this->db->query( 'COMMIT' );
+        return $result;
+    }
+
+    /**
+     * Unblock multiple seats in a single DB transaction.
+     *
+     * @param int   $event_id  Event ID.
+     * @param array $seat_keys Array of seat key strings.
+     * @return array { unblocked: string[], skipped: string[], failed: string[] }
+     */
+    public function unblock_batch( int $event_id, array $seat_keys ): array {
+        $result = array( 'unblocked' => array(), 'skipped' => array(), 'failed' => array() );
+        if ( empty( $seat_keys ) ) {
+            return $result;
+        }
+
+        $this->db->query( 'START TRANSACTION' );
+
+        foreach ( $seat_keys as $seat_key ) {
+            if ( ! $this->is_blocked( $event_id, $seat_key ) ) {
+                $result['skipped'][] = $seat_key;
+                continue;
+            }
+            $ok = $this->db->delete(
+                $this->table,
+                array( 'event_id' => $event_id, 'seat_key' => $seat_key )
+            );
+            if ( false !== $ok && $this->db->rows_affected > 0 ) {
+                $result['unblocked'][] = $seat_key;
+            } else {
+                $result['failed'][] = $seat_key;
+            }
+        }
+
+        $this->db->query( 'COMMIT' );
+        return $result;
+    }
 }

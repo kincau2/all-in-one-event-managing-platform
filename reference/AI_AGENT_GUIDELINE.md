@@ -1,7 +1,7 @@
 # AIOEMP — AI Agent Development Guideline
 
 **All-in-One Event Managing Platform (AIOEMP)**
-Version 1.1 | 24 Feb 2026
+Version 1.2 | 28 Feb 2026
 
 ---
 
@@ -390,15 +390,21 @@ all-in-one-event-managing-platform/
 │   ├── class-aioemp-security.php            # Capabilities, nonces, sanitisation, rate limiting
 │   ├── rest-api/
 │   │   ├── class-aioemp-rest-controller.php       # Abstract base controller
-│   │   ├── class-aioemp-events-controller.php     # CRUD /events (395 lines)
+│   │   ├── class-aioemp-events-controller.php     # CRUD /events (537 lines)
+│   │   ├── class-aioemp-attenders-controller.php  # Candidates CRUD /events/{id}/attenders (380 lines)
+│   │   ├── class-aioemp-seating-controller.php    # Seating allocation /events/{id}/seating (686 lines)
 │   │   ├── class-aioemp-seatmaps-controller.php   # CRUD /seatmaps
 │   │   ├── class-aioemp-seatmap-upload-controller.php  # BG image upload
 │   │   ├── class-aioemp-locking-controller.php    # Lock acquire/heartbeat/release/takeover
 │   │   └── class-aioemp-settings-controller.php   # Settings CRUD + logo upload
 │   ├── models/
 │   │   ├── class-aioemp-model.php                 # Abstract base model ($wpdb wrapper)
-│   │   ├── class-aioemp-events-model.php          # Events CRUD + search/pagination
-│   │   ├── class-aioemp-event-log-model.php       # Append-only audit log
+│   │   ├── class-aioemp-events-model.php          # Events CRUD + search/pagination (120 lines)
+│   │   ├── class-aioemp-attender-model.php        # Candidates CRUD + QR hash + bulk status (198 lines)
+│   │   ├── class-aioemp-seat-assignment-model.php # Seat assignments + batch ops (271 lines)
+│   │   ├── class-aioemp-blocked-seat-model.php    # Blocked seats + batch ops (176 lines)
+│   │   ├── class-aioemp-seat-assignment-log-model.php # Seat operation audit trail (81 lines)
+│   │   ├── class-aioemp-event-log-model.php       # Append-only event audit log (72 lines)
 │   │   └── class-aioemp-seatmap-model.php         # Seatmap CRUD + search/pagination
 │   └── services/
 │       ├── class-aioemp-locking-service.php       # Atomic SQL locking (TTL 90s)
@@ -407,9 +413,18 @@ all-in-one-event-managing-platform/
 │   ├── class-aioemp-admin.php               # Admin hooks, menu entry, script enqueue chain
 │   ├── css/aioemp-admin.css                 # Admin styles (CSS custom properties)
 │   ├── js/
-│   │   ├── aioemp-admin.js                  # Admin SPA shell (jQuery)
-│   │   ├── aioemp-settings.js               # Settings page JS
-│   │   ├── aioemp-seatmaps.js               # Seatmaps list page JS
+│   │   ├── aioemp-admin.js                  # Admin SPA shell (jQuery, 209 lines)
+│   │   ├── aioemp-events.js                 # Events module entry + shared context (101 lines)
+│   │   ├── aioemp-settings.js               # Settings page JS (326 lines)
+│   │   ├── aioemp-seatmaps.js               # Seatmaps list page JS (248 lines)
+│   │   ├── seatmap-compiler.js              # Browser IIFE of seatmap-core compile (client-side snapshot compilation)
+│   │   ├── events/                          # Events sub-modules (loaded sequentially)
+│   │   │   ├── _helpers.js                  # Shared utilities: esc, fmtDate, localToGmt, gmtToLocal, badges
+│   │   │   ├── _list.js                     # Events list page: table, search, filter, pagination, delete
+│   │   │   ├── _form.js                     # Event create/edit form: all fields + seatmap template select
+│   │   │   ├── _detail.js                   # Event detail page: header + tab container (Overview, Candidates, Attendance, Seating)
+│   │   │   ├── _candidates.js               # Candidates tab: list, search, filter, pagination, add/edit modal, bulk status, delete
+│   │   │   └── _seating.js                  # Seating tab: full-screen SVG dashboard (1607 lines)
 │   │   └── seatmap-editor/                  # ← Vite IIFE build output
 │   │       ├── seatmap-editor.js            # ~573 KB (React+Konva+Zustand bundle)
 │   │       └── seatmap-editor.css           # ~4.5 KB
@@ -925,7 +940,7 @@ The following files in the `reference/` folder are the authoritative sources for
 
 ---
 
-## 20. Implementation Progress (as of 24 Feb 2026)
+## 20. Implementation Progress (as of 28 Feb 2026)
 
 > **CRITICAL: Read this section carefully.** It documents what has been built, what works, and known patterns/pitfalls from previous development sessions.
 
@@ -938,8 +953,8 @@ The following files in the `reference/` folder are the authoritative sources for
 | 3. `@aioemp/seatmap-core` | **DONE** | Zod schemas, all compile algorithms (Grid, Arc, Wedge), seat_key stability, row label compilation, 100 vitest tests passing |
 | 4. `@aioemp/seatmap-editor` | **DONE** | Konva + React 18 canvas, Zustand 5 + Immer store, inspector panel, undo/redo, draft persistence (localStorage), save pipeline with lock token, keyboard shortcuts |
 | 5. Editor Locking | **DONE** | Atomic SQL locking (TTL 90s), heartbeat 60s, acquire/release/takeover, sendBeacon on unload, frontend takeover modal |
-| 6. Event Seatmap Snapshot | **NOT STARTED** | |
-| 7. Events + Candidates CRUD | **PARTIAL** | Events CRUD REST endpoints exist. Candidates module not started. |
+| 6. Event Seatmap Snapshot + Seating | **DONE** | Snapshot copy on event create/update, snapshot freeze enforcement, full-screen SVG seating dashboard, assign/unassign/swap/block (single + batch), drag-select, zoom/pan, auto-finalize |
+| 7. Events + Candidates CRUD | **DONE** | Events list/create/edit/detail pages, Candidates tab (list, search, filter, pagination, add/edit modal, bulk status changes, delete, status counts) |
 | 8. Attendance | **NOT STARTED** | |
 | 9. Public Registration | **NOT STARTED** | |
 | 10. Email Automation | **NOT STARTED** | |
@@ -1147,7 +1162,9 @@ All created via `dbDelta()` in `class-aioemp-activator.php`:
 | Controller | Endpoints | Status |
 |---|---|---|
 | `class-aioemp-rest-controller.php` | Abstract base | DONE |
-| `class-aioemp-events-controller.php` | GET/POST/PUT/DELETE `/events` | DONE (395 lines) |
+| `class-aioemp-events-controller.php` | GET/POST/PUT/DELETE `/events` | DONE (537 lines) |
+| `class-aioemp-attenders-controller.php` | GET/POST/PUT/DELETE `/events/{id}/attenders`, `/attenders/counts`, `/attenders/bulk-status` | DONE (380 lines) |
+| `class-aioemp-seating-controller.php` | GET `/events/{id}/seating`, POST `assign/unassign/swap/block/unblock` + batch variants + finalize | DONE (686 lines) |
 | `class-aioemp-seatmaps-controller.php` | GET/POST/PUT/DELETE `/seatmaps` | DONE |
 | `class-aioemp-seatmap-upload-controller.php` | POST/DELETE `/seatmaps/upload-bg` | DONE |
 | `class-aioemp-locking-controller.php` | POST `/lock/*` | DONE |
@@ -1161,10 +1178,181 @@ All created via `dbDelta()` in `class-aioemp-activator.php`:
 #### Admin
 
 - **Menu**: Top-level "Event Manager" menu item (`dashicons-calendar-alt`, capability `aioemp_manage_events`)
-- **Script chain**: `aioemp-admin.js` → `aioemp-settings.js` → `aioemp-seatmaps.js` → `aioemp-seatmap-editor` (React bundle)
+- **Script enqueue chain** (169 lines in `class-aioemp-admin.php`):
+  1. `aioemp-admin` — SPA shell, hash router, REST helper (`window.aioemp_api`)
+  2. `aioemp-settings` (depends on admin)
+  3. `seatmap-compiler` — Browser IIFE build of seatmap-core compile functions (`window.aioemp_compileSnapshot`)
+  4. `aioemp-events` (depends on admin + seatmap-compiler) — creates shared context `window.AIOEMP_Events`
+  5. Sub-modules loaded sequentially: `events/_helpers` → `events/_list` → `events/_form` → `events/_detail` → `events/_candidates` → `events/_seating`
+  6. `aioemp-seatmaps` (depends on admin)
+  7. `aioemp-seatmap-editor` React bundle (depends on seatmaps)
 - **Localization**: `wp_localize_script` passes `rest_url`, `nonce`, `user_id`, `version`, `logo_url` to `window.aioemp`
 
-### 20.5 Deployment Pipeline
+### 20.5 Events Module — Detailed Architecture (Phase 7)
+
+**Frontend:** jQuery-based SPA sub-modules sharing context via `window.AIOEMP_Events`.
+
+#### Module Structure
+
+The events module uses a shared context object (`ctx = window.AIOEMP_Events`) that all sub-modules extend. The context holds:
+- `api` — reference to `window.aioemp_api` REST helper
+- `detailEventId`, `detailEvent` — current event being viewed
+- `activeTab` — current tab (overview/candidates/attendance/seating)
+- `listState` — events list pagination/filter state
+- `candidateState` — candidates tab pagination/filter state
+- `seatingState` — seating tab state (assignments, blocked, selections, zoom, etc.)
+
+#### Events List (`_list.js`)
+- Table: title, status (badge), venue mode (badge), start date, capacity, delete button
+- Search input (300ms debounce) + status filter dropdown
+- Pagination: prev/next buttons, 20 per page
+- Row click → navigates to `#event/{id}`
+
+#### Event Form (`_form.js`)
+- Full-page form for create/edit with back button
+- Fields: title (required), description, status (draft/published/closed), venue mode, start/end datetime-local, capacity, seatmap template dropdown, location name/address, online URL, cover image URL
+- Seatmap dropdown loads published templates with `integrity_pass` check
+- Datetime conversion: `localToGmt()` / `gmtToLocal()` for UTC storage
+- Save: POST (create) or PUT (update) to `/events` endpoint
+
+#### Event Detail (`_detail.js`)
+- Header: back link, event title, status/venue badges, date, capacity
+- **Four tabs**: Overview, Candidates, Attendance, Seating (Seating tab only shown if event has a seatmap)
+- **Overview tab**: event info grid (title, description, status, venue, dates, capacity, location, online URL, seatmap, created), candidate statistics card (total, registered, accepted onsite, accepted online, rejected — loaded from `/attenders/counts` endpoint)
+- **Attendance tab**: placeholder for Phase 8
+
+#### Candidates Tab (`_candidates.js`)
+- Table: checkbox, name, email, company, status badge, registered date, edit/delete actions
+- Search (300ms debounce) + status filter (registered, accepted_onsite, accepted_online, rejected)
+- **Bulk actions**: select-all checkbox, bulk status change (Accept On-site, Accept Online, Reject) via `POST /attenders/bulk-status`
+- **Add/Edit modal**: overlay modal form with title (Mr/Ms/Mrs/Dr), first name (required), last name, email, company, status dropdown
+- **Delete**: confirmation dialog, `DELETE /attenders/{id}`
+- Pagination: prev/next, 20 per page
+
+#### Backend: Attenders Controller (`class-aioemp-attenders-controller.php`, 380 lines)
+
+| Method | Route | Description |
+|---|---|---|
+| GET | `/events/{id}/attenders` | Paginated list; filters: `status`, `search` (name/email/company LIKE), `ids` (comma-separated, bypasses pagination) |
+| POST | `/events/{id}/attenders` | Create candidate; requires `first_name` or `last_name`; auto-generates SHA-256 QR hash |
+| GET | `/events/{id}/attenders/{aid}` | Single candidate read |
+| PUT | `/events/{id}/attenders/{aid}` | Update candidate fields |
+| DELETE | `/events/{id}/attenders/{aid}` | Delete candidate |
+| GET | `/events/{id}/attenders/counts` | Status breakdown: `{registered, accepted_onsite, accepted_online, rejected, total}` |
+| POST | `/events/{id}/attenders/bulk-status` | Bulk update status for array of IDs; body: `{ids: [...], status: "..."}` |
+
+#### Backend: Attender Model (`class-aioemp-attender-model.php`, 198 lines)
+
+- `STATUSES`: `registered`, `accepted_onsite`, `accepted_online`, `rejected`
+- `create()`: auto-generates `qrcode_hash` via SHA-256 of UUID4 + random password
+- `list_for_event()`: paginated; supports `ids` filter for fetching specific candidates, multi-field LIKE search
+- `count_by_status()`: returns status breakdown counts
+- `bulk_update_status()`: scoped to event_id for safety
+- `find_by_qr_hash()`: for future QR scan lookup
+
+### 20.6 Event Seatmap Snapshot + Seating — Detailed Architecture (Phase 6)
+
+#### Snapshot Lifecycle
+
+1. **Creation**: When an event is created/updated with a `seatmap_id`, the events controller copies the seatmap template's `layout` JSON into `seatmap_layout_snapshot`. The seatmap must have `status=publish` and `integrity_pass=true`.
+2. **Client-side compilation**: The seating tab uses `window.aioemp_compileSnapshot()` (from `seatmap-compiler.js`, a browser IIFE build of seatmap-core) to compile primitives → flat seat list on the client. This ensures seats positions are always computed from current algorithms.
+3. **Freeze enforcement**: `check_snapshot_freeze()` in the events controller prevents seatmap changes if: (a) `seatmap_finalized_at_gmt` is set, (b) seat assignments exist, or (c) attendance records exist.
+4. **Auto-finalization**: `maybe_finalize()` in the seating controller sets `seatmap_finalized_at_gmt` on the **first** seat assignment, permanently freezing the snapshot.
+
+#### Seating Dashboard UI (`_seating.js`, 1607 lines)
+
+A full-screen overlay (`position:fixed; inset:0; z-index above SPA shell`) that provides:
+
+**Layout:**
+- Left panel: candidate search + paginated list (50 per page, status filter `accepted_onsite` only)
+- Main area: SVG seatmap canvas + toolbar + info bar
+- Header: back button, event title, stats bar (total/assigned/blocked/available)
+
+**Three Modes:**
+1. **Assign mode**: Select candidate(s) from panel → click empty seats to mark pending → Confirm Assignment button fires batch assign
+2. **Block mode**: Click or drag-select empty seats → Block/Unblock Selected buttons
+3. **Swap mode**: Click first assigned seat → click second assigned seat → atomic swap
+
+**SVG Rendering:**
+- Seats rendered as `<circle>` elements with `data-key` attributes
+- Seat number labels as `<text>` elements
+- Row labels from `compiled.rowLabels`
+- Decorations: labels (`<text>`), obstacles (`<rect>`) from primitives
+- Canvas area with shadow, workspace background (`#e8e8e8`)
+- Color coding: empty (layout seatFill), assigned (#28a745 green), blocked (#dc3545 red with ✕), pending (#f59e0b amber), pending-block (#ff6b6b), selected-assigned (#0ea5e9 blue)
+
+**Interactions:**
+- **Zoom**: mouse wheel (centered on pointer), +/- buttons, Fit button, zoom level display
+- **Pan**: Space + drag (changes SVG viewBox)
+- **Drag selection** (marquee): mousedown on empty area, drag rectangle overlay, on release selects seats within bounds (assign mode: selects assigned candidates; block mode: stages seats for batch block)
+- **Candidate multi-select**: Shift+click candidates, deselect-all button, selected count display
+- **Candidate info popup**: modal with name, email, company, status, seat, registration date
+- **Keyboard shortcuts**: Escape (close overlay / close help modal), Cmd/Ctrl+D (deselect all)
+- **Help modal**: keyboard shortcuts table + workflow tutorial
+
+**Candidate List:**
+- Filters: all, unassigned, assigned
+- Shows seat badge for assigned candidates
+- Info button per candidate (opens detail popup)
+- Shift+click for multi-select
+- When candidates are selected from the seatmap (by clicking assigned seats), switches to "selected view" showing only those candidates
+- Pagination: prev/next, 50 per page
+
+**Batch Operations:**
+- **Batch assign**: `POST /seating/assign-batch` with `{pairs: [{attender_id, seat_key}]}` — matches N candidates to N pending seats in selection order; auto-unassigns old seats
+- **Batch unassign**: `POST /seating/unassign-batch` with `{seat_keys: [...]}` — for all selected candidates that have seats
+- **Batch block**: `POST /seating/block-batch` with `{seat_keys: [...]}` — skips assigned seats
+- **Batch unblock**: `POST /seating/unblock-batch` with `{seat_keys: [...]}` — unblocks blocked seats
+- Toast notifications: success (auto-dismiss 2.5s), error (auto-dismiss 4s), info messages
+
+**State Management (`seatingState`):**
+- `assignMap`: seat_key → assignment object (for O(1) lookup)
+- `attenderMap`: attender_id → seat_key (for reverse lookup)
+- `blockedSet`: seat_key → true (for O(1) blocked check)
+- `selectedCandidates[]`: array of `{id, name, email}` for multi-select
+- `pendingSeats[]`: seat_keys staged for batch assignment
+- `pendingBlocks[]`: seat_keys staged for batch block
+- `svgScale`, `svgOffsetX/Y`: zoom/pan state
+- After each API call, `loadSeatingData()` re-fetches all assignments + blocked seats and re-renders SVG
+
+#### Backend: Seating Controller (`class-aioemp-seating-controller.php`, 686 lines)
+
+| Method | Route | Description |
+|---|---|---|
+| GET | `/events/{id}/seating` | Returns `{assignments, blocked, counts, is_finalized}` with JOIN to attender table |
+| POST | `/events/{id}/seating/assign` | Assign single seat; validates seat_key exists in snapshot |
+| POST | `/events/{id}/seating/unassign` | Unassign single seat |
+| POST | `/events/{id}/seating/assign-batch` | Batch assign pairs; transactional; auto-unassigns old seats; returns `{assigned, failed}` |
+| POST | `/events/{id}/seating/unassign-batch` | Batch unassign by seat_keys; transactional |
+| POST | `/events/{id}/seating/swap` | Swap two occupied seats atomically (transactional delete + re-insert) |
+| POST | `/events/{id}/seating/block` | Block single seat (rejects if assigned) |
+| POST | `/events/{id}/seating/unblock` | Unblock single seat |
+| POST | `/events/{id}/seating/block-batch` | Block multiple seats; transactional; skips assigned seats |
+| POST | `/events/{id}/seating/unblock-batch` | Unblock multiple seats; transactional |
+| POST | `/events/{id}/seating/finalize` | Explicitly set `seatmap_finalized_at_gmt` |
+
+**Seat key validation:** For modern architecture, validates seat_key against UUID v4 regex (`^[0-9a-f]{8}-...-[0-9a-f]{12}$`). For legacy snapshots with `compiled.seats[]`, validates against actual `seat_key` values in the snapshot.
+
+#### Backend: Models
+
+**`AIOEMP_Seat_Assignment_Model`** (271 lines):
+- `assign()`, `unassign()`, `unassign_by_attender()`, `find_by_seat()`, `find_by_attender()`
+- `list_for_event()`: JOINs with attender table for `first_name`, `last_name`, `email`, `attender_status`
+- `swap()`: transactional delete + re-insert
+- `assign_batch()`: transactional; returns `{assigned, unassigned, skipped, failed}`; handles re-assignment
+- `unassign_batch()`: transactional; returns `{unassigned, skipped, failed}`
+- DB constraints: UNIQUE(event_id, seat_key), UNIQUE(event_id, attender_id)
+
+**`AIOEMP_Blocked_Seat_Model`** (176 lines):
+- `block()`, `unblock()`, `is_blocked()`, `list_for_event()`, `count_for_event()`
+- `block_batch()`, `unblock_batch()`: transactional; return `{blocked/unblocked, skipped, failed}`
+- DB constraint: UNIQUE(event_id, seat_key)
+
+**`AIOEMP_Seat_Assignment_Log_Model`** (81 lines):
+- `log()`: records event_id, attender_id, original_seat, new_seat, reason (assign/unassign/swap/block/unblock), modified_by
+- Every seat operation (single and batch) writes to this audit log
+
+### 20.7 Deployment Pipeline
 
 Deployment is handled by `deploy.sh` which runs locally and pushes to the Hostinger server via SSH/rsync. **For credentials and SSH connection details, see `.ai-agent-notes.md`.** The pipeline:
 
@@ -1177,7 +1365,7 @@ Deployment is handled by `deploy.sh` which runs locally and pushes to the Hostin
 
 To deploy manually: `cd <plugin-root> && bash deploy.sh`
 
-### 20.6 Known Issues & Patterns for Future Agents
+### 20.8 Known Issues & Patterns for Future Agents
 
 #### File Persistence Issues (RESOLVED)
 

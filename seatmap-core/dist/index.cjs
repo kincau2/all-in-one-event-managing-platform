@@ -41,15 +41,12 @@ __export(index_exports, {
   RowLabelSchema: () => RowLabelSchema,
   SeatBlockArcSchema: () => SeatBlockArcSchema,
   SeatBlockGridSchema: () => SeatBlockGridSchema,
-  SeatBlockWedgeSchema: () => SeatBlockWedgeSchema,
   SeatsPerRowSchema: () => SeatsPerRowSchema,
-  StagePrimitiveSchema: () => StagePrimitiveSchema,
   TransformSchema: () => TransformSchema,
   arcPivotOffset: () => arcPivotOffset,
   compileArc: () => compileArc,
   compileGrid: () => compileGrid,
   compileLayout: () => compileLayout,
-  compileWedge: () => compileWedge,
   computeBounds: () => computeBounds,
   degToRad: () => degToRad,
   deterministicSeatKey: () => deterministicSeatKey,
@@ -104,12 +101,6 @@ var primitiveBase = {
   label: import_zod.z.string().optional(),
   transform: TransformSchema.optional()
 };
-var StagePrimitiveSchema = import_zod.z.object({
-  ...primitiveBase,
-  type: import_zod.z.literal("stage"),
-  width: import_zod.z.number().positive(),
-  height: import_zod.z.number().positive()
-});
 var LabelPrimitiveSchema = import_zod.z.object({
   ...primitiveBase,
   type: import_zod.z.literal("label"),
@@ -172,30 +163,12 @@ var SeatBlockArcSchema = import_zod.z.object({
   section: import_zod.z.string().default(""),
   rowLabelDisplay: RowLabelDisplaySchema
 });
-var SeatBlockWedgeSchema = import_zod.z.object({
-  ...primitiveBase,
-  type: import_zod.z.literal("seatBlockWedge"),
-  center: PointSchema,
-  innerRadius: import_zod.z.number().nonnegative(),
-  outerRadius: import_zod.z.number().positive(),
-  startAngleDeg: import_zod.z.number(),
-  endAngleDeg: import_zod.z.number(),
-  rowCount: import_zod.z.number().int().positive(),
-  seatsPerRow: SeatsPerRowSchema,
-  seatRadius: import_zod.z.number().positive().optional(),
-  rowLabel: RowLabelSchema.default({ mode: "alpha", start: "A", direction: "asc" }),
-  numbering: import_zod.z.enum(["L2R", "R2L"]).default("L2R"),
-  excludedSeats: import_zod.z.array(import_zod.z.tuple([import_zod.z.number().int(), import_zod.z.number().int()])).default([]),
-  section: import_zod.z.string().default("")
-});
 var PrimitiveSchema = import_zod.z.discriminatedUnion("type", [
-  StagePrimitiveSchema,
   LabelPrimitiveSchema,
   ObstaclePrimitiveSchema,
   ImagePrimitiveSchema,
   SeatBlockGridSchema,
-  SeatBlockArcSchema,
-  SeatBlockWedgeSchema
+  SeatBlockArcSchema
 ]);
 var CompiledSeatSchema = import_zod.z.object({
   seat_key: import_zod.z.string().uuid(),
@@ -621,70 +594,6 @@ function compileArc(primitive, globalSeatRadius = 10) {
   return { seats, rowLabels };
 }
 
-// src/compile-wedge.ts
-function compileWedge(primitive, globalSeatRadius = 10) {
-  const {
-    id,
-    center,
-    innerRadius,
-    outerRadius,
-    startAngleDeg,
-    endAngleDeg,
-    rowCount,
-    seatsPerRow,
-    excludedSeats,
-    section,
-    transform
-  } = primitive;
-  const seatRadius = primitive.seatRadius ?? globalSeatRadius;
-  const rowLabel = primitive.rowLabel ?? { mode: "alpha", start: "A", direction: "asc" };
-  const numbering = primitive.numbering ?? "L2R";
-  const seats = [];
-  const totalAngle = endAngleDeg - startAngleDeg;
-  for (let r = 0; r < rowCount; r++) {
-    const radius = rowCount === 1 ? (innerRadius + outerRadius) / 2 : innerRadius + r * ((outerRadius - innerRadius) / (rowCount - 1));
-    const n = getSeatsPerRow(seatsPerRow, r);
-    if (n <= 0) continue;
-    const rowLabelStr = generateRowLabel(
-      rowLabel.start,
-      r,
-      rowLabel.direction,
-      rowLabel.mode ?? "alpha"
-    );
-    for (let s = 0; s < n; s++) {
-      if (excludedSeats?.some(([er, ec]) => er === r && ec === s)) continue;
-      const angleDeg = n === 1 ? startAngleDeg + totalAngle / 2 : startAngleDeg + s * (totalAngle / (n - 1));
-      const angleRad = degToRad(angleDeg);
-      let x = center.x + radius * Math.cos(angleRad);
-      let y = center.y + radius * Math.sin(angleRad);
-      if (transform?.rotation) {
-        const rotated = rotatePoint(x, y, center.x, center.y, transform.rotation);
-        x = rotated.x;
-        y = rotated.y;
-      }
-      x += transform?.x ?? 0;
-      y += transform?.y ?? 0;
-      const seatNumber = numbering === "R2L" ? n - s : s + 1;
-      const label = `${rowLabelStr}-${String(seatNumber).padStart(2, "0")}`;
-      const seat_key = deterministicSeatKey(id, r, s);
-      seats.push({
-        seat_key,
-        label,
-        section: section || void 0,
-        row: rowLabelStr,
-        number: seatNumber,
-        x: round2(x),
-        y: round2(y),
-        radius: seatRadius,
-        rotation: round2(angleDeg + 90),
-        // tangent direction
-        meta: { primitiveId: id, logicalRow: r, logicalSeat: s }
-      });
-    }
-  }
-  return seats;
-}
-
 // src/compile-layout.ts
 function compileLayout(layout) {
   const allSeats = [];
@@ -704,9 +613,6 @@ function compileLayout(layout) {
         allRowLabels.push(...result.rowLabels);
         break;
       }
-      case "seatBlockWedge":
-        allSeats.push(...compileWedge(primitive, globalSeatRadius));
-        break;
     }
   }
   const bounds = computeBounds(allSeats);
@@ -767,15 +673,12 @@ function computeBounds(seats) {
   RowLabelSchema,
   SeatBlockArcSchema,
   SeatBlockGridSchema,
-  SeatBlockWedgeSchema,
   SeatsPerRowSchema,
-  StagePrimitiveSchema,
   TransformSchema,
   arcPivotOffset,
   compileArc,
   compileGrid,
   compileLayout,
-  compileWedge,
   computeBounds,
   degToRad,
   deterministicSeatKey,

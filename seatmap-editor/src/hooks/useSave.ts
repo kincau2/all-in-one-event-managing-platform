@@ -40,13 +40,15 @@ export function useSave() {
   const isDirty = useEditorStore((s) => s.isDirty);
   const setSaveStatus = useEditorStore((s) => s.setSaveStatus);
   const markClean = useEditorStore((s) => s.markClean);
+  const setSeatmapStatus = useEditorStore((s) => s.setSeatmapStatus);
 
   const savingRef = useRef(false);
 
   /**
    * Core save — validates, compiles, PUTs.
+   * @param overrideStatus  Optional status to set on save ('draft' | 'publish').
    */
-  const save = useCallback(async (): Promise<SaveResult> => {
+  const save = useCallback(async (overrideStatus?: 'draft' | 'publish'): Promise<SaveResult> => {
     if (!seatmapId) return { ok: false, error: 'No seatmap ID' };
     if (savingRef.current) return { ok: false, error: 'Save already in progress' };
 
@@ -76,12 +78,19 @@ export function useSave() {
        *    Compiled data is regenerated client-side on every load;
        *    storing it would bloat the DB and cause 504 timeouts. */
       const { compiled: _strip, ...rawLayout } = result.layout as any;
-      await seatmapApi.update(seatmapId, {
+      const updatePayload: Record<string, any> = {
         layout: JSON.stringify(rawLayout),
         integrity_pass: integrityPass ? 1 : 0,
-      });
+      };
+      if (overrideStatus) {
+        updatePayload.status = overrideStatus;
+      }
+      await seatmapApi.update(seatmapId, updatePayload);
 
-      /* 4) Success */
+      /* 4) Success — update seatmap status in store if changed. */
+      if (overrideStatus) {
+        setSeatmapStatus(overrideStatus);
+      }
       setSaveStatus('saved');
       markClean();
       clearDraft(seatmapId);
@@ -97,7 +106,7 @@ export function useSave() {
       savingRef.current = false;
       return { ok: false, error: err?.message || 'Network error' };
     }
-  }, [seatmapId, layout, setSaveStatus, markClean]);
+  }, [seatmapId, layout, setSaveStatus, markClean, setSeatmapStatus]);
 
   /* Ctrl+S keyboard shortcut */
   useEffect(() => {

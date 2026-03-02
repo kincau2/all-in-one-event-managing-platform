@@ -276,24 +276,9 @@
             svgHtml += '<rect x="' + (minX + pad) + '" y="' + (minY + pad) + '" width="' + (vbW - pad * 2) + '" height="' + (vbH - pad * 2) + '" fill="' + esc(bgColor) + '"/>';
         }
 
-        // Draw stages.
+        // Draw decorations (labels, obstacles).
         if (snapshot.primitives) {
             snapshot.primitives.forEach(function (p) {
-                if (p.type === 'stage') {
-                    var tx = (p.transform && p.transform.x) || 0;
-                    var ty = (p.transform && p.transform.y) || 0;
-                    var pw = p.width || 100;
-                    var ph = p.height || 40;
-                    var rot = (p.transform && p.transform.rotation) || 0;
-                    var transformAttr = rot ? ' transform="rotate(' + rot + ',' + (tx + pw / 2) + ',' + (ty + ph / 2) + ')"' : '';
-                    svgHtml += '<rect x="' + tx + '" y="' + ty + '" width="' + pw + '" height="' + ph +
-                               '" fill="#e0e0e0" stroke="#999" stroke-width="1" rx="4"' + transformAttr + '/>';
-                    if (p.label) {
-                        svgHtml += '<text x="' + (tx + pw / 2) + '" y="' + (ty + ph / 2) +
-                                   '" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="600" fill="#444"' +
-                                   transformAttr + '>' + esc(p.label) + '</text>';
-                    }
-                }
                 if (p.type === 'label') {
                     var ltx = (p.transform && p.transform.x) || 0;
                     var lty = (p.transform && p.transform.y) || 0;

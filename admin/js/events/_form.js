@@ -140,7 +140,7 @@
     function bindFormEvents(eventId) {
         var integrityMap = {};
 
-        api.get('seatmaps')
+        api.get('seatmaps?status=publish')
             .then(function (res) {
                 var items = Array.isArray(res) ? res : (res.data || []);
                 var $sel = $('#evt-f-seatmap');

@@ -7,17 +7,6 @@
 
 import { generateUUID } from '@aioemp/seatmap-core';
 
-export function createDefaultStage() {
-  return {
-    id: generateUUID(),
-    type: 'stage' as const,
-    name: 'Stage',
-    width: 300,
-    height: 60,
-    transform: { x: 100, y: 20, rotation: 0 },
-  };
-}
-
 export function createDefaultLabel() {
   return {
     id: generateUUID(),

@@ -23,7 +23,6 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 describe('compileLayout', () => {
   it('returns empty compiled for layout with no seat blocks', () => {
     const layout = LayoutSchema.parse(minLayout([
-      { id: 's1', type: 'stage', width: 200, height: 50 },
       { id: 'l1', type: 'label', text: 'Info' },
       { id: 'o1', type: 'obstacle', width: 30, height: 30 },
     ]));
@@ -34,7 +33,6 @@ describe('compileLayout', () => {
 
   it('compiles mixed grid + arc primitives', () => {
     const layout = LayoutSchema.parse(minLayout([
-      { id: 's1', type: 'stage', width: 300, height: 50 },
       {
         id: 'g1', type: 'seatBlockGrid',
         rows: 3, cols: 5, seatSpacingX: 30, seatSpacingY: 35,
@@ -54,21 +52,6 @@ describe('compileLayout', () => {
     for (const s of result.compiled.seats) {
       expect(s.seat_key).toMatch(UUID_RE);
     }
-  });
-
-  it('compiles wedge primitives', () => {
-    const layout = LayoutSchema.parse(minLayout([
-      {
-        id: 'w1', type: 'seatBlockWedge',
-        center: { x: 0, y: 0 },
-        innerRadius: 100, outerRadius: 200,
-        startAngleDeg: 0, endAngleDeg: 90,
-        rowCount: 2,
-        seatsPerRow: [4, 6],
-      },
-    ]));
-    const result = compileLayout(layout);
-    expect(result.compiled.seats).toHaveLength(10);
   });
 
   it('computes correct bounds', () => {

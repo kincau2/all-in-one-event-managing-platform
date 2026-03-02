@@ -151,10 +151,7 @@ function getRotationCenter(p: any): { x: number; y: number } {
     const pivot = arcPivotOffset(p.startRadius, p.rowCount, p.radiusStep, p.radiusRatio ?? 1, p.startAngleDeg, p.endAngleDeg);
     return { x: (p.center?.x ?? 0) + tx + pivot.x, y: (p.center?.y ?? 0) + ty + pivot.y };
   }
-  if (p.type === 'seatBlockWedge') {
-    return { x: (p.center?.x ?? 0) + tx, y: (p.center?.y ?? 0) + ty };
-  }
-  if (p.type === 'obstacle' || p.type === 'stage' || p.type === 'image') {
+  if (p.type === 'obstacle' || p.type === 'image') {
     return { x: tx + (p.width ?? 0) / 2, y: ty + (p.height ?? 0) / 2 };
   }
   if (p.type === 'label') {
@@ -828,7 +825,6 @@ export const EditorCanvas: React.FC<{ width: number; height: number }> = ({
       <Layer>
         {(() => {
           const TIER: Record<string, number> = {
-            stage: 0,
             image: 1,
             obstacle: 1,
             seatBlockGrid: 2,
@@ -987,12 +983,6 @@ function primitiveBBox(p: any): DragRect {
       }
     }
     return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
-  }
-  if (p.type === 'seatBlockWedge') {
-    const cx = (p.center?.x ?? 0) + tx;
-    const cy = (p.center?.y ?? 0) + ty;
-    const outerR = p.outerRadius ?? 300;
-    return { x: cx - outerR, y: cy - outerR, w: outerR * 2, h: outerR * 2 };
   }
   return { x: tx, y: ty, w: 0, h: 0 };
 }

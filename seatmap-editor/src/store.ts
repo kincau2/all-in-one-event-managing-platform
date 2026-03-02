@@ -30,7 +30,6 @@ export type Tool =
   | 'seatSelect'
   | 'addGrid'
   | 'addArc'
-  | 'addStage'
   | 'addLabel'
   | 'addObstacle'
   | 'addImage';
@@ -63,6 +62,7 @@ export interface EditorState {
   /* ── Save ── */
   saveStatus: SaveStatus;
   isDirty: boolean;
+  seatmapStatus: 'draft' | 'publish';
 
   /* ── Lock ── */
   lockToken: string | null;
@@ -104,6 +104,7 @@ export interface EditorState {
   setSaveStatus: (status: SaveStatus) => void;
   markDirty: () => void;
   markClean: () => void;
+  setSeatmapStatus: (status: 'draft' | 'publish') => void;
 
   setLock: (token: string | null, ownerId: number | null, ownerName: string | null, isLocked?: boolean) => void;
 }
@@ -156,6 +157,7 @@ export const useEditorStore = create<EditorState>()(
     stageScale: 1,
     saveStatus: 'idle',
     isDirty: false,
+    seatmapStatus: 'draft',
     lockToken: null,
     lockOwnerId: null,
     lockOwnerName: null,
@@ -474,6 +476,9 @@ export const useEditorStore = create<EditorState>()(
     },
     markClean() {
       set((s) => { s.isDirty = false; s.saveStatus = 'saved'; });
+    },
+    setSeatmapStatus(status) {
+      set((s) => { s.seatmapStatus = status; });
     },
 
     /* ── Lock ── */

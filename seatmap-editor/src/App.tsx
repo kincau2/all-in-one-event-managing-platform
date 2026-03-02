@@ -32,6 +32,7 @@ export const App: React.FC<AppProps> = ({ seatmapId, onClose }) => {
 
   const initLayout = useEditorStore((s) => s.initLayout);
   const isDirty = useEditorStore((s) => s.isDirty);
+  const setSeatmapStatus = useEditorStore((s) => s.setSeatmapStatus);
 
   /* Wire up store seatmapId */
   useEffect(() => {
@@ -53,6 +54,8 @@ export const App: React.FC<AppProps> = ({ seatmapId, onClose }) => {
       .get(seatmapId)
       .then((data: any) => {
         if (cancelled) return;
+        // Set seatmap status in store.
+        setSeatmapStatus(data?.status === 'publish' ? 'publish' : 'draft');
         if (data && (data.layout_json || data.layout)) {
           try {
             const raw = data.layout_json ?? data.layout;
@@ -104,7 +107,13 @@ export const App: React.FC<AppProps> = ({ seatmapId, onClose }) => {
     return () => window.removeEventListener('beforeunload', handler);
   }, [isDirty]);
 
-  const handleSave = useCallback(() => { save(); }, [save]);
+  const handleSave = useCallback(async (status?: 'draft' | 'publish') => {
+    const result = await save(status);
+    if (!result.ok && result.error) {
+      window.alert(result.error);
+    }
+    return result;
+  }, [save]);
 
   const handleClose = useCallback(() => {
     if (isDirty && !window.confirm('You have unsaved changes. Discard?')) return;

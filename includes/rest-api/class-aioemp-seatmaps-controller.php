@@ -104,6 +104,7 @@ class AIOEMP_Seatmaps_Controller extends AIOEMP_REST_Controller {
 
         $result = $this->model->list( array(
             'search'   => $this->text_param( $request, 'search' ),
+            'status'   => $this->text_param( $request, 'status' ),
             'per_page' => $pagination['per_page'],
             'page'     => $pagination['page'],
         ) );
@@ -122,6 +123,15 @@ class AIOEMP_Seatmaps_Controller extends AIOEMP_REST_Controller {
         }
 
         $data = array( 'title' => $title );
+
+        // Status (defaults to 'draft' via model).
+        $status = $this->text_param( $request, 'status' );
+        if ( '' !== $status ) {
+            if ( ! in_array( $status, AIOEMP_Seatmap_Model::STATUSES, true ) ) {
+                return $this->error( 'invalid_status', __( 'Invalid seatmap status. Allowed: draft, publish.', 'aioemp' ) );
+            }
+            $data['status'] = $status;
+        }
 
         // Accept optional layout JSON on create (for imports / duplicates).
         $layout = $request->get_param( 'layout' );
@@ -181,6 +191,35 @@ class AIOEMP_Seatmaps_Controller extends AIOEMP_REST_Controller {
         $title = $this->text_param( $request, 'title' );
         if ( '' !== $title ) {
             $data['title'] = $title;
+        }
+
+        // Status.
+        $status = $this->text_param( $request, 'status' );
+        if ( '' !== $status ) {
+            if ( ! in_array( $status, AIOEMP_Seatmap_Model::STATUSES, true ) ) {
+                return $this->error( 'invalid_status', __( 'Invalid seatmap status. Allowed: draft, publish.', 'aioemp' ) );
+            }
+
+            // Guard: block unpublish if any events reference this seatmap.
+            if ( 'draft' === $status && 'publish' === ( $item->status ?? '' ) ) {
+                global $wpdb;
+                $events_table = $wpdb->prefix . 'aioemp_events';
+                $event_count  = (int) $wpdb->get_var(
+                    $wpdb->prepare( "SELECT COUNT(*) FROM {$events_table} WHERE seatmap_id = %d", $id )
+                );
+                if ( $event_count > 0 ) {
+                    return $this->error(
+                        'seatmap_in_use',
+                        sprintf(
+                            /* translators: %d: number of events */
+                            __( 'Cannot switch to draft: this seatmap is assigned to %d event(s). Remove it from those events first.', 'aioemp' ),
+                            $event_count
+                        )
+                    );
+                }
+            }
+
+            $data['status'] = $status;
         }
 
         $layout = $request->get_param( 'layout' );
@@ -246,6 +285,7 @@ class AIOEMP_Seatmaps_Controller extends AIOEMP_REST_Controller {
             'page'     => array( 'type' => 'integer', 'default' => 1, 'minimum' => 1, 'sanitize_callback' => 'absint' ),
             'per_page' => array( 'type' => 'integer', 'default' => 20, 'minimum' => 1, 'maximum' => 100, 'sanitize_callback' => 'absint' ),
             'search'   => array( 'type' => 'string', 'sanitize_callback' => 'sanitize_text_field' ),
+            'status'   => array( 'type' => 'string', 'enum' => AIOEMP_Seatmap_Model::STATUSES, 'sanitize_callback' => 'sanitize_text_field' ),
         );
     }
 

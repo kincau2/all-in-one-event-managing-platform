@@ -7,6 +7,7 @@
 export interface SeatmapRecord {
   id: number;
   title: string;
+  status?: 'draft' | 'publish';
   layout?: string;
   lock_user_id?: number | null;
   lock_token?: string | null;
@@ -33,7 +34,7 @@ export const seatmapApi = {
     return api().post('seatmaps', { title, layout }) as Promise<SeatmapRecord>;
   },
 
-  update(id: number, data: { title?: string; layout?: string; integrity_pass?: number }) {
+  update(id: number, data: { title?: string; layout?: string; integrity_pass?: number; status?: 'draft' | 'publish' }) {
     return api().put(`seatmaps/${id}`, data) as Promise<SeatmapRecord>;
   },
 

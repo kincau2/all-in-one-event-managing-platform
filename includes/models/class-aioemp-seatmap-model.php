@@ -16,6 +16,9 @@ class AIOEMP_Seatmap_Model extends AIOEMP_Model {
 
     protected string $table_short = 'seatmap';
 
+    /** Allowed seatmap statuses. */
+    const STATUSES = array( 'draft', 'publish' );
+
     /**
      * Insert a new seatmap.
      *
@@ -64,6 +67,7 @@ class AIOEMP_Seatmap_Model extends AIOEMP_Model {
     public function list( array $args = array() ): object {
         $defaults = array(
             'search'   => '',
+            'status'   => '',
             'per_page' => 20,
             'page'     => 1,
         );
@@ -75,6 +79,11 @@ class AIOEMP_Seatmap_Model extends AIOEMP_Model {
         if ( '' !== $args['search'] ) {
             $where[]  = 'title LIKE %s';
             $values[] = '%' . $this->db->esc_like( $args['search'] ) . '%';
+        }
+
+        if ( '' !== $args['status'] && in_array( $args['status'], self::STATUSES, true ) ) {
+            $where[]  = 'status = %s';
+            $values[] = $args['status'];
         }
 
         $where_clause = implode( ' AND ', $where );

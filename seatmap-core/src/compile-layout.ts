@@ -9,7 +9,6 @@ import type { Layout, CompiledSeat, Bounds, CompiledRowLabel } from './types.js'
 import { LayoutSchema } from './schema.js';
 import { compileGrid } from './compile-grid.js';
 import { compileArc } from './compile-arc.js';
-import { compileWedge } from './compile-wedge.js';
 import { round2 } from './utils.js';
 
 /* ──────────────────────────────────────────────
@@ -44,10 +43,7 @@ export function compileLayout(layout: Layout): Layout {
         allRowLabels.push(...result.rowLabels);
         break;
       }
-      case 'seatBlockWedge':
-        allSeats.push(...compileWedge(primitive, globalSeatRadius));
-        break;
-      // stage, label, obstacle — decorative, produce no seats
+      // label, obstacle, image — decorative, produce no seats
     }
   }
 

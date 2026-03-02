@@ -365,6 +365,7 @@ body.aioemp-active {
 }
 
 .aioemp-badge--draft     { background: #eee; color: var(--sa-muted); }
+.aioemp-badge--publish   { background: rgba(58,196,125,.15); color: var(--sa-success); }
 .aioemp-badge--published { background: rgba(58,196,125,.15); color: var(--sa-success); }
 .aioemp-badge--closed    { background: rgba(245,54,92,.12); color: var(--sa-danger); }
 
@@ -1325,17 +1326,9 @@ body.aioemp-active {
 .aioemp-btn--danger {
     background: #dc3545 !important;
     color: #fff !important;
-    border-color: #a71d2a !important;
 }
 .aioemp-btn--danger:hover {
     background: #c82333 !important;
-}
-.aioemp-btn--danger .dashicons {
-    font-size: 14px;
-    width: 14px;
-    height: 14px;
-    vertical-align: middle;
-    margin-right: 2px;
 }
 
 /* Mode button active state */

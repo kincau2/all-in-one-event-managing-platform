@@ -64,13 +64,6 @@ const primitiveBase = {
  * Non-seat primitives
  * ────────────────────────────────────────────── */
 
-export const StagePrimitiveSchema = z.object({
-  ...primitiveBase,
-  type: z.literal('stage'),
-  width: z.number().positive(),
-  height: z.number().positive(),
-});
-
 export const LabelPrimitiveSchema = z.object({
   ...primitiveBase,
   type: z.literal('label'),
@@ -142,35 +135,16 @@ export const SeatBlockArcSchema = z.object({
   rowLabelDisplay: RowLabelDisplaySchema,
 });
 
-export const SeatBlockWedgeSchema = z.object({
-  ...primitiveBase,
-  type: z.literal('seatBlockWedge'),
-  center: PointSchema,
-  innerRadius: z.number().nonnegative(),
-  outerRadius: z.number().positive(),
-  startAngleDeg: z.number(),
-  endAngleDeg: z.number(),
-  rowCount: z.number().int().positive(),
-  seatsPerRow: SeatsPerRowSchema,
-  seatRadius: z.number().positive().optional(),
-  rowLabel: RowLabelSchema.default({ mode: 'alpha', start: 'A', direction: 'asc' }),
-  numbering: z.enum(['L2R', 'R2L']).default('L2R'),
-  excludedSeats: z.array(z.tuple([z.number().int(), z.number().int()])).default([]),
-  section: z.string().default(''),
-});
-
 /* ──────────────────────────────────────────────
  * Discriminated union of all primitives
  * ────────────────────────────────────────────── */
 
 export const PrimitiveSchema = z.discriminatedUnion('type', [
-  StagePrimitiveSchema,
   LabelPrimitiveSchema,
   ObstaclePrimitiveSchema,
   ImagePrimitiveSchema,
   SeatBlockGridSchema,
   SeatBlockArcSchema,
-  SeatBlockWedgeSchema,
 ]);
 
 /* ──────────────────────────────────────────────

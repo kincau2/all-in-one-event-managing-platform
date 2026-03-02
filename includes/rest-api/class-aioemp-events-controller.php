@@ -356,6 +356,12 @@ class AIOEMP_Events_Controller extends AIOEMP_REST_Controller {
                 if ( ! $seatmap ) {
                     return $this->error( 'seatmap_not_found', __( 'Seatmap not found.', 'aioemp' ), 404 );
                 }
+                if ( ( $seatmap->status ?? 'draft' ) !== 'publish' ) {
+                    return $this->error(
+                        'seatmap_not_published',
+                        __( 'This seatmap is still a draft. Please publish it before assigning it to an event.', 'aioemp' )
+                    );
+                }
                 if ( empty( $seatmap->integrity_pass ) ) {
                     return $this->error(
                         'seatmap_integrity_fail',
@@ -465,6 +471,12 @@ class AIOEMP_Events_Controller extends AIOEMP_REST_Controller {
 
         if ( ! $seatmap ) {
             return $this->error( 'seatmap_not_found', __( 'Seatmap not found.', 'aioemp' ), 404 );
+        }
+        if ( ( $seatmap->status ?? 'draft' ) !== 'publish' ) {
+            return $this->error(
+                'seatmap_not_published',
+                __( 'This seatmap is still a draft and cannot be used for an event.', 'aioemp' )
+            );
         }
         if ( empty( $seatmap->integrity_pass ) ) {
             return $this->error(

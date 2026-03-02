@@ -16,13 +16,11 @@ export {
   GridAisleGapSchema,
   ArcAisleGapSchema,
   SeatsPerRowSchema,
-  StagePrimitiveSchema,
   LabelPrimitiveSchema,
   ObstaclePrimitiveSchema,
   ImagePrimitiveSchema,
   SeatBlockGridSchema,
   SeatBlockArcSchema,
-  SeatBlockWedgeSchema,
   CompiledRowLabelSchema,
   RowLabelDisplaySchema,
 } from './schema.js';
@@ -43,13 +41,11 @@ export type {
   GridAisleGap,
   ArcAisleGap,
   SeatsPerRow,
-  StagePrimitive,
   LabelPrimitive,
   ObstaclePrimitive,
   ImagePrimitive,
   SeatBlockGrid,
   SeatBlockArc,
-  SeatBlockWedge,
   CompiledRowLabel,
   RowLabelDisplay,
 } from './types.js';
@@ -63,7 +59,6 @@ export {
 } from './compile-layout.js';
 export { compileGrid, type GridCompileResult } from './compile-grid.js';
 export { compileArc, type ArcCompileResult } from './compile-arc.js';
-export { compileWedge } from './compile-wedge.js';
 
 /* ── seat_key utilities ── */
 export { deterministicSeatKey } from './seat-key.js';

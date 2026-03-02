@@ -350,26 +350,6 @@ interface InspectorProps {
   disabled: boolean;
 }
 
-const StageInspector: React.FC<InspectorProps> = ({ primitive: p, onUpdate, disabled }) => {
-  const prim = p as Extract<Primitive, { type: 'stage' }>;
-  return (
-    <>
-      <TextField label="Name" value={prim.name ?? ''} disabled={disabled}
-        onChange={(v) => onUpdate({ name: v } as any)} />
-      <NumField label="Width" value={prim.width} min={10} disabled={disabled}
-        onChange={(v) => onUpdate({ width: v } as any)} />
-      <NumField label="Height" value={prim.height} min={10} disabled={disabled}
-        onChange={(v) => onUpdate({ height: v } as any)} />
-      <NumField label="X" value={prim.transform?.x ?? 0} disabled={disabled}
-        onChange={(v) => onUpdate({ transform: { ...prim.transform, x: v } } as any)} />
-      <NumField label="Y" value={prim.transform?.y ?? 0} disabled={disabled}
-        onChange={(v) => onUpdate({ transform: { ...prim.transform, y: v } } as any)} />
-      <NumField label="Rotation" value={prim.transform?.rotation ?? 0} step={1} disabled={disabled}
-        onChange={(v) => onUpdate({ transform: { ...prim.transform, rotation: v } } as any)} />
-    </>
-  );
-};
-
 const LabelInspector: React.FC<InspectorProps> = ({ primitive: p, onUpdate, disabled }) => {
   const prim = p as Extract<Primitive, { type: 'label' }>;
   return (
@@ -594,86 +574,14 @@ const ArcInspector: React.FC<InspectorProps> = ({ primitive: p, onUpdate, disabl
   );
 };
 
-const WedgeInspector: React.FC<InspectorProps> = ({ primitive: p, onUpdate, disabled }) => {
-  const prim = p as Extract<Primitive, { type: 'seatBlockWedge' }>;
-  const spr = prim.seatsPerRow as { start: number; delta: number } | number[];
-  const isArray = Array.isArray(spr);
-  return (
-    <>
-      <CollapsibleSection title="Section Property">
-        <TextField label="Name" value={prim.name ?? ''} disabled={disabled}
-          onChange={(v) => onUpdate({ name: v } as any)} />
-        <TextField label="Section" value={prim.section ?? ''} disabled={disabled}
-          onChange={(v) => onUpdate({ section: v } as any)} />
-        <NumField label="Center X" value={prim.center.x} disabled={disabled}
-          onChange={(v) => onUpdate({ center: { ...prim.center, x: v } } as any)} />
-        <NumField label="Center Y" value={prim.center.y} disabled={disabled}
-          onChange={(v) => onUpdate({ center: { ...prim.center, y: v } } as any)} />
-      </CollapsibleSection>
-
-      <CollapsibleSection title="Seat Setting">
-        <NumField label="Inner Radius" value={prim.innerRadius} min={10} disabled={disabled}
-          onChange={(v) => onUpdate({ innerRadius: v } as any)} />
-        <NumField label="Outer Radius" value={prim.outerRadius} min={20} disabled={disabled}
-          onChange={(v) => onUpdate({ outerRadius: v } as any)} />
-        <NumField label="Start Angle" value={prim.startAngleDeg} min={-360} max={360} step={1} disabled={disabled}
-          onChange={(v) => onUpdate({ startAngleDeg: v } as any)} />
-        <NumField label="End Angle" value={prim.endAngleDeg} min={-360} max={360} step={1} disabled={disabled}
-          onChange={(v) => onUpdate({ endAngleDeg: v } as any)} />
-        <NumField label="Rows" value={prim.rowCount} min={1} max={50} disabled={disabled}
-          onChange={(v) => onUpdate({ rowCount: v } as any)} />
-        {!isArray && (
-          <>
-            <NumField label="Seats (first row)" value={(spr as any).start ?? 6} min={1} disabled={disabled}
-              onChange={(v) => onUpdate({ seatsPerRow: { ...(spr as any), start: v } } as any)} />
-            <NumField label="Seats delta" value={(spr as any).delta ?? 0} disabled={disabled}
-              onChange={(v) => onUpdate({ seatsPerRow: { ...(spr as any), delta: v } } as any)} />
-          </>
-        )}
-      </CollapsibleSection>
-
-      <CollapsibleSection title="Seat Labeling">
-        <SelectField label="Numbering Direction" value={(prim as any).numbering ?? 'L2R'} disabled={disabled}
-          options={[
-            { value: 'L2R', label: 'Left → Right' },
-            { value: 'R2L', label: 'Right ← Left' },
-          ]}
-          onChange={(v) => onUpdate({ numbering: v } as any)} />
-        <SelectField label="Row Label Mode" value={(prim as any).rowLabel?.mode ?? 'alpha'} disabled={disabled}
-          options={[
-            { value: 'alpha', label: 'Alphabetic (A, B, C…)' },
-            { value: 'numeric', label: 'Numeric (1, 2, 3…)' },
-          ]}
-          onChange={(v) =>
-            onUpdate({ rowLabel: { ...(prim as any).rowLabel, mode: v } } as any)
-          } />
-        <RowStartField mode={(prim as any).rowLabel?.mode ?? 'alpha'} value={(prim as any).rowLabel?.start ?? 'A'} disabled={disabled}
-          onChange={(v) =>
-            onUpdate({ rowLabel: { ...(prim as any).rowLabel, start: v || 'A' } } as any)
-          } />
-        <SelectField label="Row Direction" value={(prim as any).rowLabel?.direction ?? 'asc'} disabled={disabled}
-          options={[
-            { value: 'asc', label: 'Ascending' },
-            { value: 'desc', label: 'Descending' },
-          ]}
-          onChange={(v) =>
-            onUpdate({ rowLabel: { ...(prim as any).rowLabel, direction: v } } as any)
-          } />
-      </CollapsibleSection>
-    </>
-  );
-};
-
 /* ── Inspector component map ── */
 
 const inspectorMap: Record<string, React.FC<InspectorProps>> = {
-  stage: StageInspector,
   label: LabelInspector,
   obstacle: ObstacleInspector,
   image: ImageInspector,
   seatBlockGrid: GridInspector,
   seatBlockArc: ArcInspector,
-  seatBlockWedge: WedgeInspector,
 };
 
 /* ── Main Inspector Panel ── */
@@ -764,8 +672,8 @@ export const InspectorPanel: React.FC = () => {
               onChange={(v) => updateLayoutStyle({ rowFontWeight: v })} />
           </CollapsibleSection>
 
-          {/* ── Stage Section ── */}
-          <CollapsibleSection title="Stage">
+          {/* ── Canvas Section ── */}
+          <CollapsibleSection title="Canvas">
             <NumField label="Canvas Width" value={canvas.w} min={200} max={10000} disabled={isLocked}
               onChange={(v) => updateCanvas({ w: v })} />
             <NumField label="Canvas Height" value={canvas.h} min={200} max={10000} disabled={isLocked}

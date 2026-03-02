@@ -85,6 +85,18 @@
   cursor: not-allowed;
 }
 
+.sme-toolbar__btn--link {
+  background: none !important;
+  color: var(--sa-primary, #4b49ac) !important;
+  text-decoration: underline;
+  font-size: 12px;
+  padding: 4px 8px;
+}
+.sme-toolbar__btn--link:hover:not(:disabled) {
+  color: var(--sa-primary-dark, #3a389a) !important;
+  background: none !important;
+}
+
 .sme-toolbar__btn .dashicons {
   font-size: 18px;
   width: 18px;

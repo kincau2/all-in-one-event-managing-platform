@@ -4,7 +4,7 @@
  * Pure visual renderer for a single primitive.
  * No event handlers — all interaction is handled by EditorCanvas.
  * Each shape gets attrs.primitiveId for hit-test identification.
- * Arc/Wedge: draws only the seated sector (not a full circle).
+ * Arc: draws only the seated sector (not a full circle).
  */
 
 import React, { useEffect, useState } from 'react';
@@ -73,23 +73,6 @@ export const PrimitiveRenderer: React.FC<Props> = ({ primitive, isSelected }) =>
   const dash = isSelected ? SELECTION_DASH : OUTLINE_DASH;
 
   switch (primitive.type) {
-    case 'stage':
-      return (
-        <Rect
-          x={tx}
-          y={ty}
-          width={primitive.width}
-          height={primitive.height}
-          rotation={rotation}
-          fill="#e0e0e0"
-          stroke={isSelected ? SELECTION_STROKE : '#999'}
-          strokeWidth={sw}
-          dash={isSelected ? SELECTION_DASH : undefined}
-          cornerRadius={4}
-          attrs={{ primitiveId: primitive.id }}
-        />
-      );
-
     case 'label': {
       const lp = primitive as any;
       const textW = (lp.text?.length ?? 5) * (lp.fontSize ?? 18) * 0.6;
@@ -302,34 +285,6 @@ export const PrimitiveRenderer: React.FC<Props> = ({ primitive, isSelected }) =>
                 attrs={{ rotateHandle: true, primitiveId: primitive.id }} />
             </>
           )}
-        </Group>
-      );
-    }
-
-    case 'seatBlockWedge': {
-      const wp = primitive as any;
-      const cx = wp.center.x + tx;
-      const cy = wp.center.y + ty;
-      const wInnerR = wp.innerRadius;
-      const wOuterR = wp.outerRadius;
-      const startRad = (wp.startAngleDeg * Math.PI) / 180;
-      const endRad = (wp.endAngleDeg * Math.PI) / 180;
-      return (
-        <Group attrs={{ primitiveId: primitive.id }}>
-          <Shape
-            attrs={{ primitiveId: primitive.id }}
-            sceneFunc={(ctx: Konva.Context, shape: Konva.Shape) => {
-              const c = ctx as any;
-              drawSectorPath(c, cx, cy, wOuterR, wOuterR, wInnerR, wInnerR, startRad, endRad);
-              ctx.fillStrokeShape(shape);
-            }}
-            fill="transparent"
-            stroke={stroke}
-            strokeWidth={sw}
-            dash={dash}
-          />
-          <Circle x={cx} y={cy} radius={3} fill={isSelected ? SELECTION_STROKE : '#4B49AC'}
-            attrs={{ primitiveId: primitive.id }} />
         </Group>
       );
     }

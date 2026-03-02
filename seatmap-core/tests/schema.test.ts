@@ -6,8 +6,6 @@ import {
   LayoutSchema,
   SeatBlockGridSchema,
   SeatBlockArcSchema,
-  SeatBlockWedgeSchema,
-  StagePrimitiveSchema,
   LabelPrimitiveSchema,
   ObstaclePrimitiveSchema,
 } from '../src/schema.js';
@@ -51,23 +49,7 @@ describe('LayoutSchema', () => {
   });
 });
 
-/* ── Stage ── */
 
-describe('StagePrimitiveSchema', () => {
-  it('accepts a valid stage', () => {
-    const result = StagePrimitiveSchema.safeParse({
-      id: 's1', type: 'stage', width: 200, height: 50,
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it('rejects stage with zero width', () => {
-    const result = StagePrimitiveSchema.safeParse({
-      id: 's1', type: 'stage', width: 0, height: 50,
-    });
-    expect(result.success).toBe(false);
-  });
-});
 
 /* ── Label ── */
 
@@ -160,32 +142,7 @@ describe('SeatBlockArcSchema', () => {
   });
 });
 
-/* ── seatBlockWedge ── */
 
-describe('SeatBlockWedgeSchema', () => {
-  it('accepts a valid wedge', () => {
-    const result = SeatBlockWedgeSchema.safeParse({
-      id: 'w1', type: 'seatBlockWedge',
-      center: { x: 500, y: 500 },
-      innerRadius: 100, outerRadius: 300,
-      startAngleDeg: 0, endAngleDeg: 45,
-      rowCount: 4,
-      seatsPerRow: { start: 8, delta: 2 },
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it('rejects wedge with outerRadius = 0', () => {
-    const result = SeatBlockWedgeSchema.safeParse({
-      id: 'w1', type: 'seatBlockWedge',
-      center: { x: 0, y: 0 },
-      innerRadius: 0, outerRadius: 0,
-      startAngleDeg: 0, endAngleDeg: 90,
-      rowCount: 1, seatsPerRow: [5],
-    });
-    expect(result.success).toBe(false);
-  });
-});
 
 /* ── Layout with mixed primitives ── */
 
@@ -193,7 +150,6 @@ describe('Layout with primitives', () => {
   it('accepts layout with mixed primitive types', () => {
     const result = LayoutSchema.safeParse(
       minLayout([
-        { id: 's1', type: 'stage', width: 200, height: 50 },
         { id: 'l1', type: 'label', text: 'Balcony' },
         {
           id: 'g1', type: 'seatBlockGrid',
@@ -210,7 +166,7 @@ describe('Layout with primitives', () => {
     );
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.primitives).toHaveLength(4);
+      expect(result.data.primitives).toHaveLength(3);
     }
   });
 

@@ -2,11 +2,11 @@
  * @aioemp/seatmap-editor — Toolbar (v2)
  *
  * Horizontal toolbar:
- * [Back] | [Block-select · Seat-select] | [Draw Grid · Draw Arc] | [+Wedge · +Stage · +Label · +Obstacle]
+ * [Back] | [Block-select · Seat-select] | [Draw Grid · Draw Arc] | [+Label · +Obstacle]
  *       | [Delete · Duplicate] | [Undo · Redo] | [Snap · Zoom] | meta + Save
  *
  * Grid / Arc are now draw-tool toggles (drag-to-create on canvas).
- * Wedge / Stage / Label / Obstacle remain instant-add.
+ * Label / Obstacle remain instant-add.
  */
 
 import React, { useCallback, useMemo, useRef, useState } from 'react';
@@ -18,7 +18,7 @@ import { uploadBgImage } from '../api';
 
 interface ToolbarProps {
   onClose: () => void;
-  onSave: () => void;
+  onSave: (status?: 'draft' | 'publish') => void;
 }
 
 export const Toolbar: React.FC<ToolbarProps> = ({ onClose, onSave }) => {
@@ -35,6 +35,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onClose, onSave }) => {
   const compiledSeats = useEditorStore((s) => s.compiledSeats);
   const saveStatus = useEditorStore((s) => s.saveStatus);
   const isDirty = useEditorStore((s) => s.isDirty);
+  const seatmapStatus = useEditorStore((s) => s.seatmapStatus);
   const stageScale = useEditorStore((s) => s.stageScale);
 
   const setTool = useEditorStore((s) => s.setActiveTool);
@@ -325,14 +326,45 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onClose, onSave }) => {
           {saveStatus === 'idle' && isDirty && 'Unsaved'}
           {saveStatus === 'idle' && !isDirty && ''}
         </span>
-        <button
-          className="sme-toolbar__btn sme-toolbar__btn--active"
-          onClick={onSave}
-          disabled={!isDirty || isLocked || saveStatus === 'saving'}
-          style={{ opacity: (!isDirty || isLocked) ? 0.5 : 1 }}
-        >
-          {saveStatus === 'saving' ? 'Saving…' : 'Save'}
-        </button>
+        {seatmapStatus === 'draft' ? (
+          <>
+            <button
+              className="sme-toolbar__btn"
+              onClick={() => onSave('draft')}
+              disabled={!isDirty || isLocked || saveStatus === 'saving'}
+              style={{ opacity: (!isDirty || isLocked) ? 0.5 : 1 }}
+            >
+              {saveStatus === 'saving' ? 'Saving…' : 'Save Draft'}
+            </button>
+            <button
+              className="sme-toolbar__btn sme-toolbar__btn--active"
+              onClick={() => onSave('publish')}
+              disabled={isLocked || saveStatus === 'saving'}
+              style={{ opacity: isLocked ? 0.5 : 1 }}
+            >
+              Publish
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              className="sme-toolbar__btn sme-toolbar__btn--active"
+              onClick={() => onSave()}
+              disabled={!isDirty || isLocked || saveStatus === 'saving'}
+              style={{ opacity: (!isDirty || isLocked) ? 0.5 : 1 }}
+            >
+              {saveStatus === 'saving' ? 'Saving…' : 'Save'}
+            </button>
+            <button
+              className="sme-toolbar__btn sme-toolbar__btn--link"
+              onClick={() => { if (window.confirm('Switch this seatmap back to draft? It will no longer be available for events.')) onSave('draft'); }}
+              disabled={isLocked || saveStatus === 'saving'}
+              style={{ opacity: isLocked ? 0.5 : 1 }}
+            >
+              Switch to Draft
+            </button>
+          </>
+        )}
       </div>
 
       {/* Integrity check detail modal */}

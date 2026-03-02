@@ -114,7 +114,7 @@
                                 '<button id="seat-confirm-assign" class="aioemp-btn aioemp-btn--xs aioemp-btn--success" style="display:none"><span class="dashicons dashicons-yes"></span> Confirm Assignment</button>' +
                                 '<button id="seat-unassign-selected" class="aioemp-btn aioemp-btn--xs aioemp-btn--danger" style="display:none"><span class="dashicons dashicons-no"></span> Unassign Selected</button>' +
                                 '<span id="seat-block-info" class="aioemp-pending-info" style="display:none"></span>' +
-                                '<button id="seat-confirm-block" class="aioemp-btn aioemp-btn--xs aioemp-btn--danger" style="display:none"><span class="dashicons dashicons-lock"></span> Block Selected</button>' +
+                                '<button id="seat-confirm-block" class="aioemp-btn aioemp-btn--xs aioemp-btn--danger" style="display:none"><span class="dashicons dashicons-lock" style=" height: 14px; width: 14px; font-size: 14px; "></span> Block Selected</button>' +
                                 '<button id="seat-confirm-unblock" class="aioemp-btn aioemp-btn--xs aioemp-btn--outline" style="display:none"><span class="dashicons dashicons-unlock" style=" height: 14px; width: 14px; font-size: 14px; "></span> Unblock Selected</button>' +
                                 '<div class="aioemp-seating-zoom">' +
                                     '<button id="seat-zoom-out" class="aioemp-btn aioemp-btn--xs aioemp-btn--outline" title="Zoom out">−</button>' +

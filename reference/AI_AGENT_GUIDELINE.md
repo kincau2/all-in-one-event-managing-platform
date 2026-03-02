@@ -390,21 +390,21 @@ all-in-one-event-managing-platform/
 │   ├── class-aioemp-security.php            # Capabilities, nonces, sanitisation, rate limiting
 │   ├── rest-api/
 │   │   ├── class-aioemp-rest-controller.php       # Abstract base controller
-│   │   ├── class-aioemp-events-controller.php     # CRUD /events (537 lines)
-│   │   ├── class-aioemp-attenders-controller.php  # Candidates CRUD /events/{id}/attenders (380 lines)
-│   │   ├── class-aioemp-seating-controller.php    # Seating allocation /events/{id}/seating (686 lines)
+│   │   ├── class-aioemp-events-controller.php     # CRUD /events (536 lines)
+│   │   ├── class-aioemp-attenders-controller.php  # Candidates CRUD /events/{id}/attenders (412 lines)
+│   │   ├── class-aioemp-seating-controller.php    # Seating allocation /events/{id}/seating (685 lines)
 │   │   ├── class-aioemp-seatmaps-controller.php   # CRUD /seatmaps
 │   │   ├── class-aioemp-seatmap-upload-controller.php  # BG image upload
 │   │   ├── class-aioemp-locking-controller.php    # Lock acquire/heartbeat/release/takeover
 │   │   └── class-aioemp-settings-controller.php   # Settings CRUD + logo upload
 │   ├── models/
 │   │   ├── class-aioemp-model.php                 # Abstract base model ($wpdb wrapper)
-│   │   ├── class-aioemp-events-model.php          # Events CRUD + search/pagination (120 lines)
-│   │   ├── class-aioemp-attender-model.php        # Candidates CRUD + QR hash + bulk status (198 lines)
-│   │   ├── class-aioemp-seat-assignment-model.php # Seat assignments + batch ops (271 lines)
-│   │   ├── class-aioemp-blocked-seat-model.php    # Blocked seats + batch ops (176 lines)
-│   │   ├── class-aioemp-seat-assignment-log-model.php # Seat operation audit trail (81 lines)
-│   │   ├── class-aioemp-event-log-model.php       # Append-only event audit log (72 lines)
+│   │   ├── class-aioemp-events-model.php          # Events CRUD + search/pagination (116 lines)
+│   │   ├── class-aioemp-attender-model.php        # Candidates CRUD + QR hash + bulk status (218 lines)
+│   │   ├── class-aioemp-seat-assignment-model.php # Seat assignments + batch ops (312 lines)
+│   │   ├── class-aioemp-blocked-seat-model.php    # Blocked seats + batch ops (180 lines)
+│   │   ├── class-aioemp-seat-assignment-log-model.php # Seat operation audit trail (77 lines)
+│   │   ├── class-aioemp-event-log-model.php       # Append-only event audit log (65 lines)
 │   │   └── class-aioemp-seatmap-model.php         # Seatmap CRUD + search/pagination
 │   └── services/
 │       ├── class-aioemp-locking-service.php       # Atomic SQL locking (TTL 90s)
@@ -413,10 +413,10 @@ all-in-one-event-managing-platform/
 │   ├── class-aioemp-admin.php               # Admin hooks, menu entry, script enqueue chain
 │   ├── css/aioemp-admin.css                 # Admin styles (CSS custom properties)
 │   ├── js/
-│   │   ├── aioemp-admin.js                  # Admin SPA shell (jQuery, 209 lines)
-│   │   ├── aioemp-events.js                 # Events module entry + shared context (101 lines)
-│   │   ├── aioemp-settings.js               # Settings page JS (326 lines)
-│   │   ├── aioemp-seatmaps.js               # Seatmaps list page JS (248 lines)
+│   │   ├── aioemp-admin.js                  # Admin SPA shell (jQuery, 208 lines)
+│   │   ├── aioemp-events.js                 # Events module entry + shared context (112 lines)
+│   │   ├── aioemp-settings.js               # Settings page JS (325 lines)
+│   │   ├── aioemp-seatmaps.js               # Seatmaps list page JS (247 lines)
 │   │   ├── seatmap-compiler.js              # Browser IIFE of seatmap-core compile (client-side snapshot compilation)
 │   │   ├── events/                          # Events sub-modules (loaded sequentially)
 │   │   │   ├── _helpers.js                  # Shared utilities: esc, fmtDate, localToGmt, gmtToLocal, badges
@@ -424,37 +424,42 @@ all-in-one-event-managing-platform/
 │   │   │   ├── _form.js                     # Event create/edit form: all fields + seatmap template select
 │   │   │   ├── _detail.js                   # Event detail page: header + tab container (Overview, Candidates, Attendance, Seating)
 │   │   │   ├── _candidates.js               # Candidates tab: list, search, filter, pagination, add/edit modal, bulk status, delete
-│   │   │   └── _seating.js                  # Seating tab: full-screen SVG dashboard (1607 lines)
+│   │   │   └── _seating.js                  # Seating tab: full-screen SVG dashboard (1606 lines)
 │   │   └── seatmap-editor/                  # ← Vite IIFE build output
 │   │       ├── seatmap-editor.js            # ~573 KB (React+Konva+Zustand bundle)
+│   │       ├── seatmap-editor.js.map        # Source map
 │   │       └── seatmap-editor.css           # ~4.5 KB
 │   └── views/
 │       └── dashboard-shell.php              # Full-screen SPA shell template
-├── public/                                  # Public-facing (not yet implemented)
+├── public/                                  # Public-facing (stub, not yet fully implemented)
+│   ├── class-aioemp-public.php              # Public hooks placeholder
+│   ├── css/aioemp-public.css                # Public styles placeholder
+│   └── js/aioemp-public.js                  # Public JS placeholder
 ├── seatmap-core/                            # @aioemp/seatmap-core (TypeScript library)
 │   ├── package.json
 │   ├── tsconfig.json
 │   ├── vitest.config.ts                     # Vitest configuration
 │   ├── src/                                 # Source (see Section 20.2)
 │   │   ├── index.ts                         # Barrel re-exports
-│   │   ├── schema.ts                        # Zod schemas (236 lines)
+│   │   ├── schema.ts                        # Zod schemas (220 lines)
 │   │   ├── types.ts                         # Zod-inferred TypeScript types
 │   │   ├── compile-layout.ts                # Orchestrator compiler
 │   │   ├── compile-grid.ts                  # Grid block compiler
-│   │   ├── compile-arc.ts                   # Arc block compiler (203 lines)
-│   │   ├── compile-wedge.ts                 # Wedge block compiler
+│   │   ├── compile-arc.ts                   # Arc block compiler (200 lines)
+│   │   ├── browser.ts                       # Browser IIFE entry (exposes compile for seatmap-compiler.js)
 │   │   ├── pivot.ts                         # Rotation pivot helpers + visual constants
 │   │   ├── seat-key.ts                      # seat_key preservation map
 │   │   └── utils.ts                         # Shared utilities (134 lines)
-│   ├── tests/                               # Vitest (100 tests, 7 files)
-│   │   ├── compile-grid.test.ts             # 13 tests
-│   │   ├── compile-arc.test.ts              # 11 tests
-│   │   ├── compile-wedge.test.ts            # 7 tests
-│   │   ├── compile-layout.test.ts           # 10 tests
-│   │   ├── schema.test.ts                   # 17 tests
-│   │   ├── seat-key.test.ts                 # 8 tests
-│   │   └── utils.test.ts                    # 34 tests
-│   └── dist/                                # tsup output (ESM + CJS + DTS, git-ignored)
+│   ├── tests/                               # Vitest (6 files)
+│   │   ├── compile-grid.test.ts
+│   │   ├── compile-arc.test.ts
+│   │   ├── compile-layout.test.ts
+│   │   ├── schema.test.ts
+│   │   ├── seat-key.test.ts
+│   │   └── utils.test.ts
+│   ├── dist/                                # tsup output (ESM + CJS + DTS, git-ignored)
+│   └── dist-browser/                        # Browser IIFE build output (git-ignored)
+│       └── browser.global.js               # Bundled browser build of browser.ts
 └── seatmap-editor/                          # @aioemp/seatmap-editor (React SPA)
     ├── package.json
     ├── tsconfig.json
@@ -463,7 +468,7 @@ all-in-one-event-managing-platform/
     └── src/
         ├── main.tsx                         # Entry: window.aioemp_seatmap_editor.mount()
         ├── App.tsx                          # Root: Toolbar + EditorCanvas + InspectorPanel
-        ├── store.ts                         # Zustand + Immer store (495 lines)
+        ├── store.ts                         # Zustand + Immer store (494 lines)
         ├── api.ts                           # REST wrappers (seatmapApi, lockApi)
         ├── layoutDefaults.ts                # LAYOUT_STYLE_DEFAULTS
         ├── primitiveFactories.ts            # Factory functions for instant-add
@@ -474,11 +479,11 @@ all-in-one-event-managing-platform/
         │   ├── useLockHeartbeat.ts          # Lock acquire + heartbeat + release
         │   └── useSave.ts                   # Ctrl+S, auto-save, REST PUT
         └── components/
-            ├── EditorCanvas.tsx             # Konva Stage + all interactions (1009 lines)
-            ├── InspectorPanel.tsx            # Right sidebar inspector (676 lines)
-            ├── PrimitiveRenderer.tsx         # Per-primitive visual renderer (340 lines)
+            ├── EditorCanvas.tsx             # Konva Stage + all interactions (1035 lines)
+            ├── InspectorPanel.tsx            # Right sidebar inspector (728 lines)
+            ├── PrimitiveRenderer.tsx         # Per-primitive visual renderer (409 lines)
             ├── SeatDots.tsx                  # High-perf seat circles + row labels
-            └── Toolbar.tsx                   # Horizontal toolbar (276 lines)
+            └── Toolbar.tsx                   # Horizontal toolbar (469 lines)
 ```
 
 ### Architecture Rules
@@ -658,7 +663,7 @@ All agent-generated UI must follow this colour palette and component style. Do *
 
 ### 10.1 Overview
 
-The seatmap builder is a **parametric** editor — admins edit primitives (blocks, arcs, wedges), not individual seats. On save, primitives are compiled into a flat seat list.
+The seatmap builder is a **parametric** editor — admins edit primitives (blocks, arcs), not individual seats. On save, primitives are compiled into a flat seat list.
 
 ### 10.2 Layout Data Model (JSON)
 
@@ -684,7 +689,6 @@ The seatmap builder is a **parametric** editor — admins edit primitives (block
 | `obstacle` | Non-seat area (rect/polygon) |
 | `seatBlockGrid` | Straight rows of seats |
 | `seatBlockArc` | Cinema-style curved rows |
-| `seatBlockWedge` | Arena pie-slice sections |
 
 Each primitive has: `id` (stable nanoid/uuid), `type`, optional `name`/`label`, optional `transform: { x, y, rotation }`.
 
@@ -706,20 +710,19 @@ type CompiledSeat = {
 
 ### 10.5 seat_key Strategy (Critical)
 
-- In the editor, generate `seat_key` as UUID for each compiled seat.
-- On re-compile, **preserve existing keys** using deterministic mapping: `(primitiveId, logicalRowId, logicalSeatIndex)` → keep prior `seat_key` if present. New seats get new keys; removed seats drop keys.
+- `seat_key` values are **fully deterministic** — generated from `(primitiveId, logicalRow, logicalSeat)` via a FNV-1a hash, formatted as UUID v4. The same logical seat always produces the same key across every compile, server round-trip, and session.
+- No "existing layout" is needed for key preservation. Keys survive recompilation and layout edits as long as the primitive's `id` and seat coordinates are unchanged.
 - **Once a layout is snapshotted into an event**, seat_keys must NOT change unless the event seatmap is not finalized.
 
 ### 10.6 Primitive Compile Algorithms
 
 - **seatBlockGrid:** Row/col grid with origin, spacing, aisle gaps, row labels (A-01 pattern), L2R/R2L numbering.
 - **seatBlockArc:** Curved rows with center, radius, angle range, seats distributed along arc, aisle gap angle adjustments.
-- **seatBlockWedge:** Arena pie-slice, similar to arc but bounded by wedge shape.
 
 ### 10.7 UI Editor Requirements
 
 - **Canvas:** Zoom/pan, multi-select primitives, move/rotate with handles, snap-to-grid toggle.
-- **Tools palette:** Add Grid/Arc blocks, add Stage/Label/Obstacle, Delete, Duplicate, Undo/Redo. (Wedge compile algorithm exists in core but no +Wedge toolbar button yet.)
+- **Tools palette:** Add Grid/Arc blocks, add Stage/Label/Obstacle, Delete, Duplicate, Undo/Redo.
 - **Inspector panel:** Editable params for selected primitive, live recompile preview (debounced 150–300ms).
 - **Performance:** Render seats as lightweight circles in Konva. Seats are NOT individually draggable — selection is per primitive. Target: 2,000+ seats without lag.
 
@@ -906,7 +909,7 @@ POST /wp-json/aioemp/v1/public/events/{event_id}/register
 |---|---|
 | 1 | **Foundation:** DB installer (`dbDelta`) + plugin bootstrap + custom capabilities + nonce framework + shared security helper class |
 | 2 | **Admin SPA shell + Settings skeleton:** wp-admin menu entry, full-screen SPA shell, left-nav routing, Settings page (logo upload, CAPTCHA config, behaviour toggles) |
-| 3 | **`@aioemp/seatmap-core` (headless):** Layout JSON schema (Zod), `compileLayout()` for Grid/Arc/Wedge primitives, seat_key stability strategy, unit tests for all compile algorithms |
+| 3 | **`@aioemp/seatmap-core` (headless):** Layout JSON schema (Zod), `compileLayout()` for Grid/Arc primitives, seat_key stability strategy, unit tests for all compile algorithms |
 | 4 | **`@aioemp/seatmap-editor` (UI):** Konva + React canvas, Zustand store, inspector panel, undo/redo, draft persistence, save pipeline with lock token; Seatmaps list page (CRUD) |
 | 5 | **Editor locking:** `lock_acquire / lock_heartbeat / lock_release / lock_takeover` endpoints (atomic SQL), frontend heartbeat and takeover modal; applied to seatmap editor |
 | 6 | **Event seatmap snapshot + Seating allocation:** Create event with seatmap-based mode (snapshot copy), seating tab with Konva overlay (assignments + blocked + check-in colours), assign/unassign/swap/block actions, `seatmap_finalized_at_gmt` trigger; apply editor locking to event editor |
@@ -950,7 +953,7 @@ The following files in the `reference/` folder are the authoritative sources for
 |---|---|---|
 | 1. Foundation | **DONE** | DB installer (10 tables via `dbDelta`), plugin bootstrap, custom capabilities (`aioemp_manage_events`, `aioemp_manage_seatmaps`, `aioemp_manage_settings`, `aioemp_scan_attendance`), security helper class |
 | 2. Admin SPA Shell + Settings | **DONE** | Full-screen SPA shell, Star Admin 2 Pro colour palette, Settings page (logo upload, behaviour toggles), CSS custom properties |
-| 3. `@aioemp/seatmap-core` | **DONE** | Zod schemas, all compile algorithms (Grid, Arc, Wedge), seat_key stability, row label compilation, 100 vitest tests passing |
+| 3. `@aioemp/seatmap-core` | **DONE** | Zod schemas, compile algorithms (Grid, Arc), deterministic seat_key (FNV-1a), row label compilation, 88 vitest tests passing (6 files) |
 | 4. `@aioemp/seatmap-editor` | **DONE** | Konva + React 18 canvas, Zustand 5 + Immer store, inspector panel, undo/redo, draft persistence (localStorage), save pipeline with lock token, keyboard shortcuts |
 | 5. Editor Locking | **DONE** | Atomic SQL locking (TTL 90s), heartbeat 60s, acquire/release/takeover, sendBeacon on unload, frontend takeover modal |
 | 6. Event Seatmap Snapshot + Seating | **DONE** | Snapshot copy on event create/update, snapshot freeze enforcement, full-screen SVG seating dashboard, assign/unassign/swap/block (single + batch), drag-select, zoom/pan, auto-finalize |
@@ -965,16 +968,15 @@ The following files in the `reference/` folder are the authoritative sources for
 
 **Build:** `cd seatmap-core && npm run build` → outputs to `seatmap-core/dist/`
 
-**Test:** `cd seatmap-core && npm run test` → 100 tests across 7 test files
+**Test:** `cd seatmap-core && npm run test` → 88 tests across 6 test files
 
-#### Schema (`schema.ts`, 236 lines)
+#### Schema (`schema.ts`, 220 lines)
 
 All data structures are defined as **Zod schemas** with TypeScript types inferred via `z.infer<>`:
 
 - **Primitives** — Discriminated union on `type` field:
   - `seatBlockGrid`: origin, rows, cols, seatSpacingX/Y, aisleGaps[], excludedSeats[], section, rowLabel (mode/start/direction), numbering (L2R/R2L), startSeatNumber, rowLabelDisplay (none/left/right/both), seatRadius, transform
   - `seatBlockArc`: center, rowCount, startRadius, radiusStep, radiusRatio, startAngleDeg, endAngleDeg, seatsPerRow, aisleGaps[], excludedSeats[], section, rowLabel, numbering, startSeatNumber, rowLabelDisplay, seatRadius, transform
-  - `seatBlockWedge`: center, innerRadius, outerRadius, startAngleDeg, endAngleDeg, rowCount, seatsPerRow, excludedSeats[], section, rowLabel, numbering, seatRadius, transform
   - `stage`: width, height (position via transform.x/y; inherits primitiveBase: id, name, label, transform)
   - `label`: text, fontSize, fontColor, fontWeight (position via transform.x/y; inherits primitiveBase)
   - `obstacle`: width, height, color (`#ffcccc`), borderColor (`#cc5555`) (position via transform.x/y; inherits primitiveBase)
@@ -1002,15 +1004,12 @@ All data structures are defined as **Zod schemas** with TypeScript types inferre
 - Row labels: Left labels at `origin.x - GRID_PAD - GRID_LBL_W * 0.5`, right labels at `origin.x + seatW + GRID_PAD + GRID_LBL_W * 0.5` (centered in label columns)
 - Returns `{ seats: CompiledSeat[], rowLabels: CompiledRowLabel[] }`
 
-**`compileArc(primitive, keyMap, globalSeatRadius)`** — in `compile-arc.ts`:
+**`compileArc(primitive, keyMap, globalSeatRadius)`** — in `compile-arc.ts` (200 lines):
 - Elliptical arc via `radiusRatio` (radiusX = baseRadius * ratio, radiusY = baseRadius)
 - Seat positions: polar → cartesian, distributed evenly across `[startAngleDeg, endAngleDeg]` minus gap angles
 - Aisle gaps: px→angle conversion via `(gapPx / avgRadius) * (180/π)`
 - Row labels: offset angularly beyond the seat arc by `(ARC_PAD + ARC_LBL_ANG * 0.5) / avgRadius * (180/π)` degrees
 - Returns `{ seats: CompiledSeat[], rowLabels: CompiledRowLabel[] }`
-
-**`compileWedge(primitive, keyMap, globalSeatRadius)`** — in `compile-wedge.ts`:
-- Pie-slice sections with inner/outer radius interpolation per row
 
 #### Pivot & Visual Constants (`pivot.ts`)
 
@@ -1020,16 +1019,18 @@ Shared between compiler and editor renderer. **Current values (24 Feb 2026):**
 |---|---|---|
 | `GRID_PAD` | `21` | Pixel padding around seat area in grid dotted rect |
 | `GRID_LBL_W` | `24` | Row-label column width (applied to BOTH left and right sides) |
-| `ARC_PAD` | `21` | Radial pixel padding around arc/wedge sector |
+| `ARC_PAD` | `21` | Radial pixel padding around arc sector |
 | `ARC_LBL_ANG` | `33` | Extra angular pixels for row labels in arc |
 
 **`gridPivotOffset(cols, rows, seatSpacingX, seatSpacingY)`**: Returns center of the dotted rectangle. Rectangle dimensions: `lx = -GRID_PAD - GRID_LBL_W`, `ly = -GRID_PAD`, `rectW = seatW + 2*GRID_PAD + 2*GRID_LBL_W`, `rectH = seatH + 2*GRID_PAD`. Pivot = `(lx + rectW/2, ly + rectH/2)`.
 
 **`arcPivotOffset(...)`**: Samples 33 points along padded sector (inner + outer radii, with angular padding), computes AABB, returns center.
 
-#### seat_key Preservation (`seat-key.ts`)
+#### seat_key Generation (`seat-key.ts`)
 
-`buildSeatKeyMap(existingSeats)` creates `Map<"primId:row:seat", uuid>`. On recompile, seats at the same logical position (primitive ID + row index + seat index) retain their UUID. New seats get new UUIDs. This is critical for database seat assignments surviving layout edits.
+`deterministicSeatKey(primitiveId, logicalRow, logicalSeat)` — generates a stable UUID v4 string using four independent FNV-1a 32-bit hashes (different seeds) of the input string `"primitiveId:row:seat"`. Produces 128 bits of hash output formatted as `xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx`.
+
+No map or existing seat data is needed. The same primitive ID + row + seat index always yields the same key — across recompiles, layout edits, and server round-trips. This is critical for database seat assignments surviving layout edits.
 
 #### Utilities (`utils.ts`)
 
@@ -1043,7 +1044,7 @@ Shared between compiler and editor renderer. **Current values (24 Feb 2026):**
 
 **Entry point:** `window.aioemp_seatmap_editor.mount(container, { seatmapId, onClose })` — creates React 18 root, renders `<App>`.
 
-#### Store (`store.ts`, 495 lines)
+#### Store (`store.ts`, 494 lines)
 
 Zustand 5 + Immer middleware. Key design decisions:
 
@@ -1065,7 +1066,7 @@ Zustand 5 + Immer middleware. Key design decisions:
 
 #### Components
 
-**`EditorCanvas.tsx`** (1009 lines) — The main Konva Stage. Handles:
+**`EditorCanvas.tsx`** (1035 lines) — The main Konva Stage. Handles:
 - Wheel zoom (centered on pointer)
 - Pan: middle mouse button drag OR Space + left drag
 - Block selection: rubber-band rectangle in `blockSelect` tool
@@ -1079,20 +1080,18 @@ Zustand 5 + Immer middleware. Key design decisions:
 - Escape: deselect all
 - Renders: background color/image, grid guides (when snap enabled), `<PrimitiveRenderer>` per primitive, `<SeatDots>` for all compiled seats + row labels
 
-**`InspectorPanel.tsx`** (676 lines) — Right sidebar:
+**`InspectorPanel.tsx`** (728 lines) — Right sidebar:
 - Nothing selected → Layout overview (canvas size, seat radius, colours, font settings, bg image upload)
 - Stage selected → StageInspector (x, y, width, height, label)
 - Label selected → LabelInspector (text, fontSize, fontColor)
 - Obstacle selected → ObstacleInspector (x, y, width, height, fill, stroke, label)
 - Grid selected → GridInspector (rows, cols, spacingX/Y, aisleGaps, section, rowLabel mode/start/direction, numbering, startSeatNumber, rowLabelDisplay, seatRadius)
 - Arc selected → ArcInspector (rowCount, startRadius, radiusStep, radiusRatio, startAngleDeg, endAngleDeg, seatsPerRow, section, rowLabel, numbering, rowLabelDisplay, seatRadius)
-- Wedge selected → WedgeInspector
 - All numeric inputs debounced 200ms to prevent lag during typing
 
-**`PrimitiveRenderer.tsx`** (340 lines) — Pure visual renderer:
+**`PrimitiveRenderer.tsx`** (409 lines) — Pure visual renderer:
 - Grid blocks: `<Group>` with pivot rotation, dotted `<Rect>` (stroke `#4B49AC44`, dash `[4,4]`), section label, corner `<Circle>` rotation handles when selected
 - Arc blocks: `<Group>` with pivot rotation, custom `<Shape>` sector path (`drawSectorPath`), section label, corner handles
-- Wedge blocks: sector around center
 - Obstacles: filled `<Rect>` with resize edge hit-areas when selected
 - Stages: grey `<Rect>`
 - Labels: `<Text>` with rotation
@@ -1105,9 +1104,8 @@ Zustand 5 + Immer middleware. Key design decisions:
 - Reads style settings reactively from store (seatFill, seatStroke, seatFontColor, seatFontSize, rowFontColor, rowFontSize, rowFontWeight)
 - `React.memo` for performance
 
-**`Toolbar.tsx`** (276 lines) — Horizontal toolbar:
+**`Toolbar.tsx`** (469 lines) — Horizontal toolbar:
 - Tool groups: Block Select (V), Seat Select (S), Draw Grid (G), Draw Arc (A), +Stage, +Obstacle, +Label, Delete, Duplicate, Undo (Ctrl+Z), Redo (Ctrl+Shift+Z), Snap toggle, Zoom slider
-- **Note:** +Wedge tool is not yet implemented (Wedge compile algorithm exists in core but has no toolbar button)
 - Seat count display, lock/user warning, save status indicator
 - Help modal with keyboard shortcuts
 - Seat select icon: pretix SVG (`tool-seatselect` — cursor with arc indicator)
@@ -1162,9 +1160,9 @@ All created via `dbDelta()` in `class-aioemp-activator.php`:
 | Controller | Endpoints | Status |
 |---|---|---|
 | `class-aioemp-rest-controller.php` | Abstract base | DONE |
-| `class-aioemp-events-controller.php` | GET/POST/PUT/DELETE `/events` | DONE (537 lines) |
-| `class-aioemp-attenders-controller.php` | GET/POST/PUT/DELETE `/events/{id}/attenders`, `/attenders/counts`, `/attenders/bulk-status` | DONE (380 lines) |
-| `class-aioemp-seating-controller.php` | GET `/events/{id}/seating`, POST `assign/unassign/swap/block/unblock` + batch variants + finalize | DONE (686 lines) |
+| `class-aioemp-events-controller.php` | GET/POST/PUT/DELETE `/events` | DONE (536 lines) |
+| `class-aioemp-attenders-controller.php` | GET/POST/PUT/DELETE `/events/{id}/attenders`, `/attenders/counts`, `/attenders/bulk-status` | DONE (412 lines) |
+| `class-aioemp-seating-controller.php` | GET `/events/{id}/seating`, POST `assign/unassign/swap/block/unblock` + batch variants + finalize | DONE (685 lines) |
 | `class-aioemp-seatmaps-controller.php` | GET/POST/PUT/DELETE `/seatmaps` | DONE |
 | `class-aioemp-seatmap-upload-controller.php` | POST/DELETE `/seatmaps/upload-bg` | DONE |
 | `class-aioemp-locking-controller.php` | POST `/lock/*` | DONE |
@@ -1178,7 +1176,7 @@ All created via `dbDelta()` in `class-aioemp-activator.php`:
 #### Admin
 
 - **Menu**: Top-level "Event Manager" menu item (`dashicons-calendar-alt`, capability `aioemp_manage_events`)
-- **Script enqueue chain** (169 lines in `class-aioemp-admin.php`):
+- **Script enqueue chain** (193 lines in `class-aioemp-admin.php`):
   1. `aioemp-admin` — SPA shell, hash router, REST helper (`window.aioemp_api`)
   2. `aioemp-settings` (depends on admin)
   3. `seatmap-compiler` — Browser IIFE build of seatmap-core compile functions (`window.aioemp_compileSnapshot`)
@@ -1229,7 +1227,7 @@ The events module uses a shared context object (`ctx = window.AIOEMP_Events`) th
 - **Delete**: confirmation dialog, `DELETE /attenders/{id}`
 - Pagination: prev/next, 20 per page
 
-#### Backend: Attenders Controller (`class-aioemp-attenders-controller.php`, 380 lines)
+#### Backend: Attenders Controller (`class-aioemp-attenders-controller.php`, 412 lines)
 
 | Method | Route | Description |
 |---|---|---|
@@ -1241,7 +1239,7 @@ The events module uses a shared context object (`ctx = window.AIOEMP_Events`) th
 | GET | `/events/{id}/attenders/counts` | Status breakdown: `{registered, accepted_onsite, accepted_online, rejected, total}` |
 | POST | `/events/{id}/attenders/bulk-status` | Bulk update status for array of IDs; body: `{ids: [...], status: "..."}` |
 
-#### Backend: Attender Model (`class-aioemp-attender-model.php`, 198 lines)
+#### Backend: Attender Model (`class-aioemp-attender-model.php`, 218 lines)
 
 - `STATUSES`: `registered`, `accepted_onsite`, `accepted_online`, `rejected`
 - `create()`: auto-generates `qrcode_hash` via SHA-256 of UUID4 + random password
@@ -1259,7 +1257,7 @@ The events module uses a shared context object (`ctx = window.AIOEMP_Events`) th
 3. **Freeze enforcement**: `check_snapshot_freeze()` in the events controller prevents seatmap changes if: (a) `seatmap_finalized_at_gmt` is set, (b) seat assignments exist, or (c) attendance records exist.
 4. **Auto-finalization**: `maybe_finalize()` in the seating controller sets `seatmap_finalized_at_gmt` on the **first** seat assignment, permanently freezing the snapshot.
 
-#### Seating Dashboard UI (`_seating.js`, 1607 lines)
+#### Seating Dashboard UI (`_seating.js`, 1606 lines)
 
 A full-screen overlay (`position:fixed; inset:0; z-index above SPA shell`) that provides:
 
@@ -1315,7 +1313,7 @@ A full-screen overlay (`position:fixed; inset:0; z-index above SPA shell`) that 
 - `svgScale`, `svgOffsetX/Y`: zoom/pan state
 - After each API call, `loadSeatingData()` re-fetches all assignments + blocked seats and re-renders SVG
 
-#### Backend: Seating Controller (`class-aioemp-seating-controller.php`, 686 lines)
+#### Backend: Seating Controller (`class-aioemp-seating-controller.php`, 685 lines)
 
 | Method | Route | Description |
 |---|---|---|
@@ -1335,7 +1333,7 @@ A full-screen overlay (`position:fixed; inset:0; z-index above SPA shell`) that 
 
 #### Backend: Models
 
-**`AIOEMP_Seat_Assignment_Model`** (271 lines):
+**`AIOEMP_Seat_Assignment_Model`** (312 lines):
 - `assign()`, `unassign()`, `unassign_by_attender()`, `find_by_seat()`, `find_by_attender()`
 - `list_for_event()`: JOINs with attender table for `first_name`, `last_name`, `email`, `attender_status`
 - `swap()`: transactional delete + re-insert
@@ -1343,12 +1341,12 @@ A full-screen overlay (`position:fixed; inset:0; z-index above SPA shell`) that 
 - `unassign_batch()`: transactional; returns `{unassigned, skipped, failed}`
 - DB constraints: UNIQUE(event_id, seat_key), UNIQUE(event_id, attender_id)
 
-**`AIOEMP_Blocked_Seat_Model`** (176 lines):
+**`AIOEMP_Blocked_Seat_Model`** (180 lines):
 - `block()`, `unblock()`, `is_blocked()`, `list_for_event()`, `count_for_event()`
 - `block_batch()`, `unblock_batch()`: transactional; return `{blocked/unblocked, skipped, failed}`
 - DB constraint: UNIQUE(event_id, seat_key)
 
-**`AIOEMP_Seat_Assignment_Log_Model`** (81 lines):
+**`AIOEMP_Seat_Assignment_Log_Model`** (77 lines):
 - `log()`: records event_id, attender_id, original_seat, new_seat, reason (assign/unassign/swap/block/unblock), modified_by
 - Every seat operation (single and batch) writes to this audit log
 
@@ -1358,7 +1356,7 @@ Deployment is handled by `deploy.sh` which runs locally and pushes to the Hostin
 
 1. **Pre-flight checks**: Scans for 0-byte files (FTP Simple corruption guard), validates critical file sizes
 2. **Build core**: `cd seatmap-core && npm run build` (tsup: ESM + CJS + DTS)
-3. **Test**: `npm run test` (100 vitest tests must pass)
+3. **Test**: `npm run test` (88 vitest tests must pass)
 4. **Build editor**: `cd seatmap-editor && npm run build` (Vite IIFE → admin/js/seatmap-editor/)
 5. **Deploy**: `rsync --delete` to remote server (excludes node_modules, .git, deploy.sh, .ai-agent-notes.md)
 6. **Verify**: Checks JS file size matches, no empty files on server
@@ -1410,7 +1408,7 @@ The `konva` package's `lib/Node.d.ts` can become corrupted (0 bytes), causing ~5
 10. **Duplicate email registrations are allowed** by design — do not add uniqueness constraints on (event_id, email).
 11. **All timestamps in the database are UTC** (`_gmt` suffix columns).
 12. **Read `.ai-agent-notes.md`** for credentials, SSH details, and deployment instructions.
-13. **Always run tests before deploying:** `cd seatmap-core && npm run test` (expect 100 passing).
+13. **Always run tests before deploying:** `cd seatmap-core && npm run test` (expect 88 passing, 6 files).
 14. **Build order matters:** Build seatmap-core FIRST (editor depends on its dist/), then seatmap-editor.
 15. **Deploy via:** `cd <plugin-root> && bash deploy.sh` — never manually copy files to server.
 16. **initLayout must recompile** — never use raw `layout.compiled` from DB without re-running `compileLayout()`.

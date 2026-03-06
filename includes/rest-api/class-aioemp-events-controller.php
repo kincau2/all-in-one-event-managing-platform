@@ -102,7 +102,7 @@ class AIOEMP_Events_Controller extends AIOEMP_REST_Controller {
      *------------------------------------------------------------*/
 
     public function list_items_permissions(): bool|\WP_Error {
-        return $this->check_permission( AIOEMP_Security::CAPS['manage_events'] );
+        return $this->check_permission( AIOEMP_Security::CAPS['view_events'] );
     }
 
     public function create_item_permissions(): bool|\WP_Error {
@@ -110,7 +110,7 @@ class AIOEMP_Events_Controller extends AIOEMP_REST_Controller {
     }
 
     public function get_item_permissions(): bool|\WP_Error {
-        return $this->check_permission( AIOEMP_Security::CAPS['manage_events'] );
+        return $this->check_permission( AIOEMP_Security::CAPS['view_events'] );
     }
 
     public function update_item_permissions(): bool|\WP_Error {

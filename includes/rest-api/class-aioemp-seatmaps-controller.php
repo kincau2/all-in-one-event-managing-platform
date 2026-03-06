@@ -42,7 +42,7 @@ class AIOEMP_Seatmaps_Controller extends AIOEMP_REST_Controller {
             array(
                 'methods'             => \WP_REST_Server::READABLE,
                 'callback'            => array( $this, 'list_items' ),
-                'permission_callback' => array( $this, 'manage_permissions' ),
+                'permission_callback' => array( $this, 'view_permissions' ),
                 'args'                => $this->get_collection_params(),
             ),
             array(
@@ -60,7 +60,7 @@ class AIOEMP_Seatmaps_Controller extends AIOEMP_REST_Controller {
             array(
                 'methods'             => \WP_REST_Server::READABLE,
                 'callback'            => array( $this, 'get_item' ),
-                'permission_callback' => array( $this, 'manage_permissions' ),
+                'permission_callback' => array( $this, 'view_permissions' ),
                 'args'                => array(
                     'id' => array( 'type' => 'integer', 'required' => true, 'sanitize_callback' => 'absint' ),
                 ),
@@ -88,6 +88,16 @@ class AIOEMP_Seatmaps_Controller extends AIOEMP_REST_Controller {
      * Permissions
      *------------------------------------------------------------*/
 
+    /**
+     * Read-only access: list, get.
+     */
+    public function view_permissions(): bool|\WP_Error {
+        return $this->check_permission( AIOEMP_Security::CAPS['view_seatmaps'] );
+    }
+
+    /**
+     * Write access: create, update, delete.
+     */
     public function manage_permissions(): bool|\WP_Error {
         return $this->check_permission( AIOEMP_Security::CAPS['manage_seatmaps'] );
     }

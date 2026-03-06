@@ -148,4 +148,5 @@ class AIOEMP_Settings_Controller extends AIOEMP_REST_Controller {
             'url'           => $url,
         ), 201 );
     }
+
 }

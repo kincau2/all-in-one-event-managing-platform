@@ -37,23 +37,17 @@ class AIOEMP_Settings_Service {
         'captcha_secret_key' => '',
 
         // Behaviour toggles.
-        'send_qr_on'         => 'acceptance', // acceptance | registration
-        'default_venue_mode' => 'onsite',     // onsite | online | mixed
+        'default_venue_mode' => 'onsite', // onsite | online | mixed
         'default_capacity'   => 100,
 
-        // Scanner device naming.
-        'scanner_device_name' => '',
+        // Ticket / check-in.
+        'ticket_page_slug'   => 'e-ticket',
     );
 
     /**
      * Allowed captcha providers.
      */
     public const CAPTCHA_PROVIDERS = array( 'none', 'recaptcha_v2', 'recaptcha_v3', 'turnstile' );
-
-    /**
-     * Allowed send_qr_on values.
-     */
-    public const SEND_QR_ON = array( 'acceptance', 'registration' );
 
     /**
      * Allowed venue modes.
@@ -149,9 +143,6 @@ class AIOEMP_Settings_Service {
                 // Alphanumeric + dashes + underscores only — typical for API keys.
                 return preg_replace( '/[^a-zA-Z0-9_\-]/', '', (string) $value );
 
-            case 'send_qr_on':
-                return in_array( $value, self::SEND_QR_ON, true ) ? $value : 'acceptance';
-
             case 'default_venue_mode':
                 return in_array( $value, self::VENUE_MODES, true ) ? $value : 'onsite';
 
@@ -159,8 +150,9 @@ class AIOEMP_Settings_Service {
                 $int = absint( $value );
                 return max( 1, min( $int, 100000 ) ); // Clamp 1–100 000.
 
-            case 'scanner_device_name':
-                return sanitize_text_field( (string) $value );
+            case 'ticket_page_slug':
+                $slug = sanitize_title( (string) $value );
+                return '' !== $slug ? $slug : 'e-ticket';
 
             default:
                 return sanitize_text_field( (string) $value );

@@ -18,6 +18,17 @@
     function renderSeatingTab($tc) {
         var d = ctx.detailEvent;
 
+        // Reset selection state on every tab entry.
+        ss.selectedCandidates = [];
+        ss.selectedCandidate = null;
+        ss.pendingSeats = [];
+        ss.pendingBlocks = [];
+        ss.swapFirst = null;
+        ss.seatmapSelectedView = false;
+        ss.mode = 'assign';
+        ss.candidateFilter = 'all';
+        ss.candPage = 1;
+
         if (!d.seatmap_layout_snapshot) {
             $tc.html(
                 '<div class="aioemp-card">' +
@@ -105,6 +116,9 @@
                                     '<button class="aioemp-btn aioemp-btn--xs aioemp-btn--outline seat-mode-btn" data-mode="swap">' +
                                         '<span class="dashicons dashicons-randomize"></span> Swap' +
                                     '</button>' +
+                                    '<button class="aioemp-btn aioemp-btn--xs aioemp-btn--outline seat-mode-btn" data-mode="history">' +
+                                        '<span class="dashicons dashicons-backup"></span> History' +
+                                    '</button>' +
                                     '<button id="seat-help-btn" class="aioemp-btn aioemp-btn--xs aioemp-btn--outline" title="Keyboard Shortcuts & Help">' +
                                         '<span class="dashicons dashicons-editor-help"></span>' +
                                     '</button>' +
@@ -124,6 +138,7 @@
                                 '</div>' +
                                 '<div class="aioemp-seating-legend">' +
                                     '<span class="aioemp-legend-item"><span class="aioemp-legend-dot aioemp-legend-dot--assigned"></span> Assigned</span>' +
+                                    '<span class="aioemp-legend-item"><span class="aioemp-legend-dot aioemp-legend-dot--checkedin"></span> Checked In</span>' +
                                     '<span class="aioemp-legend-item"><span class="aioemp-legend-dot aioemp-legend-dot--blocked"></span> Blocked</span>' +
                                     '<span class="aioemp-legend-item"><span class="aioemp-legend-dot aioemp-legend-dot--pending"></span> Pending</span>' +
                                 '</div>' +
@@ -342,6 +357,8 @@
                 fill = '#0ea5e9'; stroke = '#0284c7'; strokeW = 3; cursor = 'pointer';
             } else if (isBlocked) {
                 fill = '#dc3545'; stroke = '#a71d2a'; strokeW = 1.5; cursor = 'pointer';
+            } else if (assignment && parseInt(assignment.checked_in, 10) === 1) {
+                fill = '#7c3aed'; stroke = '#5b21b6'; strokeW = 1.5; cursor = 'pointer';
             } else if (assignment) {
                 fill = '#28a745'; stroke = '#1e7e34'; strokeW = 1.5; cursor = 'pointer';
             } else {
@@ -380,11 +397,14 @@
         var total = ss.seats.length;
         var assigned = ss.assignments.length;
         var blocked = ss.blocked.length;
+        var checkedIn = 0;
+        ss.assignments.forEach(function (a) { if (parseInt(a.checked_in, 10) === 1) checkedIn++; });
         var available = total - assigned - blocked;
 
         $('#seat-stats').html(
             '<span class="aioemp-stat-pill"><strong>' + total + '</strong> Total</span>' +
             '<span class="aioemp-stat-pill aioemp-stat-pill--assigned"><strong>' + assigned + '</strong> Assigned</span>' +
+            '<span class="aioemp-stat-pill aioemp-stat-pill--checkedin"><strong>' + checkedIn + '</strong> Checked In</span>' +
             '<span class="aioemp-stat-pill aioemp-stat-pill--blocked"><strong>' + blocked + '</strong> Blocked</span>' +
             '<span class="aioemp-stat-pill aioemp-stat-pill--available"><strong>' + available + '</strong> Available</span>'
         );
@@ -509,6 +529,8 @@
             renderSeatmap(snapshot);
             $tc.find('.seat-mode-btn').removeClass('is-active aioemp-btn--primary').addClass('aioemp-btn--outline');
             $(this).addClass('is-active aioemp-btn--primary').removeClass('aioemp-btn--outline');
+            // Toggle history cursor on SVG.
+            $('#seat-svg').toggleClass('is-history-mode', newMode === 'history');
             updateInfoBar();
         });
 
@@ -892,9 +914,26 @@
                         showSeatToast('Swap cancelled.', 'info');
                         return;
                     }
+                    // Confirm before swapping.
+                    var a1 = ss.assignMap[ss.swapFirst];
+                    var a2 = ss.assignMap[seatKey];
+                    var name1 = a1 ? ((a1.first_name || '') + ' ' + (a1.last_name || '')).trim() || '(unnamed)' : '?';
+                    var name2 = a2 ? ((a2.first_name || '') + ' ' + (a2.last_name || '')).trim() || '(unnamed)' : '?';
+                    if (!confirm('Swap seats?\n\n' +
+                        name1 + ' (Seat ' + seatLabel(ss.swapFirst) + ')\n↔\n' +
+                        name2 + ' (Seat ' + seatLabel(seatKey) + ')\n\nThis action cannot be undone.')) {
+                        ss.swapFirst = null;
+                        highlightSeat(ss.swapFirst, false);
+                        showSeatToast('Swap cancelled.', 'info');
+                        return;
+                    }
                     doSwap(ss.swapFirst, seatKey, snapshot);
                     ss.swapFirst = null;
                 }
+                break;
+
+            case 'history':
+                showSeatHistoryPopup(seatKey);
                 break;
         }
     }
@@ -970,6 +1009,14 @@
                             '<tr><th>Registered</th><td>' + esc(c.created_at_gmt || '—') + '</td></tr>' +
                         '</table>' +
                     '</div>' +
+                    '<div class="aioemp-cand-info-history">' +
+                        '<div class="aioemp-cand-info-history-header">' +
+                            '<h4>Seating History</h4>' +
+                        '</div>' +
+                        '<div class="aioemp-history-timeline" id="cand-history-timeline">' +
+                            '<p class="aioemp-loading" style="padding:12px 18px">Loading history…</p>' +
+                        '</div>' +
+                    '</div>' +
                 '</div>' +
             '</div>';
 
@@ -980,6 +1027,16 @@
                 $('.aioemp-cand-info-overlay').remove();
             }
         });
+
+        // Fetch candidate seating history.
+        api.get('events/' + ctx.detailEventId + '/seating/log/attender/' + c.id)
+            .then(function (res) {
+                var entries = (res && res.entries) || (res && res.data && res.data.entries) || [];
+                renderHistoryTimeline($('#cand-history-timeline'), entries, 'candidate');
+            })
+            .catch(function () {
+                $('#cand-history-timeline').html('<p class="aioemp-empty" style="padding:12px 18px">Could not load history.</p>');
+            });
     }
 
     /* ── Single Seat Operations ── */
@@ -1087,7 +1144,12 @@
             $dot.attr({ fill: '#0ea5e9', stroke: '#0284c7', 'stroke-width': '3' });
             $label.attr('fill', '#ffffff');
         } else {
-            $dot.attr({ fill: '#28a745', stroke: '#1e7e34', 'stroke-width': '1.5' });
+            var assignment = ss.assignMap[seatKey];
+            if (assignment && parseInt(assignment.checked_in, 10) === 1) {
+                $dot.attr({ fill: '#7c3aed', stroke: '#5b21b6', 'stroke-width': '1.5' });
+            } else {
+                $dot.attr({ fill: '#28a745', stroke: '#1e7e34', 'stroke-width': '1.5' });
+            }
             $label.attr('fill', '#ffffff');
         }
     }
@@ -1150,6 +1212,9 @@
                     msg = 'Click the first assigned seat to begin swap.';
                 }
                 break;
+            case 'history':
+                msg = 'Click any seat to view its assignment history.';
+                break;
         }
         $('#seat-info-bar').html(msg);
     }
@@ -1210,7 +1275,7 @@
             .then(function (res) {
                 $('#seat-confirm-block')
                     .prop('disabled', false)
-                    .html('<span class="dashicons dashicons-lock"></span> Block Selected');
+                    .html('<span class="dashicons dashicons-lock" style=" height: 14px; width: 14px; font-size: 14px; "></span> Block Selected');
                 var blocked = (res.blocked || []).length;
                 var failed = (res.failed || []).length;
                 if (failed > 0) {
@@ -1225,7 +1290,7 @@
             .catch(function (err) {
                 $('#seat-confirm-block')
                     .prop('disabled', false)
-                    .html('<span class="dashicons dashicons-lock"></span> Block Selected');
+                    .html('<span class="dashicons dashicons-lock" style=" height: 14px; width: 14px; font-size: 14px; "></span> Block Selected');
                 showSeatToast(err.message || 'Block failed.', 'err');
             });
     }
@@ -1319,6 +1384,24 @@
         var candidates = ss.selectedCandidates || [];
         if (!pending.length || !candidates.length) return;
 
+        // Check if any selected candidate is currently checked in (reassign scenario).
+        var checkedInNames = [];
+        candidates.forEach(function (c) {
+            var existingSeatKey = ss.attenderMap[c.id];
+            if (existingSeatKey) {
+                var assignment = ss.assignMap[existingSeatKey];
+                if (assignment && parseInt(assignment.checked_in, 10) === 1) {
+                    checkedInNames.push(c.name || 'Candidate #' + c.id);
+                }
+            }
+        });
+        if (checkedInNames.length) {
+            var msg = 'The following candidate(s) are already checked in:\n\n' +
+                      checkedInNames.join('\n') +
+                      '\n\nAre you sure you want to reassign their seat(s)?';
+            if (!confirm(msg)) return;
+        }
+
         var pairs = [];
         for (var i = 0; i < Math.min(pending.length, candidates.length); i++) {
             pairs.push({ attender_id: candidates[i].id, seat_key: pending[i] });
@@ -1352,6 +1435,152 @@
             });
     }
 
+    /* ── Seat History Popup ── */
+
+    function showSeatHistoryPopup(seatKey) {
+        $('.aioemp-seat-history-overlay').remove();
+
+        var label = seatLabel(seatKey);
+        var assignment = ss.assignMap[seatKey];
+        var isBlocked = !!ss.blockedSet[seatKey];
+
+        var statusHtml = '';
+        if (assignment) {
+            var aName = ((assignment.first_name || '') + ' ' + (assignment.last_name || '')).trim() || '(unnamed)';
+            statusHtml = '<span class="aioemp-badge aioemp-badge--success">Assigned to ' + esc(aName) + '</span>';
+        } else if (isBlocked) {
+            statusHtml = '<span class="aioemp-badge aioemp-badge--danger">Blocked</span>';
+        } else {
+            statusHtml = '<span class="aioemp-badge aioemp-badge--info">Available</span>';
+        }
+
+        var html =
+            '<div class="aioemp-seat-history-overlay">' +
+                '<div class="aioemp-seat-history-popup">' +
+                    '<div class="aioemp-cand-info-header">' +
+                        '<h4>Seat History — ' + esc(label) + '</h4>' +
+                        '<button type="button" class="aioemp-cand-info-close">&times;</button>' +
+                    '</div>' +
+                    '<div class="aioemp-seat-history-body">' +
+                        '<div style="padding:14px 18px 8px">' +
+                            '<div style="font-size:12px;color:var(--sa-muted);margin-bottom:4px">Current status</div>' +
+                            statusHtml +
+                        '</div>' +
+                        '<div class="aioemp-history-timeline" id="seat-history-timeline">' +
+                            '<p class="aioemp-loading" style="padding:12px 18px">Loading history…</p>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>' +
+            '</div>';
+
+        $('body').append(html);
+
+        // Close handlers.
+        $('.aioemp-seat-history-overlay').on('click', function (e) {
+            if ($(e.target).hasClass('aioemp-seat-history-overlay') || $(e.target).hasClass('aioemp-cand-info-close')) {
+                $('.aioemp-seat-history-overlay').remove();
+            }
+        });
+
+        // Fetch history.
+        api.get('events/' + ctx.detailEventId + '/seating/log/seat/' + encodeURIComponent(seatKey))
+            .then(function (res) {
+                var entries = (res && res.entries) || (res && res.data && res.data.entries) || [];
+                renderHistoryTimeline($('#seat-history-timeline'), entries, 'seat');
+            })
+            .catch(function () {
+                $('#seat-history-timeline').html('<p class="aioemp-empty" style="padding:12px 18px">Could not load history.</p>');
+            });
+    }
+
+    /* ── Shared History Timeline Renderer ── */
+
+    function renderHistoryTimeline($container, entries, contextType) {
+        if (!entries.length) {
+            $container.html('<p class="aioemp-empty" style="padding:12px 18px">No history recorded yet.</p>');
+            return;
+        }
+
+        var html = '<ul class="aioemp-history-list">';
+        entries.forEach(function (entry) {
+            var icon, color, description;
+            var reason = entry.reason || '';
+            var candName = '';
+            if (entry.first_name || entry.last_name) {
+                candName = ((entry.first_name || '') + ' ' + (entry.last_name || '')).trim();
+            }
+
+            switch (reason) {
+                case 'assign':
+                    icon = 'dashicons-admin-users';
+                    color = '#28a745';
+                    if (contextType === 'seat') {
+                        description = 'Assigned to <strong>' + esc(candName || 'candidate #' + entry.attender_id) + '</strong>';
+                    } else {
+                        description = 'Assigned to seat <strong>' + esc(seatLabel(entry.new_seat || '')) + '</strong>';
+                    }
+                    break;
+                case 'unassign':
+                    icon = 'dashicons-dismiss';
+                    color = '#dc3545';
+                    if (contextType === 'seat') {
+                        description = 'Unassigned from <strong>' + esc(candName || 'candidate #' + entry.attender_id) + '</strong>';
+                    } else {
+                        description = 'Unassigned from seat <strong>' + esc(seatLabel(entry.original_seat || '')) + '</strong>';
+                    }
+                    break;
+                case 'swap':
+                    icon = 'dashicons-randomize';
+                    color = '#6f42c1';
+                    if (contextType === 'seat') {
+                        var fromSeat = entry.original_seat || '';
+                        var toSeat = entry.new_seat || '';
+                        description = 'Swapped: <strong>' + esc(candName || 'candidate #' + entry.attender_id) + '</strong> moved ' +
+                            esc(seatLabel(fromSeat)) + ' → ' + esc(seatLabel(toSeat));
+                    } else {
+                        description = 'Swapped from <strong>' + esc(seatLabel(entry.original_seat || '')) +
+                            '</strong> to <strong>' + esc(seatLabel(entry.new_seat || '')) + '</strong>';
+                    }
+                    break;
+                case 'block':
+                    icon = 'dashicons-lock';
+                    color = '#dc3545';
+                    description = 'Seat <strong>' + esc(seatLabel(entry.new_seat || '')) + '</strong> blocked';
+                    break;
+                case 'unblock':
+                    icon = 'dashicons-unlock';
+                    color = '#28a745';
+                    description = 'Seat <strong>' + esc(seatLabel(entry.original_seat || '')) + '</strong> unblocked';
+                    break;
+                default:
+                    icon = 'dashicons-info';
+                    color = '#6c757d';
+                    description = esc(reason || 'Unknown action');
+            }
+
+            var timeStr = entry.created_at_gmt || '';
+            if (timeStr) {
+                try {
+                    var d = new Date(timeStr + (timeStr.indexOf('Z') < 0 ? 'Z' : ''));
+                    timeStr = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) +
+                        ' ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+                } catch (_) { /* keep raw */ }
+            }
+
+            var modifiedBy = entry.modified_by_name ? ' by ' + esc(entry.modified_by_name) : '';
+
+            html += '<li class="aioemp-history-item">' +
+                '<span class="aioemp-history-icon" style="color:' + color + '"><span class="dashicons ' + icon + '"></span></span>' +
+                '<div class="aioemp-history-content">' +
+                    '<div class="aioemp-history-desc">' + description + '</div>' +
+                    '<div class="aioemp-history-time">' + esc(timeStr) + (modifiedBy ? '<span class="aioemp-history-by">' + modifiedBy + '</span>' : '') + '</div>' +
+                '</div>' +
+            '</li>';
+        });
+        html += '</ul>';
+        $container.html(html);
+    }
+
     function showHelpModal() {
         // Remove any existing help modal.
         $('.aioemp-help-modal-overlay').remove();
@@ -1383,6 +1612,7 @@
                 '<li><strong>Assign mode:</strong> Select candidate(s) from the left panel, then click empty seats to mark them. Click <em>Confirm Assignment</em> to save.</li>' +
                 '<li><strong>Block mode:</strong> Drag-select or click seats to mark them blocked. Click <em>Block Selected</em> to confirm. Click a blocked seat to unblock.</li>' +
                 '<li><strong>Swap mode:</strong> Click an assigned seat as source, then click another assigned seat to swap the two candidates.</li>' +
+                '<li><strong>History mode:</strong> Click any seat to view its full assignment history (assigns, unassigns, swaps, blocks). Candidate info popups also show per-candidate seating history.</li>' +
             '</ol>';
 
         var $modal = $(
@@ -1492,10 +1722,18 @@
 
     function updateUnassignBtn() {
         var hasSeated = false;
+        var allCheckedIn = true;
         (ss.selectedCandidates || []).forEach(function (c) {
-            if (ss.attenderMap[c.id]) hasSeated = true;
+            if (ss.attenderMap[c.id]) {
+                hasSeated = true;
+                var seatKey = ss.attenderMap[c.id];
+                var assignment = ss.assignMap[seatKey];
+                if (!assignment || parseInt(assignment.checked_in, 10) !== 1) {
+                    allCheckedIn = false;
+                }
+            }
         });
-        if (hasSeated) {
+        if (hasSeated && !allCheckedIn) {
             $('#seat-unassign-selected').show();
         } else {
             $('#seat-unassign-selected').hide();
@@ -1504,10 +1742,21 @@
 
     function doBatchUnassign(snapshot) {
         var toUnassign = [];
+        var blockedNames = [];
         (ss.selectedCandidates || []).forEach(function (c) {
             var seatKey = ss.attenderMap[c.id];
-            if (seatKey) toUnassign.push(seatKey);
+            if (seatKey) {
+                var assignment = ss.assignMap[seatKey];
+                if (assignment && parseInt(assignment.checked_in, 10) === 1) {
+                    blockedNames.push(c.name || 'Candidate #' + c.id);
+                } else {
+                    toUnassign.push(seatKey);
+                }
+            }
         });
+        if (blockedNames.length) {
+            showSeatToast('Cannot unassign checked-in candidate(s): ' + blockedNames.join(', '), 'err');
+        }
         if (!toUnassign.length) return;
 
         $('#seat-unassign-selected').prop('disabled', true).text('Unassigning…');

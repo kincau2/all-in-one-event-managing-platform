@@ -229,14 +229,6 @@ body.aioemp-active {
     gap: 16px;
 }
 
-.aioemp-topbar__user {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 13px;
-    color: var(--sa-muted);
-}
-
 .aioemp-topbar__avatar {
     width: 32px;
     height: 32px;
@@ -269,7 +261,96 @@ body.aioemp-active {
     color: var(--sa-primary);
 }
 
-/* ------- Main content ------- */
+/* ------- Account dropdown ------- */
+.aioemp-topbar__account {
+    position: relative;
+}
+
+.aioemp-topbar__user {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--sa-muted);
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: var(--sa-radius);
+    transition: background .15s ease;
+}
+
+.aioemp-topbar__user:hover {
+    background: var(--sa-body-bg);
+}
+
+.aioemp-topbar__caret {
+    font-size: 14px;
+    transition: transform .2s ease;
+}
+
+.aioemp-topbar__account:hover .aioemp-topbar__caret {
+    transform: rotate(180deg);
+}
+
+.aioemp-topbar__dropdown {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 4px;
+    min-width: 180px;
+    background: var(--sa-card-bg);
+    border: 1px solid var(--sa-border);
+    border-radius: var(--sa-radius);
+    box-shadow: 0 8px 24px rgba(0,0,0,.12);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-8px);
+    transition: opacity .2s ease, transform .2s ease, visibility .2s ease;
+    z-index: 100;
+}
+
+.aioemp-topbar__account:hover .aioemp-topbar__dropdown {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.aioemp-topbar__dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    font-size: 13px;
+    color: var(--sa-text);
+    text-decoration: none;
+    transition: background .1s ease, color .1s ease;
+}
+
+.aioemp-topbar__dropdown-item:first-child {
+    border-radius: var(--sa-radius) var(--sa-radius) 0 0;
+}
+
+.aioemp-topbar__dropdown-item:last-child {
+    border-radius: 0 0 var(--sa-radius) var(--sa-radius);
+}
+
+.aioemp-topbar__dropdown-item:hover {
+    background: var(--sa-body-bg);
+    color: var(--sa-primary);
+}
+
+.aioemp-topbar__dropdown-item .dashicons {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+}
+
+.aioemp-topbar__dropdown-item--logout {
+    border-top: 1px solid var(--sa-border);
+}
+
+.aioemp-topbar__dropdown-item--logout:hover {
+    color: var(--sa-danger, #dc3545);
+}
 .aioemp-content {
     flex: 1;
     padding: 24px;
@@ -1012,6 +1093,10 @@ body.aioemp-active {
     background: #f59e0b;
     border: 1px solid #ff9800;
 }
+.aioemp-legend-dot--checkedin {
+    background: #7c3aed;
+    border: 1px solid #5b21b6;
+}
 
 /* SVG canvas */
 .aioemp-seating-canvas-wrap {
@@ -1287,6 +1372,7 @@ body.aioemp-active {
     margin-right: 2px;
 }
 .aioemp-stat-pill--assigned strong { color: #28a745; }
+.aioemp-stat-pill--checkedin strong { color: #7c3aed; }
 .aioemp-stat-pill--blocked strong  { color: #dc3545; }
 .aioemp-stat-pill--available strong { color: var(--sa-primary); }
 
@@ -1351,4 +1437,871 @@ body.aioemp-active {
     .aioemp-seating-stats-bar {
         display: none;
     }
+}
+
+/* ── Seat History Popup ── */
+
+.aioemp-seat-history-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000100;
+    background: rgba(0, 0, 0, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: aioemp-fade-in 0.15s ease;
+}
+.aioemp-seat-history-popup {
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.22);
+    width: 420px;
+    max-width: 90vw;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+}
+.aioemp-seat-history-body {
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+}
+
+/* ── History Timeline (shared by seat & candidate popups) ── */
+
+.aioemp-history-list {
+    list-style: none;
+    margin: 0;
+    padding: 0 18px 14px;
+}
+.aioemp-history-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--sa-border);
+}
+.aioemp-history-item:last-child {
+    border-bottom: none;
+}
+.aioemp-history-icon {
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 1px;
+}
+.aioemp-history-icon .dashicons {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+}
+.aioemp-history-content {
+    flex: 1;
+    min-width: 0;
+}
+.aioemp-history-desc {
+    font-size: 13px;
+    color: var(--sa-text);
+    line-height: 1.4;
+    word-break: break-word;
+}
+.aioemp-history-time {
+    font-size: 11px;
+    color: var(--sa-muted);
+    margin-top: 3px;
+}
+.aioemp-history-by {
+    margin-left: 6px;
+    font-style: italic;
+}
+
+/* ── Candidate Info Popup — Seating History section ── */
+
+.aioemp-cand-info-history {
+    border-top: 1px solid var(--sa-border);
+}
+.aioemp-cand-info-history-header {
+    padding: 12px 18px 0;
+}
+.aioemp-cand-info-history-header h4 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--sa-text);
+}
+
+/* History mode cursor */
+.aioemp-seating-svg.is-history-mode .seat-dot {
+    cursor: help !important;
+}
+
+/* ================================================================== *
+ * User Management (Settings page)
+ * ================================================================== */
+
+/* ================================================================== *
+ * User Management (Users page)
+ * ================================================================== */
+
+/* Actions row: search + create button */
+.aioemp-user-actions-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+.aioemp-user-actions-row .aioemp-user-search-wrap {
+    flex: 1 1 320px;
+}
+.aioemp-user-actions-row .aioemp-btn--primary {
+    white-space: nowrap;
+}
+
+/* Add-user search row (legacy) */
+.aioemp-user-add-row {
+    margin-bottom: 16px;
+}
+.aioemp-user-search-wrap {
+    position: relative;
+    max-width: 420px;
+}
+.aioemp-user-search-results {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--aioemp-card-bg, #fff);
+    border: 1px solid var(--aioemp-border, #dee2e6);
+    border-radius: 0 0 8px 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,.12);
+    max-height: 260px;
+    overflow-y: auto;
+    z-index: 100;
+}
+.aioemp-user-search-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: background .15s;
+}
+.aioemp-user-search-item:hover {
+    background: var(--aioemp-hover, #f5f5f5);
+}
+
+/* Users table */
+.aioemp-users-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+.aioemp-users-table th {
+    text-align: left;
+    padding: 8px 12px;
+    font-weight: 600;
+    border-bottom: 2px solid var(--aioemp-border, #dee2e6);
+    color: var(--aioemp-text-muted, #6c757d);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+.aioemp-users-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--aioemp-border, #dee2e6);
+    vertical-align: middle;
+}
+.aioemp-users-table tbody tr:hover {
+    background: var(--aioemp-hover, rgba(0,0,0,.02));
+}
+
+/* User avatar */
+.aioemp-user-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+/* Role badges */
+.aioemp-role-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 500;
+    background: var(--aioemp-info-bg, #e8f4fd);
+    color: var(--aioemp-info, #0284c7);
+    margin: 2px 4px 2px 0;
+    white-space: nowrap;
+}
+.aioemp-role-badge--admin {
+    background: var(--aioemp-success-bg, #d1fae5);
+    color: var(--aioemp-success, #059669);
+}
+
+/* Action buttons */
+.aioemp-user-actions-cell {
+    white-space: nowrap;
+}
+.aioemp-btn--small {
+    padding: 4px 8px;
+    min-height: 0;
+    font-size: 12px;
+    margin-right: 4px;
+}
+.aioemp-btn--danger {
+    color: var(--aioemp-danger, #dc3545);
+    border-color: var(--aioemp-danger, #dc3545);
+    background: transparent;
+}
+.aioemp-btn--danger:hover {
+    background: var(--aioemp-danger, #dc3545);
+    color: #fff;
+}
+
+/* Role editor overlay */
+.aioemp-role-editor-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 99999;
+}
+.aioemp-role-editor {
+    background: var(--aioemp-card-bg, #fff);
+    border-radius: 12px;
+    padding: 24px 28px;
+    min-width: 380px;
+    max-width: 480px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.18);
+}
+.aioemp-role-editor h4 {
+    margin: 0 0 16px;
+    font-size: 16px;
+    font-weight: 600;
+}
+.aioemp-role-checkboxes {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+.aioemp-role-checkbox-label {
+    display: block;
+    padding: 8px 12px;
+    border: 1px solid var(--aioemp-border, #dee2e6);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+}
+.aioemp-role-checkbox-label:hover {
+    border-color: var(--aioemp-primary, #6366f1);
+    background: var(--aioemp-hover, rgba(99,102,241,.04));
+}
+.aioemp-role-checkbox-label input[type="checkbox"] {
+    margin-right: 6px;
+    vertical-align: middle;
+}
+.aioemp-role-editor__actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+/* Create-user modal */
+.aioemp-create-user-form {
+    min-width: 420px;
+    max-width: 520px;
+}
+.aioemp-create-user-form .aioemp-form-group {
+    margin-bottom: 14px;
+}
+.aioemp-password-wrap {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+.aioemp-password-wrap .aioemp-input {
+    flex: 1;
+}
+.aioemp-required {
+    color: var(--aioemp-danger, #dc3545);
+}
+.aioemp-create-user-note {
+    margin: 0 0 16px;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.aioemp-create-user-error {
+    color: var(--aioemp-danger, #dc3545);
+    font-size: 13px;
+    margin-top: 10px;
+}
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+.spin {
+    animation: spin .8s linear infinite;
+}
+
+/* Check-in placeholder */
+.aioemp-checkin-placeholder {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--aioemp-text-muted, #6c757d);
+}
+
+/* ===================================================================
+   Profile Settings page
+   =================================================================== */
+.aioemp-profile {
+    max-width: 560px;
+}
+
+.aioemp-profile .aioemp-card {
+    padding: 28px 32px;
+}
+
+.aioemp-profile__header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 24px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--sa-border);
+}
+
+.aioemp-profile__avatar {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--sa-primary-lt);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.aioemp-profile__meta h3 {
+    margin: 0 0 2px;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--sa-text);
+}
+
+.aioemp-profile__meta p {
+    margin: 0;
+    font-size: 13px;
+    color: var(--sa-muted);
+}
+
+.aioemp-profile__form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.aioemp-profile__row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.aioemp-profile__field label {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--sa-text);
+    margin-bottom: 6px;
+}
+
+.aioemp-profile__field input {
+    width: 100%;
+    padding: 8px 12px;
+    font-size: 13px;
+    border: 1px solid var(--sa-border);
+    border-radius: var(--sa-radius);
+    background: var(--sa-card-bg);
+    color: var(--sa-text);
+    transition: border-color .15s ease;
+    box-sizing: border-box;
+}
+
+.aioemp-profile__field input:focus {
+    outline: none;
+    border-color: var(--sa-primary);
+    box-shadow: 0 0 0 3px rgba(75, 73, 172, .1);
+}
+
+.aioemp-profile__separator {
+    border: none;
+    border-top: 1px solid var(--sa-border);
+    margin: 8px 0;
+}
+
+.aioemp-profile__pw-hint {
+    font-size: 12px;
+    color: var(--sa-muted);
+    margin: -8px 0 0;
+}
+
+.aioemp-profile__actions {
+    display: flex;
+    gap: 10px;
+    padding-top: 8px;
+}
+
+.aioemp-profile__msg {
+    font-size: 13px;
+    padding: 10px 14px;
+    border-radius: var(--sa-radius);
+    margin-bottom: 12px;
+}
+
+.aioemp-profile__msg--success {
+    background: rgba(25, 135, 84, .1);
+    color: #198754;
+    border: 1px solid rgba(25, 135, 84, .2);
+}
+
+.aioemp-profile__msg--error {
+    background: rgba(220, 53, 69, .1);
+    color: #dc3545;
+    border: 1px solid rgba(220, 53, 69, .2);
+}
+
+@media (max-width: 600px) {
+    .aioemp-profile__row {
+        grid-template-columns: 1fr;
+    }
+    .aioemp-profile .aioemp-card {
+        padding: 20px 16px;
+    }
+}
+
+/* Password show/hide toggle + strength meter */
+.aioemp-pw-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.aioemp-pw-wrap .aioemp-input {
+    padding-right: 38px;
+}
+
+.aioemp-pw-toggle {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: var(--sa-muted);
+    transition: color .15s ease;
+    padding: 0;
+}
+
+.aioemp-pw-toggle:hover {
+    color: var(--sa-primary);
+}
+
+.aioemp-pw-toggle .dashicons {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+}
+
+.aioemp-pw-strength {
+    display: none;
+    margin-top: 8px;
+    gap: 8px;
+    align-items: center;
+}
+
+.aioemp-pw-strength.is-visible {
+    display: flex;
+}
+
+.aioemp-pw-strength__bar {
+    display: flex;
+    gap: 4px;
+    flex: 1;
+}
+
+.aioemp-pw-strength__bar span {
+    flex: 1;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--sa-border);
+    transition: background .25s ease;
+}
+
+/* Segment fill colours by strength level */
+.aioemp-pw-strength.is-weak   .aioemp-pw-strength__bar span.is-filled { background: #dc3545; }
+.aioemp-pw-strength.is-fair   .aioemp-pw-strength__bar span.is-filled { background: #fd7e14; }
+.aioemp-pw-strength.is-good   .aioemp-pw-strength__bar span.is-filled { background: #ffc107; }
+.aioemp-pw-strength.is-strong .aioemp-pw-strength__bar span.is-filled { background: #198754; }
+
+.aioemp-pw-strength__label {
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+    min-width: 52px;
+    text-align: right;
+}
+
+.aioemp-pw-strength.is-weak   .aioemp-pw-strength__label { color: #dc3545; }
+.aioemp-pw-strength.is-fair   .aioemp-pw-strength__label { color: #fd7e14; }
+.aioemp-pw-strength.is-good   .aioemp-pw-strength__label { color: #d4930a; }
+.aioemp-pw-strength.is-strong .aioemp-pw-strength__label { color: #198754; }
+
+/* ==========================================================================
+   Check-In Tab
+   ========================================================================== */
+
+.aioemp-checkin {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* Stats bar */
+.aioemp-checkin__stats {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+.aioemp-checkin__stats .aioemp-stat-card {
+    flex: 1;
+    min-width: 120px;
+}
+
+/* Scanner card */
+.aioemp-checkin__scanner-card .aioemp-card__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.aioemp-checkin__scanner-controls {
+    display: flex;
+    gap: 8px;
+}
+
+.aioemp-checkin__scanner-body {
+    position: relative;
+}
+
+/* Camera viewfinder */
+.aioemp-checkin__camera {
+    margin-bottom: 16px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #000;
+    max-width: 400px;
+    margin-left: auto;
+    margin-right: auto;
+}
+.aioemp-checkin__camera #checkin-camera-reader {
+    width: 100%;
+}
+.aioemp-checkin__camera #checkin-camera-reader video {
+    border-radius: 8px;
+}
+
+/* Manual input */
+.aioemp-checkin__manual {
+    margin-top: 12px;
+}
+.aioemp-checkin__manual-label {
+    display: block;
+    font-size: 13px;
+    color: #6c757d;
+    margin-bottom: 8px;
+}
+.aioemp-checkin__manual-row {
+    display: flex;
+    gap: 8px;
+}
+.aioemp-checkin__manual-row .aioemp-input {
+    flex: 1;
+}
+
+/* Flash messages */
+.aioemp-checkin__flash {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 12px;
+    animation: aioemp-flash-in 0.3s ease;
+}
+@keyframes aioemp-flash-in {
+    from { opacity: 0; transform: translateY(-8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.aioemp-checkin__flash .dashicons {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+}
+.aioemp-checkin__flash--success {
+    background: #d1e7dd;
+    color: #0f5132;
+    border: 1px solid #badbcc;
+}
+.aioemp-checkin__flash--danger {
+    background: #f8d7da;
+    color: #842029;
+    border: 1px solid #f5c2c7;
+}
+.aioemp-checkin__flash--warning {
+    background: #fff3cd;
+    color: #664d03;
+    border: 1px solid #ffecb5;
+}
+.aioemp-checkin__flash--info {
+    background: #cff4fc;
+    color: #055160;
+    border: 1px solid #b6effb;
+}
+
+/* Candidate popup */
+.aioemp-checkin__popup {
+    position: relative;
+    z-index: 10;
+}
+.aioemp-checkin__candidate-card {
+    border: 2px solid var(--sa-primary, #4b49ac);
+    border-radius: 8px;
+    overflow: hidden;
+}
+.aioemp-checkin__candidate-card .aioemp-card__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--sa-primary, #4b49ac);
+    color: #fff;
+}
+.aioemp-checkin__candidate-card .aioemp-card__header .aioemp-card__title {
+    color: #fff;
+}
+
+/* Check-in status banner — large, clear indicator */
+.aioemp-checkin__status-banner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 14px 24px;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+.aioemp-checkin__status-banner .dashicons {
+    font-size: 24px;
+    width: 24px;
+    height: 24px;
+}
+.aioemp-checkin__status-banner--in {
+    background: #d1fae5;
+    color: #065f46;
+    border-bottom: 2px solid #34d399;
+}
+.aioemp-checkin__status-banner--out {
+    background: #fee2e2;
+    color: #991b1b;
+    border-bottom: 2px solid #f87171;
+}
+
+.aioemp-checkin__candidate-info {
+    padding: 20px 24px;
+}
+.aioemp-checkin__candidate-name {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+.aioemp-checkin__candidate-email {
+    font-size: 14px;
+    color: #6c757d;
+    margin-bottom: 2px;
+}
+.aioemp-checkin__candidate-company {
+    font-size: 14px;
+    color: #6c757d;
+    margin-bottom: 8px;
+}
+.aioemp-checkin__candidate-meta {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+}
+.aioemp-checkin__candidate-scan {
+    font-size: 13px;
+    color: #888;
+}
+.aioemp-checkin__candidate-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 16px 24px;
+    border-top: 1px solid #eee;
+    background: #fafafa;
+}
+.aioemp-checkin__candidate-warning {
+    color: #856404;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+}
+.aioemp-checkin__candidate-warning .dashicons {
+    color: #e65100;
+}
+
+/* Search results */
+.aioemp-checkin__search-results {
+    border: 2px solid var(--sa-primary, #4b49ac);
+    border-radius: 8px;
+}
+.aioemp-checkin__search-list {
+    max-height: 300px;
+    overflow-y: auto;
+}
+.aioemp-checkin__search-item {
+    padding: 12px 16px;
+    border-bottom: 1px solid #eee;
+    cursor: pointer;
+    transition: background 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.aioemp-checkin__search-item:hover {
+    background: #f4f4ff;
+}
+.aioemp-checkin__search-item:last-child {
+    border-bottom: 0;
+}
+.aioemp-checkin__search-name {
+    font-weight: 600;
+    flex: 1;
+}
+.aioemp-checkin__search-email {
+    font-size: 13px;
+    color: #6c757d;
+    flex: 1;
+}
+
+/* Recent scans card */
+.aioemp-checkin__recent-card .aioemp-table--compact th,
+.aioemp-checkin__recent-card .aioemp-table--compact td {
+    padding: 6px 10px;
+    font-size: 13px;
+}
+
+/* ==========================================================================
+   Attendance Tab
+   ========================================================================== */
+
+.aioemp-attendance__stats {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    padding: 12px 0;
+    margin-bottom: 8px;
+    border-bottom: 1px solid #eee;
+}
+.aioemp-attendance__stat {
+    font-size: 14px;
+    color: #555;
+}
+.aioemp-attendance__stat strong {
+    color: #333;
+    font-size: 16px;
+}
+
+/* ==========================================================================
+   Badges (shared)
+   ========================================================================== */
+
+.aioemp-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: capitalize;
+    white-space: nowrap;
+}
+.aioemp-badge--success {
+    background: #d1e7dd;
+    color: #0f5132;
+}
+.aioemp-badge--danger {
+    background: #f8d7da;
+    color: #842029;
+}
+.aioemp-badge--warning {
+    background: #fff3cd;
+    color: #664d03;
+}
+.aioemp-badge--info {
+    background: #cff4fc;
+    color: #055160;
+}
+.aioemp-badge--secondary {
+    background: #e9ecef;
+    color: #495057;
+}
+.aioemp-badge--primary {
+    background: #e8e8f7;
+    color: #4b49ac;
+}
+
+/* ==========================================================================
+   Button variants additions (success / danger)
+   ========================================================================== */
+
+.aioemp-btn--success {
+    background: #198754;
+    color: #fff;
+    border: 1px solid #198754;
+}
+.aioemp-btn--success:hover {
+    background: #157347;
+    border-color: #157347;
+}
+.aioemp-btn--danger {
+    background: #dc3545;
+    color: #fff;
+    border: 1px solid #dc3545;
+}
+.aioemp-btn--danger:hover {
+    background: #bb2d3b;
+    border-color: #bb2d3b;
 }

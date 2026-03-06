@@ -73,25 +73,25 @@ class AIOEMP_Attender_Model extends AIOEMP_Model {
         );
         $args = wp_parse_args( $args, $defaults );
 
-        $where  = array( 'event_id = %d' );
+        $where  = array( 't.event_id = %d' );
         $values = array( $event_id );
 
         // Filter by specific IDs (skips pagination when used).
         $ids = array_filter( array_map( 'absint', (array) $args['ids'] ) );
         if ( ! empty( $ids ) ) {
             $placeholders = implode( ',', array_fill( 0, count( $ids ), '%d' ) );
-            $where[]      = "id IN ($placeholders)";
+            $where[]      = "t.id IN ($placeholders)";
             $values       = array_merge( $values, $ids );
         }
 
         if ( '' !== $args['status'] && in_array( $args['status'], self::STATUSES, true ) ) {
-            $where[]  = 'status = %s';
+            $where[]  = 't.status = %s';
             $values[] = $args['status'];
         }
 
         if ( '' !== $args['search'] ) {
             $like     = '%' . $this->db->esc_like( $args['search'] ) . '%';
-            $where[]  = '(first_name LIKE %s OR last_name LIKE %s OR email LIKE %s OR company LIKE %s)';
+            $where[]  = '(t.first_name LIKE %s OR t.last_name LIKE %s OR t.email LIKE %s OR t.company LIKE %s)';
             $values[] = $like;
             $values[] = $like;
             $values[] = $like;
@@ -102,16 +102,21 @@ class AIOEMP_Attender_Model extends AIOEMP_Model {
 
         // Total count.
         $count_sql = $this->db->prepare(
-            "SELECT COUNT(*) FROM {$this->table} WHERE {$where_clause}",
+            "SELECT COUNT(*) FROM {$this->table} t WHERE {$where_clause}",
             ...$values
         );
         $total = (int) $this->db->get_var( $count_sql );
+
+        // LEFT JOIN seat_assignment to include checked_in flag for candidates.
+        $sa_table = $this->db->prefix . 'aioemp_seat_assignment';
+        $select   = "SELECT t.*, sa.checked_in";
+        $from     = "FROM {$this->table} t LEFT JOIN {$sa_table} sa ON sa.attender_id = t.id AND sa.event_id = t.event_id";
 
         // When filtering by IDs, skip pagination — return all matches.
         if ( ! empty( $ids ) ) {
             $items = $this->db->get_results(
                 $this->db->prepare(
-                    "SELECT * FROM {$this->table} WHERE {$where_clause} ORDER BY created_at_gmt DESC",
+                    "{$select} {$from} WHERE {$where_clause} ORDER BY t.created_at_gmt DESC",
                     ...$values
                 )
             );
@@ -124,7 +129,7 @@ class AIOEMP_Attender_Model extends AIOEMP_Model {
             $query_values = array_merge( $values, array( $per_page, $offset ) );
             $items = $this->db->get_results(
                 $this->db->prepare(
-                    "SELECT * FROM {$this->table} WHERE {$where_clause} ORDER BY created_at_gmt DESC LIMIT %d OFFSET %d",
+                    "{$select} {$from} WHERE {$where_clause} ORDER BY t.created_at_gmt DESC LIMIT %d OFFSET %d",
                     ...$query_values
                 )
             );

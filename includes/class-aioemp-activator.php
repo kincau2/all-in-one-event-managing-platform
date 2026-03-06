@@ -190,6 +190,7 @@ class AIOEMP_Activator {
             event_id bigint(20) unsigned NOT NULL,
             attender_id bigint(20) unsigned NOT NULL,
             seat_key varchar(64) NOT NULL,
+            checked_in tinyint(1) NOT NULL DEFAULT 0,
             assigned_by bigint(20) unsigned DEFAULT NULL,
             assigned_at_gmt datetime NOT NULL,
             PRIMARY KEY  (id),
@@ -273,6 +274,16 @@ class AIOEMP_Activator {
             $col = $wpdb->get_results( "SHOW COLUMNS FROM `{$table}` LIKE 'integrity_pass'" );
             if ( empty( $col ) ) {
                 $wpdb->query( "ALTER TABLE `{$table}` ADD COLUMN `integrity_pass` tinyint(1) NOT NULL DEFAULT 0 AFTER `layout`" );
+            }
+        }
+
+        // ── Seat assignment table migrations (v1.4.0) ──
+        $sa_table = $prefix . 'seat_assignment';
+        $exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $sa_table ) );
+        if ( $exists ) {
+            $col = $wpdb->get_results( "SHOW COLUMNS FROM `{$sa_table}` LIKE 'checked_in'" );
+            if ( empty( $col ) ) {
+                $wpdb->query( "ALTER TABLE `{$sa_table}` ADD COLUMN `checked_in` tinyint(1) NOT NULL DEFAULT 0 AFTER `seat_key`" );
             }
         }
 

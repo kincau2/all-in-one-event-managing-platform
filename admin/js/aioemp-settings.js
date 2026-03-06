@@ -10,7 +10,8 @@
 (function ($) {
     'use strict';
 
-    const api = window.aioemp_api;
+    const api = window.aioemp || {};
+    const rest = window.aioemp_api;
 
     /* ------------------------------------------------------------------ *
      * Data cache
@@ -85,13 +86,6 @@
                 '<h3 class="aioemp-card__title">Behaviour</h3>' +
                 '<div class="aioemp-form-row">' +
                     '<div class="aioemp-form-group aioemp-form-group--half">' +
-                        '<label class="aioemp-label" for="aioemp-send-qr-on">Send QR Code On</label>' +
-                        '<select id="aioemp-send-qr-on" class="aioemp-select">' +
-                            '<option value="acceptance">Acceptance</option>' +
-                            '<option value="registration">Registration</option>' +
-                        '</select>' +
-                    '</div>' +
-                    '<div class="aioemp-form-group aioemp-form-group--half">' +
                         '<label class="aioemp-label" for="aioemp-default-venue-mode">Default Venue Mode</label>' +
                         '<select id="aioemp-default-venue-mode" class="aioemp-select">' +
                             '<option value="onsite">Onsite</option>' +
@@ -99,15 +93,22 @@
                             '<option value="mixed">Mixed</option>' +
                         '</select>' +
                     '</div>' +
-                '</div>' +
-                '<div class="aioemp-form-row">' +
                     '<div class="aioemp-form-group aioemp-form-group--half">' +
                         '<label class="aioemp-label" for="aioemp-default-capacity">Default Capacity</label>' +
                         '<input type="number" id="aioemp-default-capacity" class="aioemp-input" min="1" max="100000">' +
                     '</div>' +
-                    '<div class="aioemp-form-group aioemp-form-group--half">' +
-                        '<label class="aioemp-label" for="aioemp-scanner-device-name">Scanner Device Name</label>' +
-                        '<input type="text" id="aioemp-scanner-device-name" class="aioemp-input" placeholder="e.g. Front Door iPad">' +
+                '</div>' +
+            '</div>' +
+
+            /* ---- Ticket / Check-In card ---- */
+            '<div class="aioemp-card">' +
+                '<h3 class="aioemp-card__title">Ticket &amp; Check-In</h3>' +
+                '<div class="aioemp-form-group">' +
+                    '<label class="aioemp-label" for="aioemp-ticket-slug">Ticket Page Slug</label>' +
+                    '<input type="text" id="aioemp-ticket-slug" class="aioemp-input" placeholder="e-ticket" style="max-width:300px">' +
+                    '<p class="aioemp-help">The URL path for the public ticket page. Example: <code>yourdomain.com/<strong>e-ticket</strong>/&lt;hash&gt;</code></p>' +
+                    '<div id="aioemp-ticket-slug-conflict" style="display:none" class="aioemp-form-error">' +
+                        '<span class="dashicons dashicons-warning"></span> This slug conflicts with an existing page. Choose a different one.' +
                     '</div>' +
                 '</div>' +
             '</div>' +
@@ -129,7 +130,7 @@
      * ------------------------------------------------------------------ */
 
     function loadSettings($el) {
-        api.get('settings').then(function (data) {
+        rest.get('settings').then(function (data) {
             settings = data;
             populateForm(data);
             bindEvents($el);
@@ -157,10 +158,11 @@
         }
 
         // Behaviour.
-        $('#aioemp-send-qr-on').val(data.send_qr_on);
         $('#aioemp-default-venue-mode').val(data.default_venue_mode);
         $('#aioemp-default-capacity').val(data.default_capacity);
-        $('#aioemp-scanner-device-name').val(data.scanner_device_name);
+
+        // Ticket.
+        $('#aioemp-ticket-slug').val(data.ticket_page_slug || 'e-ticket');
     }
 
     function renderLogoPreview(url) {
@@ -226,10 +228,9 @@
         var payload = {
             captcha_provider:   $('#aioemp-captcha-provider').val(),
             captcha_site_key:   $('#aioemp-captcha-site-key').val(),
-            send_qr_on:         $('#aioemp-send-qr-on').val(),
             default_venue_mode: $('#aioemp-default-venue-mode').val(),
             default_capacity:   parseInt($('#aioemp-default-capacity').val(), 10) || 100,
-            scanner_device_name: $('#aioemp-scanner-device-name').val(),
+            ticket_page_slug:   $.trim($('#aioemp-ticket-slug').val()) || 'e-ticket',
         };
 
         // Only include secret key if user actually typed a new one.
@@ -238,7 +239,7 @@
             payload.captcha_secret_key = secretVal;
         }
 
-        api.put('settings', payload).then(function (data) {
+        rest.put('settings', payload).then(function (data) {
             settings = data;
             $status.text('Settings saved.').addClass('aioemp-settings__status--ok');
             // Update secret placeholder.
@@ -291,7 +292,7 @@
     }
 
     function removeLogo() {
-        api.put('settings', { logo_attachment_id: 0, logo_url: '' }).then(function () {
+        rest.put('settings', { logo_attachment_id: 0, logo_url: '' }).then(function () {
             renderLogoPreview('');
             $('#aioemp-logo-remove-btn').hide();
             updateSidebarLogo('');

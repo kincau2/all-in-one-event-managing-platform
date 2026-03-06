@@ -74,4 +74,66 @@ class AIOEMP_Seat_Assignment_Log_Model extends AIOEMP_Model {
         );
         return $rows ?: array();
     }
+
+    /**
+     * List log entries for a specific seat within an event.
+     *
+     * Matches rows where the seat_key appears as either original_seat or new_seat.
+     * JOINs with attenders table to include candidate names.
+     *
+     * @param int    $event_id Event ID.
+     * @param string $seat_key Seat key to look up.
+     * @param int    $limit    Maximum entries (default 100).
+     * @return array
+     */
+    public function list_for_seat( int $event_id, string $seat_key, int $limit = 100 ): array {
+        $attender_table = $this->db->prefix . 'aioemp_attender';
+        $users_table    = $this->db->users;
+
+        $rows = $this->db->get_results(
+            $this->db->prepare(
+                "SELECT l.*, a.first_name, a.last_name, a.email AS attender_email,
+                        u.display_name AS modified_by_name
+                 FROM {$this->table} l
+                 LEFT JOIN {$attender_table} a ON a.id = l.attender_id
+                 LEFT JOIN {$users_table} u ON u.ID = l.modified_by
+                 WHERE l.event_id = %d
+                   AND (l.original_seat = %s OR l.new_seat = %s)
+                 ORDER BY l.created_at_gmt DESC
+                 LIMIT %d",
+                $event_id,
+                $seat_key,
+                $seat_key,
+                $limit
+            )
+        );
+        return $rows ?: array();
+    }
+
+    /**
+     * List log entries for a specific attender within an event.
+     *
+     * @param int $event_id    Event ID.
+     * @param int $attender_id Attender ID.
+     * @param int $limit       Maximum entries (default 100).
+     * @return array
+     */
+    public function list_for_attender( int $event_id, int $attender_id, int $limit = 100 ): array {
+        $users_table = $this->db->users;
+
+        $rows = $this->db->get_results(
+            $this->db->prepare(
+                "SELECT l.*, u.display_name AS modified_by_name
+                 FROM {$this->table} l
+                 LEFT JOIN {$users_table} u ON u.ID = l.modified_by
+                 WHERE l.event_id = %d AND l.attender_id = %d
+                 ORDER BY l.created_at_gmt DESC
+                 LIMIT %d",
+                $event_id,
+                $attender_id,
+                $limit
+            )
+        );
+        return $rows ?: array();
+    }
 }

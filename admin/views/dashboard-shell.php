@@ -36,16 +36,27 @@ $avatar_initial = esc_html( mb_strtoupper( mb_substr( $display_name, 0, 1 ) ) );
 
         <nav class="aioemp-sidebar__nav" aria-label="<?php echo esc_attr__( 'Event Manager Navigation', 'aioemp' ); ?>">
             <ul class="aioemp-sidebar__menu">
+                <?php if ( current_user_can( AIOEMP_Security::CAPS['view_events'] ) ) : ?>
                 <li>
                     <a href="#events" class="aioemp-nav-link" data-route="events">
                         <span class="dashicons dashicons-calendar"></span>
                         <?php echo esc_html__( 'Events', 'aioemp' ); ?>
                     </a>
                 </li>
+                <?php endif; ?>
+                <?php if ( current_user_can( AIOEMP_Security::CAPS['view_seatmaps'] ) ) : ?>
                 <li>
                     <a href="#seatmaps" class="aioemp-nav-link" data-route="seatmaps">
                         <span class="dashicons dashicons-layout"></span>
                         <?php echo esc_html__( 'Seatmaps', 'aioemp' ); ?>
+                    </a>
+                </li>
+                <?php endif; ?>
+                <?php if ( current_user_can( AIOEMP_Security::CAPS['manage_settings'] ) ) : ?>
+                <li>
+                    <a href="#users" class="aioemp-nav-link" data-route="users">
+                        <span class="dashicons dashicons-admin-users"></span>
+                        <?php echo esc_html__( 'Users', 'aioemp' ); ?>
                     </a>
                 </li>
                 <li>
@@ -54,6 +65,7 @@ $avatar_initial = esc_html( mb_strtoupper( mb_substr( $display_name, 0, 1 ) ) );
                         <?php echo esc_html__( 'Settings', 'aioemp' ); ?>
                     </a>
                 </li>
+                <?php endif; ?>
             </ul>
         </nav>
 
@@ -79,9 +91,22 @@ $avatar_initial = esc_html( mb_strtoupper( mb_substr( $display_name, 0, 1 ) ) );
                     <span class="dashicons dashicons-arrow-left-alt"></span>
                     <?php echo esc_html__( 'WP Dashboard', 'aioemp' ); ?>
                 </a>
-                <div class="aioemp-topbar__user">
-                    <span class="aioemp-topbar__avatar"><?php echo $avatar_initial; // Already escaped. ?></span>
-                    <span><?php echo $display_name; // Already escaped. ?></span>
+                <div class="aioemp-topbar__account">
+                    <div class="aioemp-topbar__user">
+                        <span class="aioemp-topbar__avatar"><?php echo $avatar_initial; // Already escaped. ?></span>
+                        <span><?php echo $display_name; // Already escaped. ?></span>
+                        <span class="dashicons dashicons-arrow-down-alt2 aioemp-topbar__caret"></span>
+                    </div>
+                    <div class="aioemp-topbar__dropdown">
+                        <a href="#profile" class="aioemp-topbar__dropdown-item">
+                            <span class="dashicons dashicons-admin-users"></span>
+                            <?php echo esc_html__( 'Profile Settings', 'aioemp' ); ?>
+                        </a>
+                        <a href="<?php echo esc_url( wp_logout_url( home_url() ) ); ?>" class="aioemp-topbar__dropdown-item aioemp-topbar__dropdown-item--logout">
+                            <span class="dashicons dashicons-exit"></span>
+                            <?php echo esc_html__( 'Logout', 'aioemp' ); ?>
+                        </a>
+                    </div>
                 </div>
             </div>
         </header>

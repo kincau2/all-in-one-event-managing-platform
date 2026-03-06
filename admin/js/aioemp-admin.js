@@ -94,6 +94,20 @@
     const $content = $('#aioemp-content');
     const $title   = $('#aioemp-page-title');
     const routes   = {};
+    const caps     = cfg.user_caps || {};
+
+    /**
+     * Check if the current user has a specific AIOEMP capability.
+     *
+     * @param {string} key  Capability key (e.g. 'manage_events').
+     * @returns {boolean}
+     */
+    function userCan(key) {
+        return !!caps[key];
+    }
+
+    // Expose for other modules.
+    window.aioemp_userCan = userCan;
 
     /**
      * Register a route handler.
@@ -107,7 +121,12 @@
     }
 
     function navigate() {
-        const hash  = (location.hash || '#events').replace('#', '');
+        // Determine the default landing route based on user capabilities.
+        let defaultRoute = 'events';
+        if (!userCan('view_events') && userCan('view_seatmaps'))  defaultRoute = 'seatmaps';
+        if (!userCan('view_events') && !userCan('view_seatmaps') && userCan('manage_settings')) defaultRoute = 'users';
+
+        const hash  = (location.hash || '#' + defaultRoute).replace('#', '');
         const route = routes[hash];
 
         // Check for dynamic route: seatmap-edit/{id}
@@ -115,6 +134,27 @@
 
         // Check for dynamic route: event/{id}
         const eventDetailMatch = hash.match(/^event\/(\d+)$/);
+
+        /* ── Route-level capability guards ── */
+        const routeCaps = {
+            events:   'view_events',
+            seatmaps: 'view_seatmaps',
+            users:    'manage_settings',
+            settings: 'manage_settings',
+        };
+
+        if (editMatch && !userCan('manage_seatmaps')) {
+            location.hash = '#' + defaultRoute;
+            return;
+        }
+        if (eventDetailMatch && !userCan('view_events')) {
+            location.hash = '#' + defaultRoute;
+            return;
+        }
+        if (routeCaps[hash] && !userCan(routeCaps[hash])) {
+            location.hash = '#' + defaultRoute;
+            return;
+        }
 
         // Update active nav link.
         $('.aioemp-nav-link').removeClass('is-active');
@@ -179,6 +219,19 @@
         }
     });
 
+    registerRoute('users', 'Users', function ($el) {
+        if (window.aioemp_users && window.aioemp_users.render) {
+            window.aioemp_users.render($el);
+        } else {
+            $el.html(
+                '<div class="aioemp-card">' +
+                    '<h3 class="aioemp-card__title">Users</h3>' +
+                    '<p>Users module is loading…</p>' +
+                '</div>'
+            );
+        }
+    });
+
     registerRoute('settings', 'Settings', function ($el) {
         if (window.aioemp_settings && window.aioemp_settings.render) {
             window.aioemp_settings.render($el);
@@ -187,6 +240,19 @@
                 '<div class="aioemp-card">' +
                     '<h3 class="aioemp-card__title">Settings</h3>' +
                     '<p>Settings module is loading…</p>' +
+                '</div>'
+            );
+        }
+    });
+
+    registerRoute('profile', 'Profile Settings', function ($el) {
+        if (window.aioemp_profile && window.aioemp_profile.render) {
+            window.aioemp_profile.render($el);
+        } else {
+            $el.html(
+                '<div class="aioemp-card">' +
+                    '<h3 class="aioemp-card__title">Profile Settings</h3>' +
+                    '<p>Profile module is loading…</p>' +
                 '</div>'
             );
         }

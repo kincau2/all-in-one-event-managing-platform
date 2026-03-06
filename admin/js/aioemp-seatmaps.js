@@ -12,6 +12,7 @@
     'use strict';
 
     const api = window.aioemp_api;
+    const userCan = window.aioemp_userCan;
 
     /* ── HTML builders ── */
 
@@ -20,9 +21,11 @@
             '<div class="aioemp-card">' +
                 '<div class="aioemp-card__header">' +
                     '<h3 class="aioemp-card__title">Seatmap Templates</h3>' +
-                    '<button id="sme-btn-new" class="aioemp-btn aioemp-btn--sm aioemp-btn--primary">' +
-                        '<span class="dashicons dashicons-plus-alt2"></span> New Seatmap' +
-                    '</button>' +
+                    (userCan('manage_seatmaps')
+                        ? '<button id="sme-btn-new" class="aioemp-btn aioemp-btn--sm aioemp-btn--primary">' +
+                              '<span class="dashicons dashicons-plus-alt2"></span> New Seatmap' +
+                          '</button>'
+                        : '') +
                 '</div>' +
                 '<div id="sme-list-wrap">' +
                     '<p class="aioemp-loading">Loading…</p>' +
@@ -42,7 +45,7 @@
                     '<th>Name</th>' +
                     '<th>Status</th>' +
                     '<th>Updated</th>' +
-                    '<th style="width:180px">Actions</th>' +
+                    (userCan('manage_seatmaps') ? '<th style="width:180px">Actions</th>' : '') +
                 '</tr></thead><tbody>';
 
         rows.forEach(function (r) {
@@ -53,17 +56,19 @@
                     '<td class="sme-cell-name">' + esc(r.title || r.name || '') + '</td>' +
                     '<td><span class="aioemp-badge aioemp-badge--' + (r.status || 'draft') + '">' + (r.status || 'draft') + '</span></td>' +
                     '<td>' + date + '</td>' +
-                    '<td>' +
-                        '<button class="aioemp-btn aioemp-btn--xs aioemp-btn--primary sme-act-edit" title="Edit layout">' +
-                            '<span class="dashicons dashicons-edit"></span>' +
-                        '</button> ' +
-                        '<button class="aioemp-btn aioemp-btn--xs aioemp-btn--secondary sme-act-dup" title="Duplicate">' +
-                            '<span class="dashicons dashicons-admin-page"></span>' +
-                        '</button> ' +
-                        '<button class="aioemp-btn aioemp-btn--xs aioemp-btn--danger sme-act-del" title="Delete">' +
-                            '<span class="dashicons dashicons-trash"></span>' +
-                        '</button>' +
-                    '</td>' +
+                    (userCan('manage_seatmaps')
+                        ? '<td>' +
+                              '<button class="aioemp-btn aioemp-btn--xs aioemp-btn--primary sme-act-edit" title="Edit layout">' +
+                                  '<span class="dashicons dashicons-edit"></span>' +
+                              '</button> ' +
+                              '<button class="aioemp-btn aioemp-btn--xs aioemp-btn--secondary sme-act-dup" title="Duplicate">' +
+                                  '<span class="dashicons dashicons-admin-page"></span>' +
+                              '</button> ' +
+                              '<button class="aioemp-btn aioemp-btn--xs aioemp-btn--danger sme-act-del" title="Delete">' +
+                                  '<span class="dashicons dashicons-trash"></span>' +
+                              '</button>' +
+                          '</td>'
+                        : '') +
                 '</tr>';
         });
 

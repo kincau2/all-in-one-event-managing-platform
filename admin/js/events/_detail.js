@@ -12,6 +12,7 @@
 
     var api = ctx.api;
     var esc = ctx.esc;
+    var userCan = window.aioemp_userCan;
 
     function showEventDetail(eventId) {
         ctx.detailEventId = eventId;
@@ -60,9 +61,10 @@
 
             '<div class="aioemp-tabs">' +
                 '<button class="aioemp-tab' + (ctx.activeTab === 'overview' ? ' is-active' : '') + '" data-tab="overview">Overview</button>' +
-                '<button class="aioemp-tab' + (ctx.activeTab === 'candidates' ? ' is-active' : '') + '" data-tab="candidates">Candidates</button>' +
-                '<button class="aioemp-tab' + (ctx.activeTab === 'attendance' ? ' is-active' : '') + '" data-tab="attendance">Attendance</button>' +
-                (hasSeatmap ? '<button class="aioemp-tab' + (ctx.activeTab === 'seating' ? ' is-active' : '') + '" data-tab="seating">Seating</button>' : '') +
+                (userCan('view_candidates') ? '<button class="aioemp-tab' + (ctx.activeTab === 'candidates' ? ' is-active' : '') + '" data-tab="candidates">Candidates</button>' : '') +
+                (userCan('view_attendance') ? '<button class="aioemp-tab' + (ctx.activeTab === 'attendance' ? ' is-active' : '') + '" data-tab="attendance">Attendance Log</button>' : '') +
+                (userCan('scan_attendance') ? '<button class="aioemp-tab' + (ctx.activeTab === 'checkin' ? ' is-active' : '') + '" data-tab="checkin">Check In</button>' : '') +
+                (hasSeatmap && userCan('manage_seating') ? '<button class="aioemp-tab' + (ctx.activeTab === 'seating' ? ' is-active' : '') + '" data-tab="seating">Seating</button>' : '') +
             '</div>' +
 
             '<div id="evt-tab-content" class="aioemp-tab-content"></div>';
@@ -92,13 +94,16 @@
                 renderOverviewTab($tc);
                 break;
             case 'candidates':
-                ctx.renderCandidatesTab($tc);
+                if (userCan('view_candidates')) ctx.renderCandidatesTab($tc);
                 break;
             case 'attendance':
-                renderAttendanceTab($tc);
+                if (userCan('view_attendance')) ctx.renderAttendanceTab($tc);
+                break;
+            case 'checkin':
+                if (userCan('scan_attendance')) ctx.renderCheckInTab($tc);
                 break;
             case 'seating':
-                ctx.renderSeatingTab($tc);
+                if (userCan('manage_seating')) ctx.renderSeatingTab($tc);
                 break;
         }
     }
@@ -111,9 +116,11 @@
             '<div class="aioemp-card">' +
                 '<div class="aioemp-card__header">' +
                     '<h3 class="aioemp-card__title">Event Information</h3>' +
-                    '<button id="evt-detail-edit" class="aioemp-btn aioemp-btn--sm aioemp-btn--primary">' +
-                        '<span class="dashicons dashicons-edit"></span> Edit' +
-                    '</button>' +
+                    (userCan('manage_events')
+                        ? '<button id="evt-detail-edit" class="aioemp-btn aioemp-btn--sm aioemp-btn--primary">' +
+                              '<span class="dashicons dashicons-edit"></span> Edit' +
+                          '</button>'
+                        : '') +
                 '</div>' +
                 '<div class="aioemp-detail-grid">' +
                     detailRow('Title', d.title) +
@@ -168,17 +175,6 @@
             '<div class="aioemp-stat-card__value">' + value + '</div>' +
             '<div class="aioemp-stat-card__label">' + esc(label) + '</div>' +
         '</div>';
-    }
-
-    /* ── Attendance Tab (placeholder) ── */
-
-    function renderAttendanceTab($tc) {
-        $tc.html(
-            '<div class="aioemp-card">' +
-                '<h3 class="aioemp-card__title">Attendance</h3>' +
-                '<p>QR scanning and attendance tracking — coming in Phase 8.</p>' +
-            '</div>'
-        );
     }
 
     /* ── Register on context ── */

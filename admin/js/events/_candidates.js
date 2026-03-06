@@ -12,6 +12,8 @@
 
     var api = ctx.api;
     var esc = ctx.esc;
+    var userCan = window.aioemp_userCan;
+    var canManage = function () { return userCan('manage_candidates'); };
 
     function renderCandidatesTab($tc) {
         ctx.candidateState = { page: 1, status: '', search: '' };
@@ -20,9 +22,11 @@
             '<div class="aioemp-card">' +
                 '<div class="aioemp-card__header">' +
                     '<h3 class="aioemp-card__title">Candidates</h3>' +
-                    '<button id="cand-btn-new" class="aioemp-btn aioemp-btn--sm aioemp-btn--primary">' +
-                        '<span class="dashicons dashicons-plus-alt2"></span> Add Candidate' +
-                    '</button>' +
+                    (canManage()
+                        ? '<button id="cand-btn-new" class="aioemp-btn aioemp-btn--sm aioemp-btn--primary">' +
+                              '<span class="dashicons dashicons-plus-alt2"></span> Add Candidate' +
+                          '</button>'
+                        : '') +
                 '</div>' +
                 '<div class="aioemp-toolbar">' +
                     '<input id="cand-search" class="aioemp-input aioemp-input--sm" type="text" placeholder="Search name, email…" style="max-width:240px">' +
@@ -33,15 +37,17 @@
                         '<option value="accepted_online">Accepted (Online)</option>' +
                         '<option value="rejected">Rejected</option>' +
                     '</select>' +
-                    '<div class="aioemp-toolbar__bulk" id="cand-bulk-wrap" style="display:none">' +
-                        '<select id="cand-bulk-action" class="aioemp-select aioemp-select--sm" style="max-width:200px">' +
-                            '<option value="">Bulk Actions…</option>' +
-                            '<option value="accepted_onsite">Accept (On-site)</option>' +
-                            '<option value="accepted_online">Accept (Online)</option>' +
-                            '<option value="rejected">Reject</option>' +
-                        '</select>' +
-                        '<button id="cand-bulk-apply" class="aioemp-btn aioemp-btn--xs aioemp-btn--primary">Apply</button>' +
-                    '</div>' +
+                    (canManage()
+                        ? '<div class="aioemp-toolbar__bulk" id="cand-bulk-wrap" style="display:none">' +
+                              '<select id="cand-bulk-action" class="aioemp-select aioemp-select--sm" style="max-width:200px">' +
+                                  '<option value="">Bulk Actions…</option>' +
+                                  '<option value="accepted_onsite">Accept (On-site)</option>' +
+                                  '<option value="accepted_online">Accept (Online)</option>' +
+                                  '<option value="rejected">Reject</option>' +
+                              '</select>' +
+                              '<button id="cand-bulk-apply" class="aioemp-btn aioemp-btn--xs aioemp-btn--primary">Apply</button>' +
+                          '</div>'
+                        : '') +
                 '</div>' +
                 '<div id="cand-list-wrap">' +
                     '<p class="aioemp-loading">Loading…</p>' +
@@ -91,33 +97,48 @@
             var html =
                 '<table class="aioemp-table">' +
                     '<thead><tr>' +
-                        '<th style="width:40px"><input type="checkbox" id="cand-select-all"></th>' +
+                        (canManage() ? '<th style="width:40px"><input type="checkbox" id="cand-select-all"></th>' : '') +
                         '<th>Name</th>' +
                         '<th>Email</th>' +
                         '<th>Company</th>' +
                         '<th>Status</th>' +
+                        '<th>Attendance</th>' +
                         '<th>Registered</th>' +
-                        '<th style="width:120px">Actions</th>' +
+                        (canManage() ? '<th style="width:120px">Actions</th>' : '') +
                     '</tr></thead><tbody>';
 
             rows.forEach(function (r) {
                 var name = ((r.title ? r.title + ' ' : '') + (r.first_name || '') + ' ' + (r.last_name || '')).trim();
+                // Attendance column: show check-in badge for accepted_onsite with assignment; "—" otherwise.
+                var attCell = '—';
+                if (r.status === 'accepted_onsite') {
+                    if (r.checked_in === '1' || r.checked_in === 1 || r.checked_in === true) {
+                        attCell = '<span class="aioemp-badge aioemp-badge--success">Checked In</span>';
+                    } else if (r.checked_in !== null && typeof r.checked_in !== 'undefined') {
+                        attCell = '<span class="aioemp-badge aioemp-badge--draft">Not Checked In</span>';
+                    } else {
+                        attCell = '<span class="aioemp-badge aioemp-badge--draft">No Seat</span>';
+                    }
+                }
                 html +=
                     '<tr data-id="' + r.id + '">' +
-                        '<td><input type="checkbox" class="cand-check" value="' + r.id + '"></td>' +
+                        (canManage() ? '<td><input type="checkbox" class="cand-check" value="' + r.id + '"></td>' : '') +
                         '<td>' + esc(name || '(unnamed)') + '</td>' +
                         '<td>' + esc(r.email || '—') + '</td>' +
                         '<td>' + esc(r.company || '—') + '</td>' +
                         '<td>' + candidateStatusBadge(r.status) + '</td>' +
+                        '<td>' + attCell + '</td>' +
                         '<td>' + ctx.fmtDate(r.created_at_gmt) + '</td>' +
-                        '<td>' +
-                            '<button class="aioemp-btn aioemp-btn--xs aioemp-btn--secondary cand-act-edit" title="Edit">' +
-                                '<span class="dashicons dashicons-edit"></span>' +
-                            '</button> ' +
-                            '<button class="aioemp-btn aioemp-btn--xs aioemp-btn--danger cand-act-del" title="Delete">' +
-                                '<span class="dashicons dashicons-trash"></span>' +
-                            '</button>' +
-                        '</td>' +
+                        (canManage()
+                            ? '<td>' +
+                                  '<button class="aioemp-btn aioemp-btn--xs aioemp-btn--secondary cand-act-edit" title="Edit">' +
+                                      '<span class="dashicons dashicons-edit"></span>' +
+                                  '</button> ' +
+                                  '<button class="aioemp-btn aioemp-btn--xs aioemp-btn--danger cand-act-del" title="Delete">' +
+                                      '<span class="dashicons dashicons-trash"></span>' +
+                                  '</button>' +
+                              '</td>'
+                            : '') +
                     '</tr>';
             });
 

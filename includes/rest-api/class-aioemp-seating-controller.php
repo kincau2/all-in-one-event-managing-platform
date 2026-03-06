@@ -12,6 +12,8 @@
  * POST   /events/<id>/seating/block        — block a seat
  * POST   /events/<id>/seating/unblock      — unblock a seat
  * POST   /events/<id>/seating/finalize     — explicitly finalize snapshot
+ * GET    /events/<id>/seating/log/seat/<seat_key>       — seat history
+ * GET    /events/<id>/seating/log/attender/<attender_id> — candidate seating history
  *
  * @package AIOEMP
  * @since   0.3.0
@@ -204,6 +206,28 @@ class AIOEMP_Seating_Controller extends AIOEMP_REST_Controller {
             'permission_callback' => array( $this, 'permissions' ),
             'args'                => array( 'event_id' => $event_id_arg ),
         ) );
+
+        // GET /events/<id>/seating/log/seat/<seat_key> — history for a specific seat.
+        register_rest_route( $this->namespace, '/' . $this->rest_base . '/(?P<event_id>[\d]+)/seating/log/seat/(?P<seat_key>[a-f0-9\-]+)', array(
+            'methods'             => \WP_REST_Server::READABLE,
+            'callback'            => array( $this, 'get_seat_log' ),
+            'permission_callback' => array( $this, 'permissions' ),
+            'args'                => array(
+                'event_id' => $event_id_arg,
+                'seat_key' => array( 'type' => 'string', 'required' => true, 'sanitize_callback' => 'sanitize_text_field' ),
+            ),
+        ) );
+
+        // GET /events/<id>/seating/log/attender/<attender_id> — history for a candidate.
+        register_rest_route( $this->namespace, '/' . $this->rest_base . '/(?P<event_id>[\d]+)/seating/log/attender/(?P<attender_id>[\d]+)', array(
+            'methods'             => \WP_REST_Server::READABLE,
+            'callback'            => array( $this, 'get_attender_log' ),
+            'permission_callback' => array( $this, 'permissions' ),
+            'args'                => array(
+                'event_id'    => $event_id_arg,
+                'attender_id' => array( 'type' => 'integer', 'required' => true, 'sanitize_callback' => 'absint' ),
+            ),
+        ) );
     }
 
     /*--------------------------------------------------------------
@@ -211,7 +235,7 @@ class AIOEMP_Seating_Controller extends AIOEMP_REST_Controller {
      *------------------------------------------------------------*/
 
     public function permissions(): bool|\WP_Error {
-        return $this->check_permission( AIOEMP_Security::CAPS['manage_events'] );
+        return $this->check_permission( AIOEMP_Security::CAPS['manage_seating'] );
     }
 
     /*--------------------------------------------------------------
@@ -621,6 +645,51 @@ class AIOEMP_Seating_Controller extends AIOEMP_REST_Controller {
         ) );
 
         return $this->success( array( 'finalized' => true ) );
+    }
+
+    /**
+     * GET /events/<id>/seating/log/seat/<seat_key> — history for a specific seat.
+     */
+    public function get_seat_log( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
+        $event_id = absint( $request->get_param( 'event_id' ) );
+        $seat_key = sanitize_text_field( $request->get_param( 'seat_key' ) );
+
+        $event = $this->events->find( $event_id );
+        if ( ! $event ) {
+            return $this->error( 'event_not_found', __( 'Event not found.', 'aioemp' ), 404 );
+        }
+
+        $entries = $this->seat_log->list_for_seat( $event_id, $seat_key );
+
+        return $this->success( array(
+            'seat_key' => $seat_key,
+            'entries'  => $entries,
+        ) );
+    }
+
+    /**
+     * GET /events/<id>/seating/log/attender/<attender_id> — history for a candidate.
+     */
+    public function get_attender_log( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
+        $event_id    = absint( $request->get_param( 'event_id' ) );
+        $attender_id = absint( $request->get_param( 'attender_id' ) );
+
+        $event = $this->events->find( $event_id );
+        if ( ! $event ) {
+            return $this->error( 'event_not_found', __( 'Event not found.', 'aioemp' ), 404 );
+        }
+
+        $attender = $this->attenders->find( $attender_id );
+        if ( ! $attender || (int) $attender->event_id !== $event_id ) {
+            return $this->error( 'attender_not_found', __( 'Candidate not found for this event.', 'aioemp' ), 404 );
+        }
+
+        $entries = $this->seat_log->list_for_attender( $event_id, $attender_id );
+
+        return $this->success( array(
+            'attender_id' => $attender_id,
+            'entries'     => $entries,
+        ) );
     }
 
     /*--------------------------------------------------------------

@@ -11,8 +11,15 @@
 
     var api = ctx.api;
     var esc = ctx.esc;
+    var userCan = window.aioemp_userCan;
 
     function showEventForm(eventId) {
+        /* Gate: only users with manage_events can access the form */
+        if (!userCan('manage_events')) {
+            ctx.goToHash(eventId ? 'event/' + eventId : 'events');
+            return;
+        }
+
         var $content = $('#aioemp-content');
         $content.empty();
         $('#aioemp-page-title').text(eventId ? 'Edit Event' : 'New Event');

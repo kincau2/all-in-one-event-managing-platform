@@ -11,6 +11,7 @@
 
     var api = ctx.api;
     var esc = ctx.esc;
+    var userCan = window.aioemp_userCan;
 
     var listState = { page: 1, status: '', search: '' };
     var $wrap, $pagination;
@@ -21,9 +22,11 @@
             '<div class="aioemp-card">' +
                 '<div class="aioemp-card__header">' +
                     '<h3 class="aioemp-card__title">Events</h3>' +
-                    '<button id="evt-btn-new" class="aioemp-btn aioemp-btn--sm aioemp-btn--primary">' +
-                        '<span class="dashicons dashicons-plus-alt2"></span> New Event' +
-                    '</button>' +
+                    (userCan('manage_events')
+                        ? '<button id="evt-btn-new" class="aioemp-btn aioemp-btn--sm aioemp-btn--primary">' +
+                              '<span class="dashicons dashicons-plus-alt2"></span> New Event' +
+                          '</button>'
+                        : '') +
                 '</div>' +
                 '<div class="aioemp-toolbar">' +
                     '<input id="evt-search" class="aioemp-input aioemp-input--sm" type="text" placeholder="Search events…" style="max-width:260px">' +
@@ -55,7 +58,7 @@
                     '<th>Venue</th>' +
                     '<th>Start</th>' +
                     '<th>Capacity</th>' +
-                    '<th style="width:60px">Actions</th>' +
+                    (userCan('manage_events') ? '<th style="width:60px">Actions</th>' : '') +
                 '</tr></thead><tbody>';
 
         rows.forEach(function (r) {
@@ -66,11 +69,13 @@
                     '<td>' + ctx.venueBadge(r.venue_mode) + '</td>' +
                     '<td>' + ctx.fmtDate(r.start_date_gmt) + '</td>' +
                     '<td>' + (r.capacity ? esc(String(r.capacity)) : '—') + '</td>' +
-                    '<td>' +
-                        '<button class="aioemp-btn aioemp-btn--xs aioemp-btn--danger evt-act-del" title="Delete">' +
-                            '<span class="dashicons dashicons-trash"></span>' +
-                        '</button>' +
-                    '</td>' +
+                    (userCan('manage_events')
+                        ? '<td>' +
+                              '<button class="aioemp-btn aioemp-btn--xs aioemp-btn--danger evt-act-del" title="Delete">' +
+                                  '<span class="dashicons dashicons-trash"></span>' +
+                              '</button>' +
+                          '</td>'
+                        : '') +
                 '</tr>';
         });
 

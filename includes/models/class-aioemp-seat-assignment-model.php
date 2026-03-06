@@ -124,7 +124,7 @@ class AIOEMP_Seat_Assignment_Model extends AIOEMP_Model {
 
         $rows = $this->db->get_results(
             $this->db->prepare(
-                "SELECT sa.*, a.first_name, a.last_name, a.email, a.status AS attender_status
+                "SELECT sa.*, sa.checked_in, a.first_name, a.last_name, a.email, a.status AS attender_status
                  FROM {$this->table} sa
                  LEFT JOIN {$attender_table} a ON a.id = sa.attender_id
                  WHERE sa.event_id = %d
@@ -172,15 +172,20 @@ class AIOEMP_Seat_Assignment_Model extends AIOEMP_Model {
 
         $this->db->query( 'START TRANSACTION' );
 
+        // Preserve checked_in flags before deleting.
+        $ci1 = isset( $a1->checked_in ) ? (int) $a1->checked_in : 0;
+        $ci2 = isset( $a2->checked_in ) ? (int) $a2->checked_in : 0;
+
         // Delete both.
         $this->db->delete( $this->table, array( 'id' => $a1->id ) );
         $this->db->delete( $this->table, array( 'id' => $a2->id ) );
 
-        // Re-insert swapped.
+        // Re-insert swapped — preserve each candidate's checked_in status.
         $r1 = $this->db->insert( $this->table, array(
             'event_id'        => $event_id,
             'attender_id'     => $a1->attender_id,
             'seat_key'        => $seat_key2,
+            'checked_in'      => $ci1,
             'assigned_by'     => get_current_user_id() ?: null,
             'assigned_at_gmt' => $this->now_gmt(),
         ) );
@@ -189,6 +194,7 @@ class AIOEMP_Seat_Assignment_Model extends AIOEMP_Model {
             'event_id'        => $event_id,
             'attender_id'     => $a2->attender_id,
             'seat_key'        => $seat_key1,
+            'checked_in'      => $ci2,
             'assigned_by'     => get_current_user_id() ?: null,
             'assigned_at_gmt' => $this->now_gmt(),
         ) );
@@ -248,16 +254,19 @@ class AIOEMP_Seat_Assignment_Model extends AIOEMP_Model {
 
             // If the candidate already has a different seat, unassign it first.
             $existing = $this->find_by_attender( $event_id, $attender_id );
+            $preserve_checked_in = 0;
             if ( $existing ) {
+                $preserve_checked_in = isset( $existing->checked_in ) ? (int) $existing->checked_in : 0;
                 $this->db->delete( $this->table, array( 'id' => $existing->id ) );
                 $result['unassigned'][] = array( 'attender_id' => $attender_id, 'old_seat_key' => $existing->seat_key );
             }
 
-            // Insert new assignment.
+            // Insert new assignment — preserve checked_in if reassigning.
             $ok = $this->db->insert( $this->table, array(
                 'event_id'        => $event_id,
                 'attender_id'     => $attender_id,
                 'seat_key'        => $seat_key,
+                'checked_in'      => $preserve_checked_in,
                 'assigned_by'     => $assigned_by ?: null,
                 'assigned_at_gmt' => $now,
             ) );

@@ -73,6 +73,9 @@ class AIOEMP_Loader {
         // Public
         require_once AIOEMP_PLUGIN_DIR . 'public/class-aioemp-public.php';
 
+        // Shortcodes
+        require_once AIOEMP_PLUGIN_DIR . 'includes/class-aioemp-shortcodes.php';
+
         // Models
         // (loaded as needed by controllers & services)
 
@@ -136,6 +139,18 @@ class AIOEMP_Loader {
 
         $this->add_action( 'wp_enqueue_scripts', $public, 'enqueue_styles' );
         $this->add_action( 'wp_enqueue_scripts', $public, 'enqueue_scripts' );
+
+        // Shortcodes.
+        $shortcodes = new AIOEMP_Shortcodes();
+        $this->add_action( 'init', $shortcodes, 'register' );
+
+        // Redirect AIOEMP-role users to the dashboard on standard WP login.
+        $this->add_filter( 'login_redirect', $public, 'aioemp_login_redirect', 10, 3 );
+
+        // Virtual ticket page endpoint.
+        require_once AIOEMP_PLUGIN_DIR . 'includes/class-aioemp-ticket-endpoint.php';
+        $ticket = new AIOEMP_Ticket_Endpoint();
+        $ticket->register();
     }
 
     /**
@@ -218,4 +233,16 @@ function aioemp_register_rest_routes(): void {
     // Settings (read / update / logo upload).
     require_once AIOEMP_PLUGIN_DIR . 'includes/rest-api/class-aioemp-settings-controller.php';
     ( new AIOEMP_Settings_Controller() )->register_routes();
+
+    // Users (roles / create / search / assign).
+    require_once AIOEMP_PLUGIN_DIR . 'includes/rest-api/class-aioemp-users-controller.php';
+    ( new AIOEMP_Users_Controller() )->register_routes();
+
+    // Profile (current user get / update).
+    require_once AIOEMP_PLUGIN_DIR . 'includes/rest-api/class-aioemp-profile-controller.php';
+    ( new AIOEMP_Profile_Controller() )->register_routes();
+
+    // Attendance (check-in / check-out / logs / export).
+    require_once AIOEMP_PLUGIN_DIR . 'includes/rest-api/class-aioemp-attendance-controller.php';
+    ( new AIOEMP_Attendance_Controller() )->register_routes();
 }

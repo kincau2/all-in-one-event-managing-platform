@@ -59,7 +59,7 @@ class AIOEMP_Attenders_Controller extends AIOEMP_REST_Controller {
             array(
                 'methods'             => \WP_REST_Server::READABLE,
                 'callback'            => array( $this, 'list_items' ),
-                'permission_callback' => array( $this, 'manage_permission' ),
+                'permission_callback' => array( $this, 'view_permission' ),
                 'args'                => $this->get_collection_params(),
             ),
             array(
@@ -75,7 +75,7 @@ class AIOEMP_Attenders_Controller extends AIOEMP_REST_Controller {
             array(
                 'methods'             => \WP_REST_Server::READABLE,
                 'callback'            => array( $this, 'get_counts' ),
-                'permission_callback' => array( $this, 'manage_permission' ),
+                'permission_callback' => array( $this, 'view_permission' ),
             ),
         ) );
 
@@ -105,7 +105,7 @@ class AIOEMP_Attenders_Controller extends AIOEMP_REST_Controller {
             array(
                 'methods'             => \WP_REST_Server::READABLE,
                 'callback'            => array( $this, 'get_item' ),
-                'permission_callback' => array( $this, 'manage_permission' ),
+                'permission_callback' => array( $this, 'view_permission' ),
             ),
             array(
                 'methods'             => \WP_REST_Server::EDITABLE,
@@ -124,8 +124,29 @@ class AIOEMP_Attenders_Controller extends AIOEMP_REST_Controller {
      * Permissions
      *------------------------------------------------------------*/
 
+    /**
+     * Read-only access: list, get, counts.
+     *
+     * Granted to users with view_candidates (Candidates tab),
+     * manage_seating (Seating tab loads candidates), or
+     * scan_attendance (Check In tab looks up candidates).
+     */
+    public function view_permission(): bool|\WP_Error {
+        if (
+            current_user_can( AIOEMP_Security::CAPS['view_candidates'] ) ||
+            current_user_can( AIOEMP_Security::CAPS['manage_seating'] ) ||
+            current_user_can( AIOEMP_Security::CAPS['scan_attendance'] )
+        ) {
+            return true;
+        }
+        return $this->check_permission( AIOEMP_Security::CAPS['view_candidates'] );
+    }
+
+    /**
+     * Write access: create, update, delete, bulk.
+     */
     public function manage_permission(): bool|\WP_Error {
-        return $this->check_permission( AIOEMP_Security::CAPS['manage_events'] );
+        return $this->check_permission( AIOEMP_Security::CAPS['manage_candidates'] );
     }
 
     /*--------------------------------------------------------------

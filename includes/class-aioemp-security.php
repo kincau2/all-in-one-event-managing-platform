@@ -26,25 +26,91 @@ class AIOEMP_Security {
      * @var string[]
      */
     public const CAPS = array(
-        'manage_events'   => 'aioemp_manage_events',
-        'manage_seatmaps' => 'aioemp_manage_seatmaps',
-        'manage_settings' => 'aioemp_manage_settings',
-        'scan_attendance' => 'aioemp_scan_attendance',
+        'access_plugin'      => 'aioemp_access_plugin',
+        'view_events'        => 'aioemp_view_events',
+        'manage_events'      => 'aioemp_manage_events',
+        'view_candidates'    => 'aioemp_view_candidates',
+        'manage_candidates'  => 'aioemp_manage_candidates',
+        'view_attendance'    => 'aioemp_view_attendance',
+        'manage_attendance'  => 'aioemp_manage_attendance',
+        'manage_seating'     => 'aioemp_manage_seating',
+        'view_seatmaps'      => 'aioemp_view_seatmaps',
+        'manage_seatmaps'    => 'aioemp_manage_seatmaps',
+        'manage_settings'    => 'aioemp_manage_settings',
+        'scan_attendance'    => 'aioemp_scan_attendance',
+        'view_reports'       => 'aioemp_view_reports',
     );
 
     /**
-     * Roles that receive ALL custom capabilities on activation.
+     * Custom AIOEMP roles and the capability keys each one receives.
+     *
+     * Keys   = role slug (prefixed with 'aioemp_').
+     * Values = array of keys from self::CAPS.
+     *
+     * @var array<string, array{label: string, caps: string[]}>
+     */
+    public const ROLES = array(
+        'aioemp_admin' => array(
+            'label' => 'AIOEMP Admin',
+            'caps'  => array(
+                'access_plugin', 'view_events', 'manage_events',
+                'view_candidates', 'manage_candidates',
+                'view_attendance', 'manage_attendance',
+                'manage_seating',
+                'view_seatmaps', 'manage_seatmaps', 'manage_settings',
+                'scan_attendance', 'view_reports',
+            ),
+        ),
+        'aioemp_event_manager' => array(
+            'label' => 'AIOEMP Event Manager',
+            'caps'  => array(
+                'access_plugin', 'view_events', 'manage_events',
+                'view_candidates', 'manage_candidates',
+                'view_attendance', 'manage_attendance',
+                'manage_seating',
+                'view_seatmaps', 'view_reports',
+            ),
+        ),
+        'aioemp_seating_coordinator' => array(
+            'label' => 'AIOEMP Seating Coordinator',
+            'caps'  => array(
+                'access_plugin', 'view_events',
+                'view_candidates',
+                'manage_seating',
+                'view_seatmaps',
+            ),
+        ),
+        'aioemp_seatmap_designer' => array(
+            'label' => 'AIOEMP Seatmap Designer',
+            'caps'  => array(
+                'access_plugin', 'view_seatmaps', 'manage_seatmaps',
+            ),
+        ),
+        'aioemp_scanner' => array(
+            'label' => 'AIOEMP Scanner Operator',
+            'caps'  => array(
+                'access_plugin', 'view_events', 'scan_attendance',
+            ),
+        ),
+    );
+
+    /**
+     * WordPress roles that receive ALL custom capabilities on activation.
      *
      * @var string[]
      */
     private const ADMIN_ROLES = array( 'administrator' );
 
     /**
-     * Grant all custom capabilities to admin roles.
+     * Register custom AIOEMP roles and grant all capabilities to admin roles.
      *
      * Called once during plugin activation.
      */
     public static function grant_capabilities(): void {
+        // 1. Register (or re-register) custom AIOEMP roles.
+        self::register_roles();
+
+        // 2. Grant every capability to WP administrator(s).
         foreach ( self::ADMIN_ROLES as $role_slug ) {
             $role = get_role( $role_slug );
             if ( null === $role ) {
@@ -57,7 +123,29 @@ class AIOEMP_Security {
     }
 
     /**
-     * Remove all custom capabilities from every role.
+     * Create (or update) all custom AIOEMP roles.
+     *
+     * Uses remove_role + add_role to ensure the capability set is always
+     * in sync with the ROLES constant — safe to call repeatedly.
+     */
+    public static function register_roles(): void {
+        foreach ( self::ROLES as $slug => $def ) {
+            // Build the WP capabilities array for this role.
+            $wp_caps = array( 'read' => true ); // every role needs 'read'
+            foreach ( $def['caps'] as $key ) {
+                if ( isset( self::CAPS[ $key ] ) ) {
+                    $wp_caps[ self::CAPS[ $key ] ] = true;
+                }
+            }
+
+            // Remove first so cap changes are picked up on re-activation.
+            remove_role( $slug );
+            add_role( $slug, $def['label'], $wp_caps );
+        }
+    }
+
+    /**
+     * Remove all custom capabilities from every role and delete custom roles.
      *
      * Called during plugin deactivation.
      */
@@ -68,6 +156,7 @@ class AIOEMP_Security {
             $wp_roles = new WP_Roles(); // @codingStandardsIgnoreLine
         }
 
+        // Remove custom caps from all built-in WP roles.
         foreach ( $wp_roles->roles as $role_slug => $role_details ) {
             $role = get_role( $role_slug );
             if ( null === $role ) {
@@ -77,6 +166,91 @@ class AIOEMP_Security {
                 $role->remove_cap( $cap );
             }
         }
+
+        // Remove custom AIOEMP roles entirely.
+        foreach ( array_keys( self::ROLES ) as $slug ) {
+            remove_role( $slug );
+        }
+    }
+
+    /**
+     * Get the list of AIOEMP role slugs assigned to a given user.
+     *
+     * @param int $user_id WordPress user ID.
+     * @return string[]
+     */
+    public static function get_user_aioemp_roles( int $user_id ): array {
+        $user = get_userdata( $user_id );
+        if ( ! $user ) {
+            return array();
+        }
+        return array_values( array_intersect( $user->roles, array_keys( self::ROLES ) ) );
+    }
+
+    /**
+     * Sync a user's AIOEMP roles to the given set.
+     *
+     * Adds missing roles and removes ones no longer in the set.
+     * Only touches AIOEMP roles — leaves WP core roles untouched.
+     *
+     * @param int      $user_id WordPress user ID.
+     * @param string[] $new_roles Array of AIOEMP role slugs to assign.
+     * @return bool
+     */
+    public static function sync_user_aioemp_roles( int $user_id, array $new_roles ): bool {
+        $user = get_userdata( $user_id );
+        if ( ! $user ) {
+            return false;
+        }
+
+        // Validate that all requested roles are valid AIOEMP roles.
+        $valid_roles = array_intersect( $new_roles, array_keys( self::ROLES ) );
+
+        $current = self::get_user_aioemp_roles( $user_id );
+
+        // Remove roles no longer wanted.
+        foreach ( array_diff( $current, $valid_roles ) as $slug ) {
+            $user->remove_role( $slug );
+        }
+
+        // Add new roles.
+        foreach ( array_diff( $valid_roles, $current ) as $slug ) {
+            $user->add_role( $slug );
+        }
+
+        return true;
+    }
+
+    /**
+     * Remove all AIOEMP roles from a user.
+     *
+     * @param int $user_id WordPress user ID.
+     * @return bool
+     */
+    public static function remove_all_aioemp_roles( int $user_id ): bool {
+        $user = get_userdata( $user_id );
+        if ( ! $user ) {
+            return false;
+        }
+        foreach ( array_keys( self::ROLES ) as $slug ) {
+            $user->remove_role( $slug );
+        }
+        return true;
+    }
+
+    /**
+     * Get the AIOEMP capabilities the current user holds.
+     *
+     * Returns an associative array of cap_key => bool for use in JS.
+     *
+     * @return array<string, bool>
+     */
+    public static function get_current_user_caps(): array {
+        $result = array();
+        foreach ( self::CAPS as $key => $wp_cap ) {
+            $result[ $key ] = current_user_can( $wp_cap );
+        }
+        return $result;
     }
 
     /*--------------------------------------------------------------

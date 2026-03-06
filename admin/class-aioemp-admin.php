@@ -30,7 +30,7 @@ class AIOEMP_Admin {
         $this->hook_suffix = add_menu_page(
             __( 'Event Manager', 'aioemp' ),     // Page title
             __( 'Event Manager', 'aioemp' ),     // Menu title
-            AIOEMP_Security::CAPS['manage_events'], // Capability
+            AIOEMP_Security::CAPS['access_plugin'],   // Capability (any AIOEMP user)
             'aioemp-dashboard',                   // Menu slug
             array( $this, 'render_dashboard' ),   // Render callback
             'dashicons-calendar-alt',             // Icon
@@ -50,7 +50,7 @@ class AIOEMP_Admin {
      */
     public function render_dashboard(): void {
         // Capability re-check (defence in depth).
-        if ( ! AIOEMP_Security::current_user_can( 'manage_events' ) ) {
+        if ( ! AIOEMP_Security::current_user_can( 'access_plugin' ) ) {
             wp_die(
                 esc_html__( 'You do not have permission to access this page.', 'aioemp' ),
                 403
@@ -112,6 +112,24 @@ class AIOEMP_Admin {
             true
         );
 
+        // Users module (depends on core admin script).
+        wp_enqueue_script(
+            'aioemp-users',
+            AIOEMP_PLUGIN_URL . 'admin/js/aioemp-users.js',
+            array( 'jquery', 'aioemp-admin' ),
+            AIOEMP_VERSION,
+            true
+        );
+
+        // Profile module (depends on core admin script).
+        wp_enqueue_script(
+            'aioemp-profile',
+            AIOEMP_PLUGIN_URL . 'admin/js/aioemp-profile.js',
+            array( 'jquery', 'aioemp-admin' ),
+            AIOEMP_VERSION,
+            true
+        );
+
         // Seatmap compiler (IIFE) — compiles layout primitives → seats
         // in the browser. Required by the Events seating tab.
         wp_enqueue_script(
@@ -132,6 +150,15 @@ class AIOEMP_Admin {
             true
         );
 
+        // html5-qrcode vendor library for in-browser QR scanning.
+        wp_enqueue_script(
+            'html5-qrcode',
+            AIOEMP_PLUGIN_URL . 'admin/js/vendor/html5-qrcode.min.js',
+            array(),
+            '2.3.8',
+            true
+        );
+
         // 2-7. Sub-modules (each extends ctx).
         $events_modules = array(
             'aioemp-events-helpers'    => 'events/_helpers.js',
@@ -140,6 +167,8 @@ class AIOEMP_Admin {
             'aioemp-events-detail'     => 'events/_detail.js',
             'aioemp-events-candidates' => 'events/_candidates.js',
             'aioemp-events-seating'    => 'events/_seating.js',
+            'aioemp-events-checkin'    => 'events/_checkin.js',
+            'aioemp-events-attendance' => 'events/_attendance.js',
         );
         $prev_handle = 'aioemp-events';
         foreach ( $events_modules as $handle => $file ) {
@@ -183,11 +212,12 @@ class AIOEMP_Admin {
         $logo_url = AIOEMP_Settings_Service::get( 'logo_url' );
 
         wp_localize_script( 'aioemp-admin', 'aioemp', array(
-            'rest_url' => esc_url_raw( set_url_scheme( rest_url( 'aioemp/v1/' ), 'https' ) ),
-            'nonce'    => wp_create_nonce( 'wp_rest' ),
-            'user_id'  => get_current_user_id(),
-            'version'  => AIOEMP_VERSION,
-            'logo_url' => $logo_url ? esc_url( $logo_url ) : '',
+            'rest_url'  => esc_url_raw( set_url_scheme( rest_url( 'aioemp/v1/' ), 'https' ) ),
+            'nonce'     => wp_create_nonce( 'wp_rest' ),
+            'user_id'   => get_current_user_id(),
+            'version'   => AIOEMP_VERSION,
+            'logo_url'  => $logo_url ? esc_url( $logo_url ) : '',
+            'user_caps' => AIOEMP_Security::get_current_user_caps(),
         ) );
     }
 }

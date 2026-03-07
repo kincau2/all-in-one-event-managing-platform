@@ -20,6 +20,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 require_once __DIR__ . '/class-aioemp-rest-controller.php';
+require_once AIOEMP_PLUGIN_DIR . 'includes/services/class-aioemp-email-service.php';
+require_once AIOEMP_PLUGIN_DIR . 'includes/class-aioemp-password-setup-endpoint.php';
 
 class AIOEMP_Users_Controller extends AIOEMP_REST_Controller {
 
@@ -260,6 +262,9 @@ class AIOEMP_Users_Controller extends AIOEMP_REST_Controller {
             AIOEMP_Security::sync_user_aioemp_roles( $user_id, $roles );
         }
 
+        // Send new-user welcome email with password-setup link.
+        $this->send_welcome_email( $user_id, $user_email, $display_name ?: $user_login, $roles );
+
         $user = get_userdata( $user_id );
         return $this->success( $this->format_user(
             $user,
@@ -348,5 +353,42 @@ class AIOEMP_Users_Controller extends AIOEMP_REST_Controller {
             'aioemp_roles' => $aioemp_roles,
             'is_admin'     => $is_admin,
         );
+    }
+
+    /**
+     * Send the new-user welcome email with a password-setup link.
+     *
+     * @param int    $user_id      WP user ID.
+     * @param string $email        User email address.
+     * @param string $display_name Display name for the greeting.
+     * @param array  $roles        AIOEMP role slugs assigned.
+     */
+    private function send_welcome_email( int $user_id, string $email, string $display_name, array $roles ): void {
+        if ( empty( $email ) || ! is_email( $email ) ) {
+            return;
+        }
+
+        $setup_url  = AIOEMP_Password_Setup_Endpoint::generate_setup_url( $user_id );
+        $user       = get_userdata( $user_id );
+        $user_login = $user ? $user->user_login : '';
+
+        // Build a human-readable role name.
+        $role_labels = array();
+        foreach ( $roles as $slug ) {
+            if ( isset( AIOEMP_Security::ROLES[ $slug ] ) ) {
+                $role_labels[] = AIOEMP_Security::ROLES[ $slug ]['label'];
+            }
+        }
+        $role_name = ! empty( $role_labels ) ? implode( ', ', $role_labels ) : 'User';
+
+        $variables = array(
+            'display_name' => $display_name,
+            'user_login'   => $user_login,
+            'user_email'   => $email,
+            'setup_url'    => $setup_url,
+            'role_name'    => $role_name,
+        );
+
+        AIOEMP_Email_Service::send( 'new_user_welcome', $email, $variables );
     }
 }

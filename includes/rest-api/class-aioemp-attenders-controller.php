@@ -23,6 +23,9 @@ require_once __DIR__ . '/class-aioemp-rest-controller.php';
 require_once AIOEMP_PLUGIN_DIR . 'includes/models/class-aioemp-attender-model.php';
 require_once AIOEMP_PLUGIN_DIR . 'includes/models/class-aioemp-events-model.php';
 require_once AIOEMP_PLUGIN_DIR . 'includes/models/class-aioemp-event-log-model.php';
+require_once AIOEMP_PLUGIN_DIR . 'includes/models/class-aioemp-seat-assignment-model.php';
+require_once AIOEMP_PLUGIN_DIR . 'includes/services/class-aioemp-email-service.php';
+require_once AIOEMP_PLUGIN_DIR . 'includes/class-aioemp-ticket-endpoint.php';
 
 class AIOEMP_Attenders_Controller extends AIOEMP_REST_Controller {
 
@@ -79,11 +82,64 @@ class AIOEMP_Attenders_Controller extends AIOEMP_REST_Controller {
             ),
         ) );
 
-        // Bulk status change.
+        // Bulk status change (DB only — no email).
         register_rest_route( $this->namespace, '/' . $this->rest_base . '/bulk-status', array(
             array(
                 'methods'             => \WP_REST_Server::CREATABLE,
                 'callback'            => array( $this, 'bulk_status' ),
+                'permission_callback' => array( $this, 'manage_permission' ),
+                'args'                => array(
+                    'ids' => array(
+                        'type'     => 'array',
+                        'required' => true,
+                        'items'    => array( 'type' => 'integer' ),
+                    ),
+                    'status' => array(
+                        'type'     => 'string',
+                        'required' => true,
+                        'enum'     => AIOEMP_Attender_Model::STATUSES,
+                    ),
+                ),
+            ),
+        ) );
+
+        // Bulk delete.
+        register_rest_route( $this->namespace, '/' . $this->rest_base . '/bulk-delete', array(
+            array(
+                'methods'             => \WP_REST_Server::CREATABLE,
+                'callback'            => array( $this, 'bulk_delete' ),
+                'permission_callback' => array( $this, 'manage_permission' ),
+                'args'                => array(
+                    'ids' => array(
+                        'type'     => 'array',
+                        'required' => true,
+                        'items'    => array( 'type' => 'integer' ),
+                    ),
+                ),
+            ),
+        ) );
+
+        // Bulk resend email (one at a time from JS, but endpoint handles a small batch).
+        register_rest_route( $this->namespace, '/' . $this->rest_base . '/bulk-resend', array(
+            array(
+                'methods'             => \WP_REST_Server::CREATABLE,
+                'callback'            => array( $this, 'bulk_resend' ),
+                'permission_callback' => array( $this, 'manage_permission' ),
+                'args'                => array(
+                    'ids' => array(
+                        'type'     => 'array',
+                        'required' => true,
+                        'items'    => array( 'type' => 'integer' ),
+                    ),
+                ),
+            ),
+        ) );
+
+        // Batch process — update status + send emails for a small batch.
+        register_rest_route( $this->namespace, '/' . $this->rest_base . '/batch-process', array(
+            array(
+                'methods'             => \WP_REST_Server::CREATABLE,
+                'callback'            => array( $this, 'batch_process' ),
                 'permission_callback' => array( $this, 'manage_permission' ),
                 'args'                => array(
                     'ids' => array(
@@ -117,6 +173,13 @@ class AIOEMP_Attenders_Controller extends AIOEMP_REST_Controller {
                 'callback'            => array( $this, 'delete_item' ),
                 'permission_callback' => array( $this, 'manage_permission' ),
             ),
+        ) );
+
+        // Resend email for a single candidate.
+        register_rest_route( $this->namespace, '/' . $this->rest_base . '/(?P<id>[\d]+)/resend-email', array(
+            'methods'             => \WP_REST_Server::CREATABLE,
+            'callback'            => array( $this, 'resend_email' ),
+            'permission_callback' => array( $this, 'manage_permission' ),
         ) );
     }
 
@@ -206,6 +269,10 @@ class AIOEMP_Attenders_Controller extends AIOEMP_REST_Controller {
         $this->log->log( $event_id, 'attender_created', array(), $data, get_current_user_id() );
 
         $attender = $this->model->find( $id );
+
+        // Send email for newly-created candidate.
+        $this->maybe_send_create_email( $attender, $event_id );
+
         return $this->success( $attender, 201 );
     }
 
@@ -255,7 +322,14 @@ class AIOEMP_Attenders_Controller extends AIOEMP_REST_Controller {
         // Audit log.
         $this->log->log( $event_id, 'attender_updated', $previous, $data, get_current_user_id() );
 
-        return $this->success( $this->model->find( $id ) );
+        $updated_attender = $this->model->find( $id );
+
+        // Send status change email if status was changed.
+        if ( isset( $data['status'] ) && $data['status'] !== ( $previous['status'] ?? '' ) ) {
+            $this->maybe_send_status_email( $updated_attender, $data['status'], $event_id );
+        }
+
+        return $this->success( $updated_attender );
     }
 
     /**
@@ -295,7 +369,7 @@ class AIOEMP_Attenders_Controller extends AIOEMP_REST_Controller {
     }
 
     /**
-     * POST /events/<event_id>/attenders/bulk-status — bulk status change.
+     * POST /events/<event_id>/attenders/bulk-status — bulk status change (DB only, no email).
      */
     public function bulk_status( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
         $event_id   = absint( $request->get_param( 'event_id' ) );
@@ -320,6 +394,152 @@ class AIOEMP_Attenders_Controller extends AIOEMP_REST_Controller {
         $this->log->log( $event_id, 'attender_bulk_status', array( 'ids' => $ids ), array( 'status' => $new_status, 'updated' => $updated ), get_current_user_id() );
 
         return $this->success( array( 'updated' => $updated ) );
+    }
+
+    /**
+     * POST /events/<event_id>/attenders/batch-process — update status + send email
+     * for a small batch of candidates (≤ 5 at a time, driven by the JS progress bar).
+     */
+    public function batch_process( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
+        $event_id   = absint( $request->get_param( 'event_id' ) );
+        $ids        = $request->get_param( 'ids' );
+        $new_status = $this->text_param( $request, 'status' );
+
+        $event = $this->events->find( $event_id );
+        if ( ! $event ) {
+            return $this->error( 'event_not_found', __( 'Event not found.', 'aioemp' ), 404 );
+        }
+
+        if ( ! in_array( $new_status, AIOEMP_Attender_Model::STATUSES, true ) ) {
+            return $this->error( 'invalid_status', __( 'Invalid status value.', 'aioemp' ) );
+        }
+
+        if ( ! is_array( $ids ) || empty( $ids ) ) {
+            return $this->error( 'no_ids', __( 'No candidates in batch.', 'aioemp' ) );
+        }
+
+        // Cap at 10 per call as a safety measure.
+        $ids = array_slice( $ids, 0, 10 );
+
+        // Update status in DB.
+        $updated = $this->model->bulk_update_status( $event_id, $ids, $new_status );
+
+        // Send emails one by one with a small pause.
+        $sent   = 0;
+        $failed = array();
+        $has_template = isset( self::STATUS_EMAIL_MAP[ $new_status ] );
+
+        if ( $updated > 0 && $has_template ) {
+            foreach ( $ids as $att_id ) {
+                $att = $this->model->find( absint( $att_id ) );
+                if ( ! $att ) {
+                    continue;
+                }
+                $email = $att->email ?? '';
+                if ( empty( $email ) || ! is_email( $email ) ) {
+                    continue;
+                }
+
+                $template_type = self::STATUS_EMAIL_MAP[ $new_status ];
+                $variables     = $this->build_email_variables( $att, $event, $template_type );
+                $ok            = AIOEMP_Email_Service::send( $template_type, $email, $variables );
+
+                if ( $ok ) {
+                    $sent++;
+                } else {
+                    $failed[] = $att_id;
+                }
+            }
+        }
+
+        return $this->success( array(
+            'updated' => $updated,
+            'sent'    => $sent,
+            'failed'  => $failed,
+        ) );
+    }
+
+    /**
+     * POST /events/<event_id>/attenders/bulk-delete — delete multiple candidates.
+     */
+    public function bulk_delete( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
+        $event_id = absint( $request->get_param( 'event_id' ) );
+        $ids      = $request->get_param( 'ids' );
+
+        if ( ! $this->events->find( $event_id ) ) {
+            return $this->error( 'event_not_found', __( 'Event not found.', 'aioemp' ), 404 );
+        }
+
+        if ( ! is_array( $ids ) || empty( $ids ) ) {
+            return $this->error( 'no_ids', __( 'No candidates selected.', 'aioemp' ) );
+        }
+
+        $deleted = $this->model->bulk_delete( $event_id, $ids );
+
+        // Audit log.
+        $this->log->log( $event_id, 'attender_bulk_delete', array( 'ids' => $ids ), array( 'deleted' => $deleted ), get_current_user_id() );
+
+        return $this->success( array( 'deleted' => $deleted ) );
+    }
+
+    /**
+     * POST /events/<event_id>/attenders/bulk-resend — resend emails for a small batch.
+     */
+    public function bulk_resend( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
+        $event_id = absint( $request->get_param( 'event_id' ) );
+        $ids      = $request->get_param( 'ids' );
+
+        $event = $this->events->find( $event_id );
+        if ( ! $event ) {
+            return $this->error( 'event_not_found', __( 'Event not found.', 'aioemp' ), 404 );
+        }
+
+        if ( ! is_array( $ids ) || empty( $ids ) ) {
+            return $this->error( 'no_ids', __( 'No candidates selected.', 'aioemp' ) );
+        }
+
+        // Cap at 10 per call.
+        $ids = array_slice( $ids, 0, 10 );
+
+        $sent    = 0;
+        $skipped = 0;
+        $failed  = array();
+
+        foreach ( $ids as $att_id ) {
+            $att = $this->model->find( absint( $att_id ) );
+            if ( ! $att || (int) ( $att->event_id ?? 0 ) !== $event_id ) {
+                $skipped++;
+                continue;
+            }
+
+            $status = $att->status ?? '';
+            if ( ! isset( self::CREATE_EMAIL_MAP[ $status ] ) ) {
+                $skipped++;
+                continue;
+            }
+
+            $email = $att->email ?? '';
+            if ( empty( $email ) || ! is_email( $email ) ) {
+                $skipped++;
+                continue;
+            }
+
+            $template_type = self::CREATE_EMAIL_MAP[ $status ];
+            $variables     = $this->build_email_variables( $att, $event, $template_type );
+            $ok            = AIOEMP_Email_Service::send( $template_type, $email, $variables );
+
+            if ( $ok ) {
+                $sent++;
+            } else {
+                $failed[] = $att_id;
+            }
+        }
+
+        return $this->success( array(
+            'sent'    => $sent,
+            'skipped' => $skipped,
+            'failed'  => $failed,
+        ) );
     }
 
     /*--------------------------------------------------------------
@@ -429,5 +649,199 @@ class AIOEMP_Attenders_Controller extends AIOEMP_REST_Controller {
                 'enum' => AIOEMP_Attender_Model::STATUSES,
             ),
         );
+    }
+
+    /*--------------------------------------------------------------
+     * Email notification helpers
+     *------------------------------------------------------------*/
+
+    /**
+     * Map attender status → email template type (for status *changes*).
+     */
+    private const STATUS_EMAIL_MAP = array(
+        'accepted_onsite' => 'accepted_onsite',
+        'accepted_online' => 'accepted_online',
+        'rejected'        => 'rejected',
+    );
+
+    /**
+     * Map attender status → email template type (for resend / newly-created).
+     * Includes 'registered' → registration_confirmation.
+     */
+    private const CREATE_EMAIL_MAP = array(
+        'registered'       => 'registration_confirmation',
+        'accepted_onsite'  => 'accepted_onsite',
+        'accepted_online'  => 'accepted_online',
+        'rejected'         => 'rejected',
+    );
+
+    /**
+     * POST /events/<id>/attenders/<id>/resend-email
+     *
+     * Resend the email that corresponds to the candidate's current status.
+     */
+    public function resend_email( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
+        $event_id    = absint( $request->get_param( 'event_id' ) );
+        $attender_id = absint( $request->get_param( 'id' ) );
+
+        $event = $this->events->find( $event_id );
+        if ( ! $event ) {
+            return $this->error( 'event_not_found', __( 'Event not found.', 'aioemp' ), 404 );
+        }
+
+        $attender = $this->model->find( $attender_id );
+        if ( ! $attender || (int) ( $attender->event_id ?? 0 ) !== $event_id ) {
+            return $this->error( 'attender_not_found', __( 'Candidate not found.', 'aioemp' ), 404 );
+        }
+
+        $status = $attender->status ?? '';
+        if ( ! isset( self::CREATE_EMAIL_MAP[ $status ] ) ) {
+            return $this->error( 'no_template', __( 'No email template for this candidate status.', 'aioemp' ) );
+        }
+
+        $email = $attender->email ?? '';
+        if ( empty( $email ) || ! is_email( $email ) ) {
+            return $this->error( 'invalid_email', __( 'Candidate has no valid email address.', 'aioemp' ) );
+        }
+
+        $template_type = self::CREATE_EMAIL_MAP[ $status ];
+        $variables     = $this->build_email_variables( $attender, $event, $template_type );
+        $sent          = AIOEMP_Email_Service::send( $template_type, $email, $variables );
+
+        if ( ! $sent ) {
+            return $this->error( 'send_failed', __( 'Failed to send email.', 'aioemp' ), 500 );
+        }
+
+        return $this->success( array(
+            'sent'     => true,
+            'template' => $template_type,
+            'to'       => $email,
+        ) );
+    }
+
+    /**
+     * Send an email for a newly-created candidate.
+     *
+     * @param object|null $attender Attender record.
+     * @param int         $event_id Event ID.
+     */
+    private function maybe_send_create_email( ?object $attender, int $event_id ): void {
+        if ( ! $attender ) {
+            return;
+        }
+
+        $status = $attender->status ?? 'registered';
+
+        if ( ! isset( self::CREATE_EMAIL_MAP[ $status ] ) ) {
+            return;
+        }
+
+        $email = $attender->email ?? '';
+        if ( empty( $email ) || ! is_email( $email ) ) {
+            error_log( '[AIOEMP] Skipping create email: no valid email for attender #' . ( $attender->id ?? '?' ) );
+            return;
+        }
+
+        $template_type = self::CREATE_EMAIL_MAP[ $status ];
+        $event = $this->events->find( $event_id );
+        if ( ! $event ) {
+            error_log( '[AIOEMP] Skipping create email: event #' . $event_id . ' not found' );
+            return;
+        }
+
+        $variables = $this->build_email_variables( $attender, $event, $template_type );
+
+        error_log( '[AIOEMP] Sending ' . $template_type . ' email to ' . $email . ' (attender #' . $attender->id . ')' );
+        $sent = AIOEMP_Email_Service::send( $template_type, $email, $variables );
+        if ( ! $sent ) {
+            error_log( '[AIOEMP] FAILED to send ' . $template_type . ' email to ' . $email );
+        }
+    }
+
+    /**
+     * Send a status-change email for an attender, if a matching template exists.
+     *
+     * @param object $attender   Attender record (after update).
+     * @param string $new_status The new status value.
+     * @param int    $event_id   Event ID.
+     * @return array  Diagnostic info about the email attempt.
+     */
+    private function maybe_send_status_email( object $attender, string $new_status, int $event_id, ?object $event = null ): void {
+        if ( ! isset( self::STATUS_EMAIL_MAP[ $new_status ] ) ) {
+            return;
+        }
+
+        $email = $attender->email ?? '';
+        if ( empty( $email ) || ! is_email( $email ) ) {
+            return;
+        }
+
+        $template_type = self::STATUS_EMAIL_MAP[ $new_status ];
+        if ( ! $event ) {
+            $event = $this->events->find( $event_id );
+        }
+        if ( ! $event ) {
+            return;
+        }
+
+        $variables = $this->build_email_variables( $attender, $event, $template_type );
+
+        AIOEMP_Email_Service::send( $template_type, $email, $variables );
+    }
+
+    /**
+     * Build the placeholder variables array for an email template.
+     *
+     * @param object $attender      Attender record.
+     * @param object $event         Event record.
+     * @param string $template_type Email template type.
+     * @return array<string, string>
+     */
+    private function build_email_variables( object $attender, object $event, string $template_type ): array {
+        $variables = array(
+            'first_name'     => $attender->first_name ?? '',
+            'last_name'      => $attender->last_name ?? '',
+            'full_name'      => trim( ( $attender->first_name ?? '' ) . ' ' . ( $attender->last_name ?? '' ) ),
+            'email'          => $attender->email ?? '',
+            'event_title'    => $event->title ?? '',
+            'event_date'     => AIOEMP_Email_Service::format_date( $event->start_date_gmt ?? null ),
+            'event_location' => AIOEMP_Email_Service::get_event_location( $event ),
+        );
+
+        // Onsite-specific variables.
+        if ( 'accepted_onsite' === $template_type ) {
+            $qr_hash    = $attender->qrcode_hash ?? '';
+            $ticket_url = $qr_hash ? AIOEMP_Ticket_Endpoint::get_ticket_url( $qr_hash ) : '';
+
+            // Look up seat assignment for an assigned seat label.
+            $seat_label = '';
+            $seat_line  = '';
+            $seat_model = new AIOEMP_Seat_Assignment_Model();
+            $assignment = $seat_model->find_by_attender( (int) $event->id, (int) $attender->id );
+            if ( $assignment && ! empty( $assignment->seat_key ) ) {
+                $seat_label = ! empty( $assignment->seat_label ) ? $assignment->seat_label : $assignment->seat_key;
+                $seat_line  = '<br><strong>Seat:</strong> ' . esc_html( $seat_label );
+            }
+
+            // QR code image — full <img> tag so the placeholder is clean in editors.
+            $qr_code_image = '';
+            if ( $ticket_url ) {
+                $qr_src        = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' . rawurlencode( $ticket_url );
+                $qr_code_image = '<img src="' . esc_url( $qr_src ) . '" alt="QR Code" width="200" height="200" style="display:block;margin:0 auto 16px;" />';
+            }
+
+            $variables['ticket_url']    = $ticket_url;
+            $variables['qr_code_url']   = $ticket_url;
+            $variables['qr_code_image'] = $qr_code_image;
+            $variables['seat_label']    = $seat_label;
+            $variables['seat_line']     = $seat_line;
+        }
+
+        // Online-specific variables.
+        if ( 'accepted_online' === $template_type ) {
+            $variables['online_url'] = $event->online_url ?? '';
+        }
+
+        return $variables;
     }
 }

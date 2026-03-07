@@ -16,6 +16,9 @@
     var canManage = function () { return userCan('manage_candidates'); };
 
     function renderCandidatesTab($tc) {
+        // Remove all previously-bound .cand handlers to avoid stacking.
+        $tc.off('.cand');
+
         ctx.candidateState = { page: 1, status: '', search: '' };
 
         var html =
@@ -44,6 +47,8 @@
                                   '<option value="accepted_onsite">Accept (On-site)</option>' +
                                   '<option value="accepted_online">Accept (Online)</option>' +
                                   '<option value="rejected">Reject</option>' +
+                                  '<option value="__resend_email">Resend Email</option>' +
+                                  '<option value="__delete">Delete</option>' +
                               '</select>' +
                               '<button id="cand-bulk-apply" class="aioemp-btn aioemp-btn--xs aioemp-btn--primary">Apply</button>' +
                           '</div>'
@@ -134,6 +139,9 @@
                                   '<button class="aioemp-btn aioemp-btn--xs aioemp-btn--secondary cand-act-edit" title="Edit">' +
                                       '<span class="dashicons dashicons-edit"></span>' +
                                   '</button> ' +
+                                  '<button class="aioemp-btn aioemp-btn--xs aioemp-btn--outline cand-act-resend" title="Resend Email">' +
+                                      '<span class="dashicons dashicons-email-alt"></span>' +
+                                  '</button> ' +
                                   '<button class="aioemp-btn aioemp-btn--xs aioemp-btn--danger cand-act-del" title="Delete">' +
                                       '<span class="dashicons dashicons-trash"></span>' +
                                   '</button>' +
@@ -160,7 +168,7 @@
 
         // Search.
         var searchTimer;
-        $tc.on('input', '#cand-search', function () {
+        $tc.on('input.cand', '#cand-search', function () {
             clearTimeout(searchTimer);
             var val = $(this).val();
             searchTimer = setTimeout(function () {
@@ -171,31 +179,31 @@
         });
 
         // Filter.
-        $tc.on('change', '#cand-filter-status', function () {
+        $tc.on('change.cand', '#cand-filter-status', function () {
             ctx.candidateState.status = $(this).val();
             ctx.candidateState.page = 1;
             loadCandidates();
         });
 
         // Pagination.
-        $tc.on('click', '.cand-page-prev', function () {
+        $tc.on('click.cand', '.cand-page-prev', function () {
             if (ctx.candidateState.page > 1) {
                 ctx.candidateState.page--;
                 loadCandidates();
             }
         });
-        $tc.on('click', '.cand-page-next', function () {
+        $tc.on('click.cand', '.cand-page-next', function () {
             ctx.candidateState.page++;
             loadCandidates();
         });
 
         // Select all / show bulk bar.
-        $tc.on('change', '#cand-select-all', function () {
+        $tc.on('change.cand', '#cand-select-all', function () {
             var checked = $(this).prop('checked');
             $tc.find('.cand-check').prop('checked', checked);
             toggleBulkBar();
         });
-        $tc.on('change', '.cand-check', function () {
+        $tc.on('change.cand', '.cand-check', function () {
             toggleBulkBar();
         });
 
@@ -204,8 +212,8 @@
             $('#cand-bulk-wrap').toggle(selected > 0);
         }
 
-        // Bulk action apply.
-        $tc.on('click', '#cand-bulk-apply', function () {
+        // Bulk action apply — dispatch based on action type.
+        $tc.on('click.cand', '#cand-bulk-apply', function () {
             var action = $('#cand-bulk-action').val();
             if (!action) { alert('Select a bulk action first.'); return; }
 
@@ -215,40 +223,261 @@
             });
 
             if (!ids.length) { alert('No candidates selected.'); return; }
-            if (!confirm('Change ' + ids.length + ' candidate(s) to "' + action.replace(/_/g, ' ') + '"?')) return;
 
-            api.post('events/' + ctx.detailEventId + '/attenders/bulk-status', {
-                ids: ids,
-                status: action,
-            })
-            .then(function (res) {
-                alert('Updated ' + (res.updated || 0) + ' candidate(s).');
-                loadCandidates();
-            })
-            .catch(function (err) {
-                alert('Bulk update failed: ' + (err.message || 'Unknown error'));
-            });
+            if (action === '__delete') {
+                if (!confirm('Delete ' + ids.length + ' candidate(s)? This cannot be undone.')) return;
+                runBulkDelete(ids);
+            } else if (action === '__resend_email') {
+                if (!confirm('Resend email to ' + ids.length + ' candidate(s)?')) return;
+                runBulkResend(ids);
+            } else {
+                if (!confirm('Change ' + ids.length + ' candidate(s) to "' + action.replace(/_/g, ' ') + '"?')) return;
+                runBatchProcess(ids, action);
+            }
         });
 
+        /**
+         * Bulk delete — single API call, no progress bar needed.
+         */
+        function runBulkDelete(ids) {
+            api.post('events/' + ctx.detailEventId + '/attenders/bulk-delete', { ids: ids })
+                .then(function (res) {
+                    alert('Deleted ' + (res.deleted || 0) + ' candidate(s).');
+                    loadCandidates();
+                })
+                .catch(function (err) {
+                    alert('Bulk delete failed: ' + (err.message || 'Unknown error'));
+                });
+        }
+
+        /**
+         * Bulk resend email — one at a time with progress bar.
+         */
+        function runBulkResend(allIds) {
+            var total     = allIds.length;
+            var processed = 0;
+            var totalSent = 0;
+            var totalSkipped = 0;
+            var totalFailed  = [];
+
+            // Build progress modal.
+            var $overlay = $('<div class="aioemp-modal-overlay"></div>');
+            var $modal   = $(
+                '<div class="aioemp-modal" style="max-width:480px">' +
+                    '<div class="aioemp-modal__header">' +
+                        '<h3>Resending Emails</h3>' +
+                    '</div>' +
+                    '<div class="aioemp-modal__body">' +
+                        '<p class="batch-status-text">Sending 1 of ' + total + '…</p>' +
+                        '<div class="aioemp-progress">' +
+                            '<div class="aioemp-progress__bar" style="width:0%"></div>' +
+                        '</div>' +
+                        '<p class="batch-detail-text" style="font-size:13px;color:#666;">0 / ' + total + ' processed</p>' +
+                    '</div>' +
+                '</div>'
+            );
+            $overlay.append($modal);
+            $('body').append($overlay);
+
+            var $bar    = $modal.find('.aioemp-progress__bar');
+            var $status = $modal.find('.batch-status-text');
+            var $detail = $modal.find('.batch-detail-text');
+
+            function sendNext(index) {
+                if (index >= total) {
+                    // Done — show summary.
+                    $bar.css('width', '100%');
+                    $status.text('Complete!');
+
+                    var summary = totalSent + ' email(s) sent.';
+                    if (totalSkipped > 0) summary += ' ' + totalSkipped + ' skipped (no template).';
+                    if (totalFailed.length > 0) summary += ' ' + totalFailed.length + ' failed.';
+                    $detail.text(summary);
+
+                    var $closeBtn = $('<button class="button button-primary" style="margin-top:12px;">Close</button>');
+                    $closeBtn.on('click', function () { $overlay.remove(); loadCandidates(); });
+                    $modal.find('.aioemp-modal__body').append($closeBtn);
+                    $overlay.on('click', function (e) {
+                        if ($(e.target).hasClass('aioemp-modal-overlay')) { $overlay.remove(); loadCandidates(); }
+                    });
+                    return;
+                }
+
+                $status.text('Sending ' + (index + 1) + ' of ' + total + '…');
+
+                api.post('events/' + ctx.detailEventId + '/attenders/bulk-resend', {
+                    ids: [allIds[index]],
+                })
+                .then(function (res) {
+                    processed++;
+                    totalSent    += (res.sent || 0);
+                    totalSkipped += (res.skipped || 0);
+                    if (res.failed && res.failed.length) totalFailed = totalFailed.concat(res.failed);
+
+                    var pct = Math.round((processed / total) * 100);
+                    $bar.css('width', pct + '%');
+                    $detail.text(processed + ' / ' + total + ' processed');
+                    sendNext(index + 1);
+                })
+                .catch(function () {
+                    processed++;
+                    totalFailed.push(allIds[index]);
+                    var pct = Math.round((processed / total) * 100);
+                    $bar.css('width', pct + '%');
+                    $detail.text(processed + ' / ' + total + ' processed');
+                    sendNext(index + 1);
+                });
+            }
+
+            sendNext(0);
+        }
+
+        /**
+         * Process candidates in batches of 5 with a progress modal.
+         * Each batch updates DB status AND sends emails atomically.
+         */
+        function runBatchProcess(allIds, status) {
+            var BATCH_SIZE = 1;
+            var total      = allIds.length;
+            var processed  = 0;
+            var totalSent  = 0;
+            var totalFailed = [];
+            var batches    = [];
+
+            // Chunk IDs into groups of BATCH_SIZE.
+            for (var i = 0; i < total; i += BATCH_SIZE) {
+                batches.push(allIds.slice(i, i + BATCH_SIZE));
+            }
+
+            // Build progress modal.
+            var $overlay = $('<div class="aioemp-modal-overlay"></div>');
+            var $modal   = $(
+                '<div class="aioemp-modal" style="max-width:480px">' +
+                    '<div class="aioemp-modal__header">' +
+                        '<h3>Processing Candidates</h3>' +
+                    '</div>' +
+                    '<div class="aioemp-modal__body">' +
+                        '<p class="batch-status-text">Preparing batch 1 of ' + batches.length + '…</p>' +
+                        '<div class="aioemp-progress">' +
+                            '<div class="aioemp-progress__bar" style="width:0%"></div>' +
+                        '</div>' +
+                        '<p class="batch-detail-text" style="font-size:13px;color:#666;">0 / ' + total + ' candidates processed</p>' +
+                    '</div>' +
+                '</div>'
+            );
+            $overlay.append($modal);
+            $('body').append($overlay);
+            // Prevent closing during processing.
+
+            var $bar    = $modal.find('.aioemp-progress__bar');
+            var $status = $modal.find('.batch-status-text');
+            var $detail = $modal.find('.batch-detail-text');
+
+            function processBatch(index) {
+                if (index >= batches.length) {
+                    // Done — show summary.
+                    var pct = 100;
+                    $bar.css('width', pct + '%');
+                    $status.text('Complete!');
+
+                    var summary = processed + ' candidate(s) updated.';
+                    if (totalSent > 0) {
+                        summary += ' ' + totalSent + ' email(s) sent.';
+                    }
+                    if (totalFailed.length > 0) {
+                        summary += ' ' + totalFailed.length + ' email(s) failed.';
+                    }
+                    $detail.text(summary);
+
+                    // Add close button.
+                    var $closeBtn = $('<button class="button button-primary" style="margin-top:12px;">Close</button>');
+                    $closeBtn.on('click', function () {
+                        $overlay.remove();
+                        loadCandidates();
+                    });
+                    $modal.find('.aioemp-modal__body').append($closeBtn);
+
+                    // Allow overlay click to close.
+                    $overlay.on('click', function (e) {
+                        if ($(e.target).hasClass('aioemp-modal-overlay')) {
+                            $overlay.remove();
+                            loadCandidates();
+                        }
+                    });
+                    return;
+                }
+
+                var batch = batches[index];
+                $status.text('Processing batch ' + (index + 1) + ' of ' + batches.length + '…');
+
+                api.post('events/' + ctx.detailEventId + '/attenders/batch-process', {
+                    ids: batch,
+                    status: status,
+                })
+                .then(function (res) {
+                    processed += (res.updated || 0);
+                    totalSent += (res.sent || 0);
+                    if (res.failed && res.failed.length) {
+                        totalFailed = totalFailed.concat(res.failed);
+                    }
+
+                    var pct = Math.round((processed / total) * 100);
+                    $bar.css('width', pct + '%');
+                    $detail.text(processed + ' / ' + total + ' candidates processed');
+
+                    // Next batch.
+                    processBatch(index + 1);
+                })
+                .catch(function (err) {
+                    // On error, still continue with remaining batches.
+                    $detail.text('Batch ' + (index + 1) + ' error: ' + (err.message || 'Unknown') + '. Continuing…');
+                    processBatch(index + 1);
+                });
+            }
+
+            // Start.
+            processBatch(0);
+        }
+
         // Add candidate.
-        $tc.on('click', '#cand-btn-new', function () {
+        $tc.on('click.cand', '#cand-btn-new', function () {
             showCandidateForm(null);
         });
 
         // Edit candidate.
-        $tc.on('click', '.cand-act-edit', function () {
+        $tc.on('click.cand', '.cand-act-edit', function () {
             var id = $(this).closest('tr').data('id');
             showCandidateForm(id);
         });
 
         // Delete candidate.
-        $tc.on('click', '.cand-act-del', function () {
+        $tc.on('click.cand', '.cand-act-del', function () {
             var id = $(this).closest('tr').data('id');
             if (!confirm('Delete this candidate? This cannot be undone.')) return;
             api.del('events/' + ctx.detailEventId + '/attenders/' + id)
                 .then(function () { loadCandidates(); })
                 .catch(function (err) {
                     alert('Delete failed: ' + (err.message || 'Unknown error'));
+                });
+        });
+
+        // Resend email for candidate.
+        $tc.on('click.cand', '.cand-act-resend', function () {
+            var $btn = $(this);
+            var id   = $btn.closest('tr').data('id');
+            if (!confirm('Resend email to this candidate based on their current status?')) return;
+
+            $btn.prop('disabled', true);
+            api.post('events/' + ctx.detailEventId + '/attenders/' + id + '/resend-email', {})
+                .then(function (res) {
+                    var data = res && res.data ? res.data : res;
+                    alert('Email sent to ' + (data.to || 'candidate') + ' (' + (data.template || '').replace(/_/g, ' ') + ')');
+                })
+                .catch(function (err) {
+                    alert('Failed to send email: ' + (err.message || 'Unknown error'));
+                })
+                .finally(function () {
+                    $btn.prop('disabled', false);
                 });
         });
 

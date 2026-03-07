@@ -182,6 +182,18 @@ class AIOEMP_Admin {
             $prev_handle = $handle;
         }
 
+        // Emails module (depends on core admin script).
+        wp_enqueue_script(
+            'aioemp-emails',
+            AIOEMP_PLUGIN_URL . 'admin/js/aioemp-emails.js',
+            array( 'jquery', 'aioemp-admin' ),
+            AIOEMP_VERSION,
+            true
+        );
+
+        // Enqueue TinyMCE editor assets for the email body editor.
+        wp_enqueue_editor();
+
         // Seatmaps list module (depends on core admin script).
         wp_enqueue_script(
             'aioemp-seatmaps',

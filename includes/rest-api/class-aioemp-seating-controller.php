@@ -76,6 +76,7 @@ class AIOEMP_Seating_Controller extends AIOEMP_REST_Controller {
                 'event_id'    => $event_id_arg,
                 'attender_id' => array( 'type' => 'integer', 'required' => true, 'sanitize_callback' => 'absint' ),
                 'seat_key'    => array( 'type' => 'string',  'required' => true, 'sanitize_callback' => 'sanitize_text_field' ),
+                'seat_label'  => array( 'type' => 'string',  'required' => false, 'sanitize_callback' => 'sanitize_text_field' ),
             ),
         ) );
 
@@ -87,6 +88,20 @@ class AIOEMP_Seating_Controller extends AIOEMP_REST_Controller {
             'args'                => array(
                 'event_id' => $event_id_arg,
                 'seat_key' => array( 'type' => 'string', 'required' => true, 'sanitize_callback' => 'sanitize_text_field' ),
+            ),
+        ) );
+
+        // POST /events/<id>/seating/backfill-labels
+        register_rest_route( $this->namespace, '/' . $this->rest_base . '/(?P<event_id>[\d]+)/seating/backfill-labels', array(
+            'methods'             => \WP_REST_Server::CREATABLE,
+            'callback'            => array( $this, 'backfill_labels' ),
+            'permission_callback' => array( $this, 'permissions' ),
+            'args'                => array(
+                'event_id' => $event_id_arg,
+                'labels'   => array(
+                    'type'     => 'object',
+                    'required' => true,
+                ),
             ),
         ) );
 
@@ -266,6 +281,24 @@ class AIOEMP_Seating_Controller extends AIOEMP_REST_Controller {
     }
 
     /**
+     * POST /events/<id>/seating/backfill-labels — update NULL seat_labels.
+     */
+    public function backfill_labels( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
+        $event_id = absint( $request->get_param( 'event_id' ) );
+        $labels   = $request->get_param( 'labels' );
+
+        if ( ! is_array( $labels ) || empty( $labels ) ) {
+            return $this->error( 'invalid_labels', __( 'Labels map is required.', 'aioemp' ), 400 );
+        }
+
+        $updated = $this->assignments->backfill_labels( $event_id, $labels );
+
+        return $this->success( array(
+            'updated' => $updated,
+        ) );
+    }
+
+    /**
      * POST /events/<id>/seating/assign — assign seat to candidate.
      */
     public function assign_seat( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
@@ -317,8 +350,9 @@ class AIOEMP_Seating_Controller extends AIOEMP_REST_Controller {
         $this->maybe_finalize( $event_id, $event );
 
         // Assign.
-        $user_id = get_current_user_id();
-        $id = $this->assignments->assign( $event_id, $attender_id, $seat_key, $user_id );
+        $user_id    = get_current_user_id();
+        $seat_label = sanitize_text_field( $request->get_param( 'seat_label' ) ?? '' );
+        $id = $this->assignments->assign( $event_id, $attender_id, $seat_key, $user_id, $seat_label );
         if ( false === $id ) {
             return $this->error( 'assign_failed', __( 'Could not assign seat. It may already be taken.', 'aioemp' ), 500 );
         }
@@ -329,6 +363,7 @@ class AIOEMP_Seating_Controller extends AIOEMP_REST_Controller {
         return $this->success( array(
             'id'          => $id,
             'seat_key'    => $seat_key,
+            'seat_label'  => $seat_label,
             'attender_id' => $attender_id,
         ), 201 );
     }
@@ -505,6 +540,7 @@ class AIOEMP_Seating_Controller extends AIOEMP_REST_Controller {
             return array(
                 'attender_id' => absint( $p['attender_id'] ),
                 'seat_key'    => sanitize_text_field( $p['seat_key'] ),
+                'seat_label'  => sanitize_text_field( $p['seat_label'] ?? '' ),
             );
         }, $pairs );
 

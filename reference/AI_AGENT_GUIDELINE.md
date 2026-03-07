@@ -451,7 +451,9 @@ all-in-one-event-managing-platform/
 ├── templates/                               # Public-facing templates
 │   ├── login-form.php                       # Login form template (254 lines)
 │   ├── ticket-page.php                      # Virtual ticket page template (297 lines)
-│   └── ticket-error.php                     # Ticket error page template (71 lines)
+│   ├── ticket-error.php                     # Ticket error page template (71 lines)
+│   ├── password-setup.php                   # Password setup form + success page (175 lines)
+│   └── password-setup-error.php             # Password setup error page (90 lines)
 ├── includes/
 │   ├── class-aioemp-activator.php           # DB installer (dbDelta, 10 tables, explicit migrations)
 │   ├── class-aioemp-deactivator.php         # Capability revocation, role removal
@@ -459,18 +461,20 @@ all-in-one-event-managing-platform/
 │   ├── class-aioemp-security.php            # Capabilities (13), roles (5), nonces, sanitisation, rate limiting (463 lines)
 │   ├── class-aioemp-shortcodes.php          # [aioemp_login] shortcode (348 lines)
 │   ├── class-aioemp-ticket-endpoint.php     # Virtual /e-ticket/{hash} page (210 lines)
+│   ├── class-aioemp-password-setup-endpoint.php # Virtual /setup-password/{token} page (276 lines)
 │   ├── rest-api/
 │   │   ├── class-aioemp-rest-controller.php       # Abstract base controller (212 lines)
 │   │   ├── class-aioemp-events-controller.php     # CRUD /events (536 lines)
-│   │   ├── class-aioemp-attenders-controller.php  # Candidates CRUD /events/{id}/attenders (434 lines)
+│   │   ├── class-aioemp-attenders-controller.php  # Candidates CRUD /events/{id}/attenders (500+ lines)
 │   │   ├── class-aioemp-seating-controller.php    # Seating allocation /events/{id}/seating (754 lines)
 │   │   ├── class-aioemp-attendance-controller.php # Check-in/out, logs, stats, CSV export (368 lines)
 │   │   ├── class-aioemp-seatmaps-controller.php   # CRUD /seatmaps (347 lines)
 │   │   ├── class-aioemp-seatmap-upload-controller.php  # BG image upload (157 lines)
 │   │   ├── class-aioemp-locking-controller.php    # Lock acquire/heartbeat/release/takeover (178 lines)
 │   │   ├── class-aioemp-settings-controller.php   # Settings CRUD + logo upload (152 lines)
-│   │   ├── class-aioemp-users-controller.php      # User/role management (353 lines)
-│   │   └── class-aioemp-profile-controller.php    # Current user profile (144 lines)
+│   │   ├── class-aioemp-users-controller.php      # User/role management + welcome email (400+ lines)
+│   │   ├── class-aioemp-profile-controller.php    # Current user profile (144 lines)
+│   │   └── class-aioemp-email-templates-controller.php # Email template CRUD + preview (270 lines)
 │   ├── models/
 │   │   ├── class-aioemp-model.php                 # Abstract base model ($wpdb wrapper)
 │   │   ├── class-aioemp-events-model.php          # Events CRUD + search/pagination (116 lines)
@@ -483,17 +487,19 @@ all-in-one-event-managing-platform/
 │   │   └── class-aioemp-seatmap-model.php         # Seatmap CRUD + search/pagination (112 lines)
 │   └── services/
 │       ├── class-aioemp-locking-service.php       # Atomic SQL locking (TTL 90s) (322 lines)
-│       └── class-aioemp-settings-service.php      # Single wp_options key, typed defaults (188 lines)
+│       ├── class-aioemp-settings-service.php      # Single wp_options key, typed defaults (200+ lines)
+│       └── class-aioemp-email-service.php         # Email templates CRUD, send, HTML wrapper (471 lines)
 ├── admin/
 │   ├── class-aioemp-admin.php               # Admin hooks, menu entry, script enqueue chain (224 lines)
 │   ├── css/aioemp-admin.css                 # Admin styles (CSS custom properties)
 │   ├── js/
-│   │   ├── aioemp-admin.js                  # Admin SPA shell (jQuery, 275 lines)
+│   │   ├── aioemp-admin.js                  # Admin SPA shell (jQuery, 290+ lines)
 │   │   ├── aioemp-events.js                 # Events module entry + shared context (112 lines)
-│   │   ├── aioemp-settings.js               # Settings page JS (326 lines)
+│   │   ├── aioemp-settings.js               # Settings page JS (360+ lines)
 │   │   ├── aioemp-seatmaps.js               # Seatmaps list page JS (252 lines)
 │   │   ├── aioemp-users.js                  # Users/role management page JS (515 lines)
 │   │   ├── aioemp-profile.js                # Profile settings page JS (257 lines)
+│   │   ├── aioemp-emails.js                 # Email templates editor page JS (270 lines)
 │   │   ├── seatmap-compiler.js              # Browser IIFE of seatmap-core compile (client-side snapshot compilation)
 │   │   ├── vendor/
 │   │   │   └── html5-qrcode.min.js          # QR scanning vendor library (v2.3.8)
@@ -1178,31 +1184,97 @@ Public-facing attendee ticket display — no login required.
 
 ## 16. Email & Communications
 
-> **Status: NOT YET IMPLEMENTED.** Planned for Phase 10.
+> **Status: IMPLEMENTED** (Phase 10).
 
-### Email Types
+### 16.1 Architecture
 
-| Email | Trigger |
-|---|---|
-| Submission acknowledgement | On registration |
-| Status change notification | On accept (onsite/online) or reject |
-| QR code delivery | On acceptance (configurable) or on registration |
-| EDM broadcast | Admin-triggered to filtered registrant lists |
+- **Service class:** `includes/services/class-aioemp-email-service.php`
+- **REST controller:** `includes/rest-api/class-aioemp-email-templates-controller.php`
+- **Storage:** `wp_options` key `aioemp_email_templates` (serialised array)
+- **Admin UI:** `admin/js/aioemp-emails.js` — "Emails" tab in the SPA dashboard
 
-### Rules
+### 16.2 Template Types
 
-- Use `wp_mail()` for all emails.
-- Templates must be configurable in admin Settings.
-- QR delivery timing is configurable: on acceptance vs on registration.
-- All emails must be logged or auditable.
+| Type Key                    | Label                             | Trigger                                      |
+|---|---|---|
+| `registration_confirmation` | Registration Confirmation         | On public registration _(wired in Phase 9)_  |
+| `accepted_onsite`           | Accepted (On-site) with QR Ticket | Status change to `accepted_onsite`            |
+| `accepted_online`           | Accepted (Online)                 | Status change to `accepted_online`            |
+| `rejected`                  | Application Rejected              | Status change to `rejected`                   |
+| `new_user_welcome`          | New User Welcome (Password Setup) | User creation via Users module                |
+
+### 16.3 Placeholder System
+
+Each template has **type-specific placeholders** plus **common placeholders** available to all templates:
+
+**Common (all types):** `{{company_name}}`, `{{company_email}}`, `{{company_tel}}`, `{{company_address}}`, `{{logo_url}}`, `{{site_url}}`
+
+**Type-specific:**
+- **registration_confirmation / rejected:** `{{first_name}}`, `{{last_name}}`, `{{full_name}}`, `{{email}}`, `{{event_title}}`, `{{event_date}}`, `{{event_location}}`
+- **accepted_onsite:** All of the above plus `{{ticket_url}}`, `{{qr_code_url}}`, `{{seat_label}}`
+- **accepted_online:** Common event fields plus `{{online_url}}`
+- **new_user_welcome:** `{{display_name}}`, `{{user_login}}`, `{{user_email}}`, `{{setup_url}}`, `{{role_name}}`
+
+### 16.4 Email Sending
+
+- Uses `wp_mail()` with HTML content type.
+- Wraps body in a responsive HTML email layout with logo, company info footer.
+- `From` header set from company email/name in Settings (falls back to WP admin email).
+- Placeholders resolved via simple `str_replace()` at send time.
+
+### 16.5 REST API Endpoints
+
+| Method | Endpoint                            | Permission        | Description                          |
+|--------|-------------------------------------|--------------------|--------------------------------------|
+| GET    | `/email-templates`                  | `manage_settings`  | List all templates + labels/placeholders |
+| GET    | `/email-templates/{type}`           | `manage_settings`  | Get single template                  |
+| PUT    | `/email-templates/{type}`           | `manage_settings`  | Update subject & body                |
+| POST   | `/email-templates/{type}/reset`     | `manage_settings`  | Reset to default                     |
+| POST   | `/email-templates/{type}/preview`   | `manage_settings`  | Send test email to specified address |
+
+### 16.6 Email Triggers (Automatic)
+
+- **Attender status change (individual):** `update_item()` in Attenders controller — sends email matching new status.
+- **Attender bulk status change:** `bulk_status()` in Attenders controller — sends email to each affected attender.
+- **New user creation:** `create_user()` in Users controller — sends welcome email with password setup link.
+
+### 16.7 Password Setup Virtual Endpoint
+
+- **File:** `includes/class-aioemp-password-setup-endpoint.php`
+- **URL pattern:** `/setup-password/{64-char-hex-token}`
+- **Token security:**
+  - Raw token: 32 random bytes → 64-char hex string (sent to user in email URL).
+  - Stored token: SHA-256 hash of raw token (stored in `user_meta`).
+  - Expiry: 48 hours (`TOKEN_LIFETIME = 172800` seconds).
+  - One-time use: token deleted after successful password setup.
+- **User meta keys:** `aioemp_password_setup_token`, `aioemp_password_setup_expiry`
+- **Form validation:** nonce, honeypot, min 8 chars, confirmation match.
+- **Templates:** `templates/password-setup.php` (form + success), `templates/password-setup-error.php` (invalid/expired token).
+- **Design:** Matches the login form overlay layout (same branding/logo).
+
+### 16.8 Company Details in Settings
+
+Four new settings fields added to the Settings module:
+- `company_name` — text, used in email From header and templates
+- `company_email` — email, used in From header (falls back to admin email)
+- `company_tel` — phone (regex validated), used in email footer
+- `company_address` — textarea, used in email footer
+
+### 16.9 Admin UI — Email Templates Tab
+
+- New sidebar nav item: "Emails" with `dashicons-email-alt`
+- Route: `#emails` (requires `manage_settings` capability)
+- Two-panel layout: template list (left) + editor (right)
+- Editor features: subject input, HTML body textarea, clickable placeholder chips (insert at cursor), save, reset to default, send test email
 
 ---
 
 ## 17. Settings Module
 
-- **Company logo upload** (used in admin shell header, login form, ticket page).
+- **Company logo upload** (used in admin shell header, login form, ticket page, email layout).
+- **Company details** — `company_name`, `company_email`, `company_tel`, `company_address` (used in email templates and footer).
 - **Ticket page slug** (configurable, default: `e-ticket`).
-- **Email template configuration** (acknowledgement, status change, QR) _(not yet implemented)_.
+- **Email templates** — editable via the Emails admin tab (subject + body with placeholders).
 - **Behavior toggles:**
   - Send QR on acceptance vs on registration.
   - Default venue mode.
@@ -1246,7 +1318,7 @@ Public-facing attendee ticket display — no login required.
 | 7 | **Core Events + Candidates CRUD:** Events list/create/edit pages, Candidates tab (list, status change, bulk actions, candidate detail), event Overview tab metrics | **DONE** |
 | 8 | **Attendance + Users/Roles + Login + Ticket Page:** QR token generation, scan + confirm IN/OUT flow, sequence validation with force override, attendance log tab, CSV export, `checked_in` denormalised flag, device detection, user/role management, login shortcode, virtual ticket page | **DONE** |
 | 9 | **Public registration:** Shortcode/block form, CAPTCHA/Turnstile integration, acknowledgement email, external REST registration endpoint with rate limiting and CORS allowlist | NOT STARTED |
-| 10 | **Email automation:** Status-change emails (accept/reject), QR delivery (configurable timing), EDM broadcast, configurable email templates in Settings UI | NOT STARTED |
+| 10 | **Email automation:** Status-change emails (accept/reject), QR delivery, new user welcome email with password setup link, editable templates UI, company details in settings, virtual password-setup endpoint | **DONE** |
 
 > **Important:** Security controls are NOT a separate phase — they must be integrated into every phase from the start.
 

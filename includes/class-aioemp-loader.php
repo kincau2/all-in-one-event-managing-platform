@@ -151,6 +151,11 @@ class AIOEMP_Loader {
         require_once AIOEMP_PLUGIN_DIR . 'includes/class-aioemp-ticket-endpoint.php';
         $ticket = new AIOEMP_Ticket_Endpoint();
         $ticket->register();
+
+        // Virtual password-setup page endpoint.
+        require_once AIOEMP_PLUGIN_DIR . 'includes/class-aioemp-password-setup-endpoint.php';
+        $password_setup = new AIOEMP_Password_Setup_Endpoint();
+        $password_setup->register();
     }
 
     /**
@@ -245,4 +250,8 @@ function aioemp_register_rest_routes(): void {
     // Attendance (check-in / check-out / logs / export).
     require_once AIOEMP_PLUGIN_DIR . 'includes/rest-api/class-aioemp-attendance-controller.php';
     ( new AIOEMP_Attendance_Controller() )->register_routes();
+
+    // Email templates (CRUD / preview).
+    require_once AIOEMP_PLUGIN_DIR . 'includes/rest-api/class-aioemp-email-templates-controller.php';
+    ( new AIOEMP_Email_Templates_Controller() )->register_routes();
 }

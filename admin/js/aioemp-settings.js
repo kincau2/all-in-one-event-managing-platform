@@ -55,6 +55,32 @@
                 '</div>' +
             '</div>' +
 
+            /* ---- Company Details card ---- */
+            '<div class="aioemp-card">' +
+                '<h3 class="aioemp-card__title">Company Details</h3>' +
+                '<p class="aioemp-help" style="margin-bottom:12px;">Used in email templates and public-facing pages.</p>' +
+                '<div class="aioemp-form-row">' +
+                    '<div class="aioemp-form-group aioemp-form-group--half">' +
+                        '<label class="aioemp-label" for="aioemp-company-name">Company Name</label>' +
+                        '<input type="text" id="aioemp-company-name" class="aioemp-input" placeholder="Your Company Ltd.">' +
+                    '</div>' +
+                    '<div class="aioemp-form-group aioemp-form-group--half">' +
+                        '<label class="aioemp-label" for="aioemp-company-email">Email Address</label>' +
+                        '<input type="email" id="aioemp-company-email" class="aioemp-input" placeholder="info@example.com">' +
+                    '</div>' +
+                '</div>' +
+                '<div class="aioemp-form-row">' +
+                    '<div class="aioemp-form-group aioemp-form-group--half">' +
+                        '<label class="aioemp-label" for="aioemp-company-tel">Telephone</label>' +
+                        '<input type="text" id="aioemp-company-tel" class="aioemp-input" placeholder="+852 1234 5678">' +
+                    '</div>' +
+                    '<div class="aioemp-form-group aioemp-form-group--half">' +
+                        '<label class="aioemp-label" for="aioemp-company-address">Address</label>' +
+                        '<textarea id="aioemp-company-address" class="aioemp-input" rows="2" placeholder="123 Main St, City, Country"></textarea>' +
+                    '</div>' +
+                '</div>' +
+            '</div>' +
+
             /* ---- CAPTCHA card ---- */
             '<div class="aioemp-card">' +
                 '<h3 class="aioemp-card__title">CAPTCHA / Bot Protection</h3>' +
@@ -157,6 +183,12 @@
             $('#aioemp-captcha-secret-key').attr('placeholder', data.captcha_secret_key); // shows masked ••••
         }
 
+        // Company details.
+        $('#aioemp-company-name').val(data.company_name || '');
+        $('#aioemp-company-email').val(data.company_email || '');
+        $('#aioemp-company-tel').val(data.company_tel || '');
+        $('#aioemp-company-address').val(data.company_address || '');
+
         // Behaviour.
         $('#aioemp-default-venue-mode').val(data.default_venue_mode);
         $('#aioemp-default-capacity').val(data.default_capacity);
@@ -226,6 +258,10 @@
         $status.text('Saving…').removeClass('aioemp-settings__status--error aioemp-settings__status--ok');
 
         var payload = {
+            company_name:       $.trim($('#aioemp-company-name').val()),
+            company_email:      $.trim($('#aioemp-company-email').val()),
+            company_tel:        $.trim($('#aioemp-company-tel').val()),
+            company_address:    $.trim($('#aioemp-company-address').val()),
             captcha_provider:   $('#aioemp-captcha-provider').val(),
             captcha_site_key:   $('#aioemp-captcha-site-key').val(),
             default_venue_mode: $('#aioemp-default-venue-mode').val(),
@@ -300,12 +336,7 @@
     }
 
     function updateSidebarLogo(url) {
-        var $brand = $('.aioemp-sidebar__brand-icon');
-        if (url) {
-            $brand.html('<img src="' + escHtml(url) + '" alt="Logo" style="width:100%;height:100%;object-fit:contain;border-radius:inherit;">');
-        } else {
-            $brand.html('<span class="dashicons dashicons-calendar-alt"></span>');
-        }
+        // Sidebar brand always uses the default dashicon — no-op.
     }
 
     /* ------------------------------------------------------------------ *

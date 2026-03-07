@@ -224,6 +224,9 @@
                 renderSeatmap(snapshot);
                 updateSeatStats();
                 renderCandidateListForSeating();
+
+                // Auto-backfill missing seat_labels in the DB.
+                maybeBackfillLabels();
             })
             .catch(function () {
                 $('#seat-canvas-wrap').html('<p class="aioemp-error">Failed to load seating data.</p>');
@@ -940,11 +943,49 @@
 
     /* ── Helpers ── */
 
+    /**
+     * Auto-backfill missing seat_labels in the DB.
+     * Compares loaded assignments against the compiled seats map
+     * and sends a PATCH for any that have a NULL/empty label.
+     */
+    function maybeBackfillLabels() {
+        if (!ss.assignments || !ss.seats || !ss.seats.length) return;
+
+        var labelMap = {};
+        ss.seats.forEach(function (s) {
+            if (s.seat_key && s.label) {
+                labelMap[s.seat_key] = s.label;
+            }
+        });
+
+        var toFix = {};
+        ss.assignments.forEach(function (a) {
+            if ((!a.seat_label || a.seat_label === '') && labelMap[a.seat_key]) {
+                toFix[a.seat_key] = labelMap[a.seat_key];
+            }
+        });
+
+        if (!Object.keys(toFix).length) return;
+
+        api.post('events/' + ctx.detailEventId + '/seating/backfill-labels', { labels: toFix })
+            .then(function (res) {
+                if (res.updated) {
+                    // Update local data so the UI reflects the fix.
+                    ss.assignments.forEach(function (a) {
+                        if (toFix[a.seat_key]) {
+                            a.seat_label = toFix[a.seat_key];
+                        }
+                    });
+                }
+            })
+            .catch(function () { /* silent — best-effort backfill */ });
+    }
+
     function seatLabel(key) {
         for (var i = 0; i < ss.seats.length; i++) {
             if (ss.seats[i].seat_key === key) {
                 var s = ss.seats[i];
-                return (s.row || '') + (s.number || '') || key.substring(0, 8);
+                return s.label || ((s.row || '') + (s.number || '')) || key.substring(0, 8);
             }
         }
         return key.substring(0, 8);
@@ -1045,6 +1086,7 @@
         api.post('events/' + ctx.detailEventId + '/seating/assign', {
             attender_id: attenderId,
             seat_key: seatKey,
+            seat_label: seatLabel(seatKey),
         })
         .then(function () {
             showSeatToast('Seat assigned!', 'ok');
@@ -1404,7 +1446,7 @@
 
         var pairs = [];
         for (var i = 0; i < Math.min(pending.length, candidates.length); i++) {
-            pairs.push({ attender_id: candidates[i].id, seat_key: pending[i] });
+            pairs.push({ attender_id: candidates[i].id, seat_key: pending[i], seat_label: seatLabel(pending[i]) });
         }
 
         $('#seat-confirm-assign').prop('disabled', true).text('Assigning…');

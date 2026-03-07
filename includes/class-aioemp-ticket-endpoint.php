@@ -119,7 +119,7 @@ class AIOEMP_Ticket_Endpoint {
         $seat_table = $wpdb->prefix . 'aioemp_seat_assignment';
         $seat = $wpdb->get_row(
             $wpdb->prepare(
-                "SELECT seat_key FROM {$seat_table} WHERE event_id = %d AND attender_id = %d",
+                "SELECT seat_key, seat_label FROM {$seat_table} WHERE event_id = %d AND attender_id = %d",
                 (int) $attender->event_id,
                 (int) $attender->id
             )
@@ -134,13 +134,28 @@ class AIOEMP_Ticket_Endpoint {
         require_once AIOEMP_PLUGIN_DIR . 'includes/services/class-aioemp-settings-service.php';
         $logo_url = AIOEMP_Settings_Service::get( 'logo_url' );
 
+        // Resolve human-readable seat label.
+        // Suppress raw UUID/hash values — only show if a real label was stored.
+        $seat_label_display = null;
+        if ( $seat && ! empty( $seat->seat_label ) ) {
+            $seat_label_display = $seat->seat_label;
+        }
+
+        // Build QR code image URL.
+        $qr_hash   = $attender->qrcode_hash ?? '';
+        $ticket_url = $qr_hash ? self::get_ticket_url( $qr_hash ) : '';
+        $qr_code_url = $ticket_url
+            ? 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' . rawurlencode( $ticket_url )
+            : '';
+
         // Load the template.
         $template_data = array(
-            'attender'    => $attender,
-            'event'       => $event,
-            'seat_label'  => $seat ? $seat->seat_key : null,
-            'latest_scan' => $latest_scan,
-            'logo_url'    => $logo_url,
+            'attender'     => $attender,
+            'event'        => $event,
+            'seat_label'   => $seat_label_display,
+            'latest_scan'  => $latest_scan,
+            'logo_url'     => $logo_url,
+            'qr_code_url'  => $qr_code_url,
         );
 
         $this->render_template( $template_data );
@@ -156,11 +171,12 @@ class AIOEMP_Ticket_Endpoint {
         nocache_headers();
 
         // Extract variables for template.
-        $attender    = $data['attender'];
-        $event       = $data['event'];
-        $seat_label  = $data['seat_label'];
-        $latest_scan = $data['latest_scan'];
-        $logo_url    = $data['logo_url'];
+        $attender     = $data['attender'];
+        $event        = $data['event'];
+        $seat_label   = $data['seat_label'];
+        $latest_scan  = $data['latest_scan'];
+        $logo_url     = $data['logo_url'];
+        $qr_code_url  = $data['qr_code_url'] ?? '';
 
         include AIOEMP_PLUGIN_DIR . 'templates/ticket-page.php';
         exit;

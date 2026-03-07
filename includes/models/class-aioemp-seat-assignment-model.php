@@ -30,12 +30,13 @@ class AIOEMP_Seat_Assignment_Model extends AIOEMP_Model {
      * @param int    $assigned_by WP user ID who made the assignment.
      * @return int|false Inserted row ID or false on failure.
      */
-    public function assign( int $event_id, int $attender_id, string $seat_key, int $assigned_by = 0 ) {
+    public function assign( int $event_id, int $attender_id, string $seat_key, int $assigned_by = 0, string $seat_label = '' ) {
         $data = array(
-            'event_id'       => $event_id,
-            'attender_id'    => $attender_id,
-            'seat_key'       => $seat_key,
-            'assigned_by'    => $assigned_by ?: null,
+            'event_id'        => $event_id,
+            'attender_id'     => $attender_id,
+            'seat_key'        => $seat_key,
+            'seat_label'      => $seat_label ?: null,
+            'assigned_by'     => $assigned_by ?: null,
             'assigned_at_gmt' => $this->now_gmt(),
         );
 
@@ -266,6 +267,7 @@ class AIOEMP_Seat_Assignment_Model extends AIOEMP_Model {
                 'event_id'        => $event_id,
                 'attender_id'     => $attender_id,
                 'seat_key'        => $seat_key,
+                'seat_label'      => ! empty( $pair['seat_label'] ) ? (string) $pair['seat_label'] : null,
                 'checked_in'      => $preserve_checked_in,
                 'assigned_by'     => $assigned_by ?: null,
                 'assigned_at_gmt' => $now,
@@ -280,6 +282,36 @@ class AIOEMP_Seat_Assignment_Model extends AIOEMP_Model {
 
         $this->db->query( 'COMMIT' );
         return $result;
+    }
+
+    /**
+     * Backfill seat_label for assignments that have NULL labels.
+     *
+     * @param int   $event_id Event ID.
+     * @param array $map      Associative array: seat_key => label.
+     * @return int  Number of rows updated.
+     */
+    public function backfill_labels( int $event_id, array $map ): int {
+        $count = 0;
+        foreach ( $map as $seat_key => $label ) {
+            $seat_key = sanitize_text_field( $seat_key );
+            $label    = sanitize_text_field( $label );
+            if ( empty( $seat_key ) || empty( $label ) ) {
+                continue;
+            }
+            $updated = $this->db->query(
+                $this->db->prepare(
+                    "UPDATE {$this->table} SET seat_label = %s WHERE event_id = %d AND seat_key = %s AND (seat_label IS NULL OR seat_label = '')",
+                    $label,
+                    $event_id,
+                    $seat_key
+                )
+            );
+            if ( $updated ) {
+                $count += (int) $this->db->rows_affected;
+            }
+        }
+        return $count;
     }
 
     /**

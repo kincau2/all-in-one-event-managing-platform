@@ -285,6 +285,12 @@ class AIOEMP_Activator {
             if ( empty( $col ) ) {
                 $wpdb->query( "ALTER TABLE `{$sa_table}` ADD COLUMN `checked_in` tinyint(1) NOT NULL DEFAULT 0 AFTER `seat_key`" );
             }
+
+            // v1.5.0 — add seat_label column for human-readable seat label.
+            $col = $wpdb->get_results( "SHOW COLUMNS FROM `{$sa_table}` LIKE 'seat_label'" );
+            if ( empty( $col ) ) {
+                $wpdb->query( "ALTER TABLE `{$sa_table}` ADD COLUMN `seat_label` varchar(100) DEFAULT NULL AFTER `seat_key`" );
+            }
         }
 
         // ── Events table migrations (v1.3.0) ──

@@ -7,10 +7,11 @@
  *
  * Available variables:
  *   $attender    object   Attender record (id, first_name, last_name, email, status, qrcode_hash, …)
- *   $event       object   Event record (id, title, event_date_gmt, venue, …)
- *   $seat_label  string|null  Seat key (e.g. "A-12") or null if no seat assigned.
- *   $latest_scan object|null  Latest attendance record (type, scanned_at_gmt) or null.
- *   $logo_url    string   Logo URL from plugin settings (may be empty).
+ *   $event       object   Event record (id, title, start_date_gmt, venue, …)
+ *   $seat_label   string|null  Seat key (e.g. "A-12") or null if no seat assigned.
+ *   $latest_scan  object|null  Latest attendance record (type, scanned_at_gmt) or null.
+ *   $logo_url     string   Logo URL from plugin settings (may be empty).
+ *   $qr_code_url  string   QR code image URL (may be empty).
  *
  * @package AIOEMP
  * @since   0.8.0
@@ -22,10 +23,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 // Format event date.
 $event_date_display = '';
-if ( ! empty( $event->event_date_gmt ) ) {
+if ( ! empty( $event->start_date_gmt ) ) {
     $event_date_display = wp_date(
         get_option( 'date_format' ) . ' ' . get_option( 'time_format' ),
-        strtotime( $event->event_date_gmt )
+        strtotime( $event->start_date_gmt )
     );
 }
 
@@ -42,6 +43,20 @@ if ( empty( $attendee_name ) ) {
 
 // Candidate status badge.
 $candidate_status = $attender->status ?? 'pending';
+
+// Human-readable status labels.
+$status_labels_map = array(
+    'registered'       => __( 'Registered', 'aioemp' ),
+    'pending'          => __( 'Pending', 'aioemp' ),
+    'accepted_onsite'  => __( 'Accepted (On-site)', 'aioemp' ),
+    'accepted_online'  => __( 'Accepted (Online)', 'aioemp' ),
+    'rejected'         => __( 'Rejected', 'aioemp' ),
+    'cancelled'        => __( 'Cancelled', 'aioemp' ),
+);
+$candidate_status_label = $status_labels_map[ $candidate_status ] ?? ucfirst( str_replace( '_', ' ', $candidate_status ) );
+
+// CSS class safe status key (strip compound to first word for badge class).
+$candidate_status_class = explode( '_', $candidate_status )[0];
 ?>
 <!DOCTYPE html>
 <html <?php language_attributes(); ?>>
@@ -67,6 +82,21 @@ $candidate_status = $attender->status ?? 'pending';
             padding: 24px 16px;
         }
 
+        .aioemp-ticket-wrapper {
+            width: 100%;
+            max-width: 420px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .aioemp-ticket-wrapper__logo {
+            max-width: 160px;
+            max-height: 70px;
+            margin-bottom: 20px;
+            object-fit: contain;
+        }
+
         .aioemp-ticket {
             width: 100%;
             max-width: 420px;
@@ -82,13 +112,6 @@ $candidate_status = $attender->status ?? 'pending';
             color: #fff;
             padding: 24px 24px 20px;
             text-align: center;
-        }
-        .aioemp-ticket__logo {
-            max-width: 140px;
-            max-height: 60px;
-            margin: 0 auto 12px;
-            display: block;
-            object-fit: contain;
         }
         .aioemp-ticket__event-title {
             font-size: 20px;
@@ -187,6 +210,24 @@ $candidate_status = $attender->status ?? 'pending';
             color: #c62828;
         }
 
+        /* QR Code */
+        .aioemp-ticket__qr {
+            text-align: center;
+            padding: 20px 24px 16px;
+        }
+        .aioemp-ticket__qr img {
+            display: block;
+            margin: 0 auto;
+            width: 180px;
+            height: 180px;
+            border-radius: 8px;
+        }
+        .aioemp-ticket__qr-hint {
+            margin-top: 8px;
+            font-size: 12px;
+            color: #888;
+        }
+
         /* Footer */
         .aioemp-ticket__footer {
             text-align: center;
@@ -206,15 +247,18 @@ $candidate_status = $attender->status ?? 'pending';
     </style>
 </head>
 <body>
+    <div class="aioemp-ticket-wrapper">
+
+        <?php if ( ! empty( $logo_url ) ) : ?>
+            <img src="<?php echo esc_url( $logo_url ); ?>"
+                 alt="<?php esc_attr_e( 'Logo', 'aioemp' ); ?>"
+                 class="aioemp-ticket-wrapper__logo">
+        <?php endif; ?>
+
     <div class="aioemp-ticket">
 
         <!-- Header -->
         <div class="aioemp-ticket__header">
-            <?php if ( ! empty( $logo_url ) ) : ?>
-                <img src="<?php echo esc_url( $logo_url ); ?>"
-                     alt="<?php esc_attr_e( 'Logo', 'aioemp' ); ?>"
-                     class="aioemp-ticket__logo">
-            <?php endif; ?>
             <div class="aioemp-ticket__event-title">
                 <?php echo esc_html( $event->title ?? __( 'Event', 'aioemp' ) ); ?>
             </div>
@@ -233,6 +277,17 @@ $candidate_status = $attender->status ?? 'pending';
             </span>
         </div>
 
+        <!-- QR Code -->
+        <?php if ( ! empty( $qr_code_url ) ) : ?>
+            <div class="aioemp-ticket__qr">
+                <img src="<?php echo esc_url( $qr_code_url ); ?>"
+                     alt="<?php esc_attr_e( 'QR Code', 'aioemp' ); ?>">
+                <div class="aioemp-ticket__qr-hint">
+                    <?php esc_html_e( 'Present this QR code at the entrance', 'aioemp' ); ?>
+                </div>
+            </div>
+        <?php endif; ?>
+
         <!-- Ticket details -->
         <div class="aioemp-ticket__body">
             <div class="aioemp-ticket__row">
@@ -250,13 +305,13 @@ $candidate_status = $attender->status ?? 'pending';
             <div class="aioemp-ticket__row">
                 <span class="aioemp-ticket__label"><?php esc_html_e( 'Status', 'aioemp' ); ?></span>
                 <span class="aioemp-ticket__value">
-                    <span class="aioemp-ticket__candidate-badge aioemp-ticket__candidate-badge--<?php echo esc_attr( $candidate_status ); ?>">
-                        <?php echo esc_html( ucfirst( $candidate_status ) ); ?>
+                    <span class="aioemp-ticket__candidate-badge aioemp-ticket__candidate-badge--<?php echo esc_attr( $candidate_status_class ); ?>">
+                        <?php echo esc_html( $candidate_status_label ); ?>
                     </span>
                 </span>
             </div>
 
-            <?php if ( ! empty( $seat_label ) ) : ?>
+            <?php if ( $is_checked_in && ! empty( $seat_label ) ) : ?>
                 <div class="aioemp-ticket__row">
                     <span class="aioemp-ticket__label"><?php esc_html_e( 'Seat', 'aioemp' ); ?></span>
                     <span class="aioemp-ticket__value" style="font-family: monospace; font-size: 16px; font-weight: 700;">
@@ -292,6 +347,7 @@ $candidate_status = $attender->status ?? 'pending';
             <?php echo esc_html( get_bloginfo( 'name' ) ); ?>
         </div>
 
-    </div>
+    </div><!-- .aioemp-ticket -->
+    </div><!-- .aioemp-ticket-wrapper -->
 </body>
 </html>

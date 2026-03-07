@@ -265,6 +265,10 @@
         $tc.on('click.checkinTab', '#checkin-popup .checkin-popup-close', function () {
             hidePopup();
         });
+        // Close popup on backdrop click (outside the card).
+        $tc.on('click.checkinTab', '#checkin-popup', function (e) {
+            if (e.target === this) hidePopup();
+        });
 
         // Recent scans pagination.
         $tc.on('click.checkinTab', '.recent-page-prev', function () {

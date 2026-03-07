@@ -31,6 +31,12 @@ class AIOEMP_Settings_Service {
         'logo_attachment_id' => 0,
         'logo_url'           => '',
 
+        // Company details — used in emails and public pages.
+        'company_name'       => '',
+        'company_email'      => '',
+        'company_tel'        => '',
+        'company_address'    => '',
+
         // CAPTCHA / Turnstile.
         'captcha_provider'   => 'none', // none | recaptcha_v2 | recaptcha_v3 | turnstile
         'captcha_site_key'   => '',
@@ -134,6 +140,20 @@ class AIOEMP_Settings_Service {
 
             case 'logo_url':
                 return esc_url_raw( (string) $value );
+
+            case 'company_name':
+                return sanitize_text_field( (string) $value );
+
+            case 'company_email':
+                $email = sanitize_email( (string) $value );
+                return is_email( $email ) ? $email : '';
+
+            case 'company_tel':
+                // Allow digits, spaces, +, -, (, ) only.
+                return preg_replace( '/[^\d\s\+\-\(\)]/', '', (string) $value );
+
+            case 'company_address':
+                return sanitize_textarea_field( (string) $value );
 
             case 'captcha_provider':
                 return in_array( $value, self::CAPTCHA_PROVIDERS, true ) ? $value : 'none';

@@ -197,6 +197,35 @@ class AIOEMP_Attender_Model extends AIOEMP_Model {
     }
 
     /**
+     * Bulk-delete attenders belonging to a specific event.
+     *
+     * @param int   $event_id     Event ID (security: ensures IDs belong to event).
+     * @param array $attender_ids Array of attender IDs.
+     * @return int  Number of rows deleted.
+     */
+    public function bulk_delete( int $event_id, array $attender_ids ): int {
+        if ( empty( $attender_ids ) ) {
+            return 0;
+        }
+
+        $ids = array_map( 'absint', $attender_ids );
+        $ids = array_filter( $ids );
+        if ( empty( $ids ) ) {
+            return 0;
+        }
+
+        $placeholders = implode( ',', array_fill( 0, count( $ids ), '%d' ) );
+        $sql = $this->db->prepare(
+            "DELETE FROM {$this->table} WHERE event_id = %d AND id IN ({$placeholders})",
+            $event_id,
+            ...$ids
+        );
+
+        $this->db->query( $sql );
+        return (int) $this->db->rows_affected;
+    }
+
+    /**
      * Find an attender by QR code hash.
      *
      * @param string $hash QR code hash.

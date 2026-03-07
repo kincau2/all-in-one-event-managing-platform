@@ -141,6 +141,7 @@
             seatmaps: 'view_seatmaps',
             users:    'manage_settings',
             settings: 'manage_settings',
+            emails:   'manage_settings',
         };
 
         if (editMatch && !userCan('manage_seatmaps')) {
@@ -245,6 +246,19 @@
         }
     });
 
+    registerRoute('emails', 'Email Templates', function ($el) {
+        if (window.aioemp_emails && window.aioemp_emails.render) {
+            window.aioemp_emails.render($el);
+        } else {
+            $el.html(
+                '<div class="aioemp-card">' +
+                    '<h3 class="aioemp-card__title">Email Templates</h3>' +
+                    '<p>Emails module is loading…</p>' +
+                '</div>'
+            );
+        }
+    });
+
     registerRoute('profile', 'Profile Settings', function ($el) {
         if (window.aioemp_profile && window.aioemp_profile.render) {
             window.aioemp_profile.render($el);
@@ -262,11 +276,8 @@
     $(document).ready(function () {
         initOverlay();
 
-        // Apply saved logo to sidebar brand icon.
-        if (cfg.logo_url) {
-            var $brand = $('.aioemp-sidebar__brand-icon');
-            $brand.html('<img src="' + cfg.logo_url + '" alt="Logo" style="width:100%;height:100%;object-fit:contain;border-radius:inherit;">');
-        }
+        // Sidebar brand icon — always use the default calendar dashicon.
+        // (Company logo is only used on public pages / emails.)
 
         navigate();
     });

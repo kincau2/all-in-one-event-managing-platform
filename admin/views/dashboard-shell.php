@@ -60,15 +60,15 @@ $avatar_initial = esc_html( mb_strtoupper( mb_substr( $display_name, 0, 1 ) ) );
                     </a>
                 </li>
                 <li>
-                    <a href="#settings" class="aioemp-nav-link" data-route="settings">
-                        <span class="dashicons dashicons-admin-generic"></span>
-                        <?php echo esc_html__( 'Settings', 'aioemp' ); ?>
-                    </a>
-                </li>
-                <li>
                     <a href="#emails" class="aioemp-nav-link" data-route="emails">
                         <span class="dashicons dashicons-email-alt"></span>
                         <?php echo esc_html__( 'Emails', 'aioemp' ); ?>
+                    </a>
+                </li>
+                <li>
+                    <a href="#settings" class="aioemp-nav-link" data-route="settings">
+                        <span class="dashicons dashicons-admin-generic"></span>
+                        <?php echo esc_html__( 'Settings', 'aioemp' ); ?>
                     </a>
                 </li>
                 <?php endif; ?>

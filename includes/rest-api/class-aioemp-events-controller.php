@@ -186,6 +186,8 @@ class AIOEMP_Events_Controller extends AIOEMP_REST_Controller {
             return $this->error( 'not_found', __( 'Event not found.', 'aioemp' ), 404 );
         }
 
+        $event = $this->enrich_event( $event );
+
         return $this->success( $event );
     }
 
@@ -458,6 +460,20 @@ class AIOEMP_Events_Controller extends AIOEMP_REST_Controller {
     /*--------------------------------------------------------------
      * Snapshot helpers
      *------------------------------------------------------------*/
+
+    /**
+     * Enrich an event object with related data (e.g. seatmap_title).
+     */
+    private function enrich_event( object $event ): object {
+        if ( ! empty( $event->seatmap_id ) ) {
+            require_once AIOEMP_PLUGIN_DIR . 'includes/models/class-aioemp-seatmap-model.php';
+            $sm = ( new AIOEMP_Seatmap_Model() )->find( (int) $event->seatmap_id );
+            $event->seatmap_title = $sm ? ( $sm->title ?? $sm->name ?? '' ) : '';
+        } else {
+            $event->seatmap_title = '';
+        }
+        return $event;
+    }
 
     /**
      * Copy a seatmap's layout JSON as the event snapshot.

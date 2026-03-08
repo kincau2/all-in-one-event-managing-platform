@@ -25,14 +25,14 @@ class AIOEMP_Attendance_Controller extends AIOEMP_REST_Controller {
 
     protected string $rest_base = 'events';
 
-    private AIOEMP_Attendance_Model $attendance;
-    private AIOEMP_Attender_Model   $attender;
-    private AIOEMP_Events_Model     $events;
+    private AIOEMP_Attendance_Model         $attendance;
+    private AIOEMP_Attender_Model           $attender;
+    private AIOEMP_Events_Model             $events;
 
     public function __construct() {
-        $this->attendance = new AIOEMP_Attendance_Model();
-        $this->attender   = new AIOEMP_Attender_Model();
-        $this->events     = new AIOEMP_Events_Model();
+        $this->attendance  = new AIOEMP_Attendance_Model();
+        $this->attender    = new AIOEMP_Attender_Model();
+        $this->events      = new AIOEMP_Events_Model();
     }
 
     /*--------------------------------------------------------------
@@ -277,6 +277,7 @@ class AIOEMP_Attendance_Controller extends AIOEMP_REST_Controller {
             'first_name'  => $attender->first_name,
             'last_name'   => $attender->last_name,
             'email'       => $attender->email,
+            'status'      => $attender->status,
             'forced'      => $force,
             'message'     => 'IN' === $type
                 ? __( 'Checked in successfully.', 'aioemp' )
@@ -364,4 +365,5 @@ class AIOEMP_Attendance_Controller extends AIOEMP_REST_Controller {
             'csv'      => $csv,
         ) );
     }
+
 }

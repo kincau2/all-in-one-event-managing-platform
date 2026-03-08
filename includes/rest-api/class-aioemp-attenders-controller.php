@@ -260,6 +260,17 @@ class AIOEMP_Attenders_Controller extends AIOEMP_REST_Controller {
 
         $data['event_id'] = $event_id;
 
+        // Venue-mode guard on status at creation.
+        if ( isset( $data['status'] ) ) {
+            $event = $this->events->find( $event_id );
+            if ( $event ) {
+                $venue_err = $this->validate_status_venue_mode( $data['status'], $event );
+                if ( $venue_err ) {
+                    return $venue_err;
+                }
+            }
+        }
+
         $id = $this->model->create( $data );
         if ( false === $id ) {
             return $this->error( 'create_failed', __( 'Could not create candidate.', 'aioemp' ), 500 );
@@ -306,6 +317,17 @@ class AIOEMP_Attenders_Controller extends AIOEMP_REST_Controller {
         $data = $this->extract_attender_data( $request, true );
         if ( is_wp_error( $data ) ) {
             return $data;
+        }
+
+        // Venue-mode guard on status changes.
+        if ( isset( $data['status'] ) ) {
+            $event = $this->events->find( $event_id );
+            if ( $event ) {
+                $venue_err = $this->validate_status_venue_mode( $data['status'], $event );
+                if ( $venue_err ) {
+                    return $venue_err;
+                }
+            }
         }
 
         if ( empty( $data ) ) {
@@ -376,12 +398,19 @@ class AIOEMP_Attenders_Controller extends AIOEMP_REST_Controller {
         $ids        = $request->get_param( 'ids' );
         $new_status = $this->text_param( $request, 'status' );
 
-        if ( ! $this->events->find( $event_id ) ) {
+        $event = $this->events->find( $event_id );
+        if ( ! $event ) {
             return $this->error( 'event_not_found', __( 'Event not found.', 'aioemp' ), 404 );
         }
 
         if ( ! in_array( $new_status, AIOEMP_Attender_Model::STATUSES, true ) ) {
             return $this->error( 'invalid_status', __( 'Invalid status value.', 'aioemp' ) );
+        }
+
+        // Venue-mode guard.
+        $venue_err = $this->validate_status_venue_mode( $new_status, $event );
+        if ( $venue_err ) {
+            return $venue_err;
         }
 
         if ( ! is_array( $ids ) || empty( $ids ) ) {
@@ -416,6 +445,12 @@ class AIOEMP_Attenders_Controller extends AIOEMP_REST_Controller {
 
         if ( ! is_array( $ids ) || empty( $ids ) ) {
             return $this->error( 'no_ids', __( 'No candidates in batch.', 'aioemp' ) );
+        }
+
+        // Venue-mode guard.
+        $venue_err = $this->validate_status_venue_mode( $new_status, $event );
+        if ( $venue_err ) {
+            return $venue_err;
         }
 
         // Cap at 10 per call as a safety measure.
@@ -545,6 +580,33 @@ class AIOEMP_Attenders_Controller extends AIOEMP_REST_Controller {
     /*--------------------------------------------------------------
      * Data extraction & validation
      *------------------------------------------------------------*/
+
+    /**
+     * Validate that the requested status is compatible with the event's venue_mode.
+     *
+     * @param string $status  Candidate status being set.
+     * @param object $event   Event record.
+     * @return \WP_Error|null  Error if invalid, null if OK.
+     */
+    private function validate_status_venue_mode( string $status, object $event ): ?\WP_Error {
+        $mode = $event->venue_mode ?? 'mixed';
+
+        if ( $mode === 'onsite' && $status === 'accepted_online' ) {
+            return $this->error(
+                'venue_mode_mismatch',
+                __( 'Cannot set status to "Accepted Online" — this is an on-site event.', 'aioemp' )
+            );
+        }
+
+        if ( $mode === 'online' && $status === 'accepted_onsite' ) {
+            return $this->error(
+                'venue_mode_mismatch',
+                __( 'Cannot set status to "Accepted On-site" — this is an online event.', 'aioemp' )
+            );
+        }
+
+        return null;
+    }
 
     /**
      * Extract and validate attender data from request.

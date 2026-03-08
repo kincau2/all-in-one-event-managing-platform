@@ -91,7 +91,8 @@ class AIOEMP_Attender_Model extends AIOEMP_Model {
 
         if ( '' !== $args['search'] ) {
             $like     = '%' . $this->db->esc_like( $args['search'] ) . '%';
-            $where[]  = '(t.first_name LIKE %s OR t.last_name LIKE %s OR t.email LIKE %s OR t.company LIKE %s)';
+            $where[]  = '(t.first_name LIKE %s OR t.last_name LIKE %s OR CONCAT(t.first_name, \' \', t.last_name) LIKE %s OR t.email LIKE %s OR t.company LIKE %s)';
+            $values[] = $like;
             $values[] = $like;
             $values[] = $like;
             $values[] = $like;

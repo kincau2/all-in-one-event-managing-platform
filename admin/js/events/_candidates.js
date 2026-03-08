@@ -21,6 +21,8 @@
 
         ctx.candidateState = { page: 1, status: '', search: '' };
 
+        var vm = (ctx.detailEvent && ctx.detailEvent.venue_mode) || 'mixed';
+
         var html =
             '<div class="aioemp-card">' +
                 '<div class="aioemp-card__header">' +
@@ -44,8 +46,8 @@
                         ? '<div class="aioemp-toolbar__bulk" id="cand-bulk-wrap" style="display:none">' +
                               '<select id="cand-bulk-action" class="aioemp-select aioemp-select--sm" style="max-width:200px">' +
                                   '<option value="">Bulk Actions…</option>' +
-                                  '<option value="accepted_onsite">Accept (On-site)</option>' +
-                                  '<option value="accepted_online">Accept (Online)</option>' +
+                                  (vm !== 'online' ? '<option value="accepted_onsite">Accept (On-site)</option>' : '') +
+                                  (vm !== 'onsite' ? '<option value="accepted_online">Accept (Online)</option>' : '') +
                                   '<option value="rejected">Reject</option>' +
                                   '<option value="__resend_email">Resend Email</option>' +
                                   '<option value="__delete">Delete</option>' +
@@ -109,7 +111,7 @@
                         '<th>Status</th>' +
                         '<th>Attendance</th>' +
                         '<th>Registered</th>' +
-                        (canManage() ? '<th style="width:120px">Actions</th>' : '') +
+                        (canManage() ? '<th style="width:140px">Actions</th>' : '') +
                     '</tr></thead><tbody>';
 
             rows.forEach(function (r) {
@@ -135,7 +137,7 @@
                         '<td>' + attCell + '</td>' +
                         '<td>' + ctx.fmtDate(r.created_at_gmt) + '</td>' +
                         (canManage()
-                            ? '<td>' +
+                            ? '<td style="white-space:nowrap">' +
                                   '<button class="aioemp-btn aioemp-btn--xs aioemp-btn--secondary cand-act-edit" title="Edit">' +
                                       '<span class="dashicons dashicons-edit"></span>' +
                                   '</button> ' +
@@ -518,8 +520,10 @@
                     $('#cand-modal-body').html(buildCandidateFields(data));
                     bindCandidateFormEvents(overlay, candidateId);
                 })
-                .catch(function () {
-                    $('#cand-modal-body').html('<p class="aioemp-error">Failed to load candidate.</p>');
+                .catch(function (err) {
+                    console.error('Failed to load candidate', candidateId, err);
+                    var msg = (err && err.message) ? err.message : 'Unknown error';
+                    $('#cand-modal-body').html('<p class="aioemp-error">Failed to load candidate: ' + ctx.esc(msg) + '</p>');
                 });
         } else {
             bindCandidateFormEvents(overlay, null);
@@ -527,6 +531,7 @@
     }
 
     function buildCandidateFields(data) {
+        var vm = (ctx.detailEvent && ctx.detailEvent.venue_mode) || 'mixed';
         return (
             '<div class="aioemp-form-row">' +
                 '<div class="aioemp-form-group aioemp-form-group--half">' +
@@ -543,8 +548,8 @@
                     '<label class="aioemp-label">Status</label>' +
                     '<select id="cand-f-status" class="aioemp-select">' +
                         '<option value="registered"' + (data.status === 'registered' || !data.status ? ' selected' : '') + '>Registered</option>' +
-                        '<option value="accepted_onsite"' + (data.status === 'accepted_onsite' ? ' selected' : '') + '>Accepted (On-site)</option>' +
-                        '<option value="accepted_online"' + (data.status === 'accepted_online' ? ' selected' : '') + '>Accepted (Online)</option>' +
+                        (vm !== 'online' ? '<option value="accepted_onsite"' + (data.status === 'accepted_onsite' ? ' selected' : '') + '>Accepted (On-site)</option>' : '') +
+                        (vm !== 'onsite' ? '<option value="accepted_online"' + (data.status === 'accepted_online' ? ' selected' : '') + '>Accepted (Online)</option>' : '') +
                         '<option value="rejected"' + (data.status === 'rejected' ? ' selected' : '') + '>Rejected</option>' +
                     '</select>' +
                 '</div>' +

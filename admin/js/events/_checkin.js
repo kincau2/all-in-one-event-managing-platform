@@ -55,6 +55,8 @@
     var recentPage    = 1;
     var RECENT_PER_PAGE = 20;
     var seatKeyToLabel = {};     // seat_key UUID → human label (e.g. "A-08")
+    var allCompiledSeatKeys = []; // ordered list of all compiled seat keys
+    var lastResolved = null;      // last resolved candidate data (for auto-assign)
 
     /**
      * Detect a short device model string from navigator.userAgent.
@@ -192,6 +194,7 @@
 
     function buildSeatLabelMap() {
         seatKeyToLabel = {};
+        allCompiledSeatKeys = [];
         try {
             var snapshot = ctx.detailEvent && ctx.detailEvent.seatmap_layout_snapshot;
             if (!snapshot) return;
@@ -200,8 +203,11 @@
             var result = window.aioemp_compileSnapshot(layout);
             var seats = result && result.seats ? result.seats : [];
             for (var i = 0; i < seats.length; i++) {
-                if (seats[i].seat_key && seats[i].label) {
-                    seatKeyToLabel[seats[i].seat_key] = seats[i].label;
+                if (seats[i].seat_key) {
+                    allCompiledSeatKeys.push(seats[i].seat_key);
+                    if (seats[i].label) {
+                        seatKeyToLabel[seats[i].seat_key] = seats[i].label;
+                    }
                 }
             }
         } catch (e) {
@@ -215,6 +221,65 @@
     function seatLabel(seatKey) {
         if (!seatKey) return null;
         return seatKeyToLabel[seatKey] || seatKey;
+    }
+
+    /* ── Auto-assign seat (client-side) ── */
+
+    /**
+     * Auto-assign the first available seat to a candidate.
+     * Called after a successful check-in of an accepted_onsite candidate with no seat.
+     *
+     * Flow:
+     *   1. Uses allCompiledSeatKeys (built from client-side seatmap compilation)
+     *   2. Fetches current assignments + blocked seats from seating API
+     *   3. Finds first unassigned, unblocked seat
+     *   4. Calls seating/assign API
+     */
+    function autoAssignSeat(attenderId) {
+        if (!allCompiledSeatKeys.length) return;
+
+        api.get('events/' + ctx.detailEventId + '/seating')
+            .then(function (seating) {
+                var assignedSet = {};
+                var blockedSet  = {};
+
+                var assignments = seating.assignments || [];
+                for (var i = 0; i < assignments.length; i++) {
+                    assignedSet[assignments[i].seat_key] = true;
+                }
+                var blocked = seating.blocked || [];
+                for (var j = 0; j < blocked.length; j++) {
+                    blockedSet[blocked[j].seat_key] = true;
+                }
+
+                // Find first available seat.
+                var targetKey = null;
+                for (var k = 0; k < allCompiledSeatKeys.length; k++) {
+                    var key = allCompiledSeatKeys[k];
+                    if (!assignedSet[key] && !blockedSet[key]) {
+                        targetKey = key;
+                        break;
+                    }
+                }
+
+                if (!targetKey) {
+                    showFlash('warning', 'No available seats for auto-assignment.');
+                    return;
+                }
+
+                var label = seatKeyToLabel[targetKey] || '';
+
+                return api.post('events/' + ctx.detailEventId + '/seating/assign', {
+                    attender_id: attenderId,
+                    seat_key:    targetKey,
+                    seat_label:  label,
+                }).then(function () {
+                    showFlash('success', 'Seat ' + (label || targetKey) + ' was automatically assigned.');
+                });
+            })
+            .catch(function (err) {
+                showFlash('warning', 'Auto-assign failed: ' + (err.message || 'Unknown error'));
+            });
     }
 
     /* ── Event binding ── */
@@ -561,6 +626,9 @@
 
         $('#checkin-popup').html(html).show();
 
+        // Store last resolved data for auto-assign.
+        lastResolved = data;
+
         // Play a sound / beep (optional).
         playBeep(isAccepted ? 'success' : 'error');
     }
@@ -589,6 +657,13 @@
             showFlash('success', data.message || (type === 'IN' ? 'Checked in!' : 'Checked out!'));
             addRecentScan(data);
             loadStats();
+
+            // Auto-assign seat if accepted_onsite, checking in, and no seat.
+            if (type === 'IN' && data.status === 'accepted_onsite' && lastResolved && !lastResolved.seat_label) {
+                autoAssignSeat(data.attender_id);
+            }
+
+            lastResolved = null;
 
             // Refocus manual input.
             $('#checkin-manual-input').focus();

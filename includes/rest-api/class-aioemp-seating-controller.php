@@ -357,6 +357,19 @@ class AIOEMP_Seating_Controller extends AIOEMP_REST_Controller {
             return $this->error( 'assign_failed', __( 'Could not assign seat. It may already be taken.', 'aioemp' ), 500 );
         }
 
+        // Sync checked_in flag: if the attender is already checked in (latest
+        // attendance scan = IN), mark the new seat assignment as checked_in too.
+        require_once AIOEMP_PLUGIN_DIR . 'includes/models/class-aioemp-attendance-model.php';
+        $att_model = new AIOEMP_Attendance_Model();
+        $latest    = $att_model->get_latest( $event_id, $attender_id );
+        if ( $latest && 'IN' === $latest->type ) {
+            $GLOBALS['wpdb']->update(
+                $GLOBALS['wpdb']->prefix . 'aioemp_seat_assignment',
+                array( 'checked_in' => 1 ),
+                array( 'id' => $id )
+            );
+        }
+
         // Log.
         $this->seat_log->log( $event_id, $attender_id, null, $seat_key, 'assign', $user_id );
 

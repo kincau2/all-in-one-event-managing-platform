@@ -42,6 +42,7 @@
         var html =
             '<table class="aioemp-table">' +
                 '<thead><tr>' +
+                    '<th style="width:60px">ID</th>' +
                     '<th>Name</th>' +
                     '<th>Status</th>' +
                     '<th>Updated</th>' +
@@ -53,6 +54,7 @@
             var date = dateStr ? new Date(dateStr + 'Z').toLocaleDateString() : '—';
             html +=
                 '<tr data-id="' + r.id + '">' +
+                    '<td>' + r.id + '</td>' +
                     '<td class="sme-cell-name">' + esc(r.title || r.name || '') + '</td>' +
                     '<td><span class="aioemp-badge aioemp-badge--' + (r.status || 'draft') + '">' + (r.status || 'draft') + '</span></td>' +
                     '<td>' + date + '</td>' +

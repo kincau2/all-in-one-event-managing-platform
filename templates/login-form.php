@@ -126,9 +126,10 @@ html, body {
                             <input type="checkbox" name="aioemp_remember" value="1">
                             <?php esc_html_e( 'Remember me', 'aioemp' ); ?>
                         </label>
-                        <a href="#" id="aioemp-forgot-link" class="aioemp-login-forgot">
+                        <?php // Forgot-password link hidden until backend reset endpoint is implemented. ?>
+                        <!-- <a href="#" id="aioemp-forgot-link" class="aioemp-login-forgot">
                             <?php esc_html_e( 'Forgot password?', 'aioemp' ); ?>
-                        </a>
+                        </a> -->
                     </div>
 
                     <button type="submit" class="aioemp-login-submit">

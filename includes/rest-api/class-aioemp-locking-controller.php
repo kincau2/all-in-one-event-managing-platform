@@ -165,7 +165,6 @@ class AIOEMP_Locking_Controller extends AIOEMP_REST_Controller {
         $cap_map = array(
             'seatmap' => AIOEMP_Security::CAPS['manage_seatmaps'],
             'event'   => AIOEMP_Security::CAPS['manage_events'],
-            'seating' => AIOEMP_Security::CAPS['manage_seating'],
         );
 
         $cap = $cap_map[ $type ] ?? null;

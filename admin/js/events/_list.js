@@ -124,18 +124,19 @@
     }
 
     function renderEventsList($el) {
+        $el.off('.aioemp-list');
         $el.html(listSkeleton());
         $wrap = $('#evt-list-wrap');
         $pagination = $('#evt-pagination');
 
         listState = { page: 1, status: '', search: '' };
 
-        $el.on('click', '#evt-btn-new', function () {
+        $el.on('click.aioemp-list', '#evt-btn-new', function () {
             ctx.showEventForm(null);
         });
 
         var searchTimer;
-        $el.on('input', '#evt-search', function () {
+        $el.on('input.aioemp-list', '#evt-search', function () {
             clearTimeout(searchTimer);
             var val = $(this).val();
             searchTimer = setTimeout(function () {
@@ -145,23 +146,23 @@
             }, 300);
         });
 
-        $el.on('change', '#evt-filter-status', function () {
+        $el.on('change.aioemp-list', '#evt-filter-status', function () {
             listState.status = $(this).val();
             listState.page = 1;
             loadEventList();
         });
 
-        $el.on('click', '.evt-act-del', function () {
+        $el.on('click.aioemp-list', '.evt-act-del', function () {
             var id = $(this).closest('tr').data('id');
             deleteEvent(id);
         });
-        $el.on('click', '.evt-page-prev', function () {
+        $el.on('click.aioemp-list', '.evt-page-prev', function () {
             if (listState.page > 1) {
                 listState.page--;
                 loadEventList();
             }
         });
-        $el.on('click', '.evt-page-next', function () {
+        $el.on('click.aioemp-list', '.evt-page-next', function () {
             listState.page++;
             loadEventList();
         });

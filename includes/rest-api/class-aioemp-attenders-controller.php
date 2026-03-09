@@ -826,7 +826,7 @@ class AIOEMP_Attenders_Controller extends AIOEMP_REST_Controller {
      * @param object $attender   Attender record (after update).
      * @param string $new_status The new status value.
      * @param int    $event_id   Event ID.
-     * @return array  Diagnostic info about the email attempt.
+     * @return void
      */
     private function maybe_send_status_email( object $attender, string $new_status, int $event_id, ?object $event = null ): void {
         if ( ! isset( self::STATUS_EMAIL_MAP[ $new_status ] ) ) {

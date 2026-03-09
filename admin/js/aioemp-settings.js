@@ -318,8 +318,6 @@
             $('#aioemp-logo-remove-btn').show();
             $status.text('Logo uploaded.').addClass('aioemp-settings__status--ok');
             setTimeout(function () { $status.text(''); }, 3000);
-            // Update sidebar brand if logo is shown there.
-            updateSidebarLogo(data.url);
         })
         .catch(function (err) {
             var msg = (err && err.message) ? err.message : 'Upload failed.';
@@ -331,23 +329,14 @@
         rest.put('settings', { logo_attachment_id: 0, logo_url: '' }).then(function () {
             renderLogoPreview('');
             $('#aioemp-logo-remove-btn').hide();
-            updateSidebarLogo('');
         });
-    }
-
-    function updateSidebarLogo(url) {
-        // Sidebar brand always uses the default dashicon — no-op.
     }
 
     /* ------------------------------------------------------------------ *
      * Utility
      * ------------------------------------------------------------------ */
 
-    function escHtml(str) {
-        var div = document.createElement('div');
-        div.appendChild(document.createTextNode(str));
-        return div.innerHTML;
-    }
+    var escHtml = window.aioemp_esc;
 
     /* ------------------------------------------------------------------ *
      * Expose to SPA router

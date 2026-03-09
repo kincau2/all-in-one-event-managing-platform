@@ -69,6 +69,15 @@
     // Expose for other modules.
     window.aioemp_api = api;
 
+    /**
+     * Shared HTML-escape utility — use instead of per-module copies.
+     */
+    window.aioemp_esc = function (str) {
+        var el = document.createElement('span');
+        el.textContent = str == null ? '' : String(str);
+        return el.innerHTML;
+    };
+
     /* --------------------------------------------------------------------- *
      * Full-screen overlay setup
      * --------------------------------------------------------------------- */

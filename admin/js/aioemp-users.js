@@ -499,12 +499,7 @@
      * Utility
      * ------------------------------------------------------------------ */
 
-    function escHtml(str) {
-        if (str == null) return '';
-        var div = document.createElement('div');
-        div.appendChild(document.createTextNode(String(str)));
-        return div.innerHTML;
-    }
+    var escHtml = window.aioemp_esc;
 
     /* ------------------------------------------------------------------ *
      * Expose to SPA router

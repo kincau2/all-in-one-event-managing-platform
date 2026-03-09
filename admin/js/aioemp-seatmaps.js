@@ -78,11 +78,7 @@
         return html;
     }
 
-    function esc(str) {
-        var el = document.createElement('span');
-        el.textContent = str || '';
-        return el.innerHTML;
-    }
+    var esc = window.aioemp_esc;
 
     /* ── State ── */
 

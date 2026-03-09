@@ -36,9 +36,15 @@ class AIOEMP_Events_Controller extends AIOEMP_REST_Controller {
      */
     private AIOEMP_Event_Log_Model $log;
 
+    /**
+     * @var AIOEMP_Seatmap_Model
+     */
+    private AIOEMP_Seatmap_Model $seatmap_model;
+
     public function __construct() {
-        $this->model = new AIOEMP_Events_Model();
-        $this->log   = new AIOEMP_Event_Log_Model();
+        $this->model         = new AIOEMP_Events_Model();
+        $this->log           = new AIOEMP_Event_Log_Model();
+        $this->seatmap_model = new AIOEMP_Seatmap_Model();
     }
 
     /*--------------------------------------------------------------
@@ -266,6 +272,18 @@ class AIOEMP_Events_Controller extends AIOEMP_REST_Controller {
             return $this->error( 'delete_failed', __( 'Could not delete event.', 'aioemp' ), 500 );
         }
 
+        // Cascade-delete related data.
+        $prefix = $GLOBALS['wpdb']->prefix . 'aioemp_';
+        $where  = array( 'event_id' => $id );
+        $fmt    = array( '%d' );
+
+        $GLOBALS['wpdb']->delete( $prefix . 'seat_assignment_log', $where, $fmt );
+        $GLOBALS['wpdb']->delete( $prefix . 'seat_assignment',     $where, $fmt );
+        $GLOBALS['wpdb']->delete( $prefix . 'blocked_seat',        $where, $fmt );
+        $GLOBALS['wpdb']->delete( $prefix . 'attendance',          $where, $fmt );
+        $GLOBALS['wpdb']->delete( $prefix . 'attender',            $where, $fmt );
+        $GLOBALS['wpdb']->delete( $prefix . 'event_meta',          $where, $fmt );
+
         // Audit log.
         $this->log->log( $id, 'event_deleted', (array) $event, array(), get_current_user_id() );
 
@@ -352,8 +370,7 @@ class AIOEMP_Events_Controller extends AIOEMP_REST_Controller {
                 $sm_id = absint( $seatmap_id );
 
                 // Verify seatmap passes integrity check before allowing assignment.
-                $sm_model = new AIOEMP_Seatmap_Model();
-                $seatmap  = $sm_model->find( $sm_id );
+                $seatmap = $this->seatmap_model->find( $sm_id );
 
                 if ( ! $seatmap ) {
                     return $this->error( 'seatmap_not_found', __( 'Seatmap not found.', 'aioemp' ), 404 );
@@ -467,7 +484,7 @@ class AIOEMP_Events_Controller extends AIOEMP_REST_Controller {
     private function enrich_event( object $event ): object {
         if ( ! empty( $event->seatmap_id ) ) {
             require_once AIOEMP_PLUGIN_DIR . 'includes/models/class-aioemp-seatmap-model.php';
-            $sm = ( new AIOEMP_Seatmap_Model() )->find( (int) $event->seatmap_id );
+            $sm = $this->seatmap_model->find( (int) $event->seatmap_id );
             $event->seatmap_title = $sm ? ( $sm->title ?? $sm->name ?? '' ) : '';
         } else {
             $event->seatmap_title = '';
@@ -482,8 +499,7 @@ class AIOEMP_Events_Controller extends AIOEMP_REST_Controller {
      * @return string|\WP_Error Layout JSON string or error.
      */
     private function copy_seatmap_snapshot( int $seatmap_id ): string|\WP_Error {
-        $sm_model = new AIOEMP_Seatmap_Model();
-        $seatmap  = $sm_model->find( $seatmap_id );
+        $seatmap = $this->seatmap_model->find( $seatmap_id );
 
         if ( ! $seatmap ) {
             return $this->error( 'seatmap_not_found', __( 'Seatmap not found.', 'aioemp' ), 404 );

@@ -69,16 +69,17 @@
 
             '<div id="evt-tab-content" class="aioemp-tab-content"></div>';
 
+        $el.off('.aioemp-detail');
         $el.html(html);
 
-        $el.on('click', '.aioemp-tab', function () {
+        $el.on('click.aioemp-detail', '.aioemp-tab', function () {
             ctx.activeTab = $(this).data('tab');
             $el.find('.aioemp-tab').removeClass('is-active');
             $(this).addClass('is-active');
             ctx.renderTabContent();
         });
 
-        $el.on('click', '#evt-detail-edit', function () {
+        $el.on('click.aioemp-detail', '#evt-detail-edit', function () {
             ctx.showEventForm(ctx.detailEventId);
         });
 

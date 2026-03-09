@@ -42,7 +42,9 @@ class AIOEMP_Event_Log_Model extends AIOEMP_Model {
             'created_at_gmt' => $this->now_gmt(),
         );
 
-        $result = $this->db->insert( $this->table, $data );
+        $formats = array( '%d', '%d', '%s', '%s', '%s', '%s' );
+
+        $result = $this->db->insert( $this->table, $data, $formats );
         return $result ? (int) $this->db->insert_id : false;
     }
 

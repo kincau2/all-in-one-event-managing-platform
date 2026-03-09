@@ -770,8 +770,8 @@ class AIOEMP_Seating_Controller extends AIOEMP_REST_Controller {
         }
 
         // Modern architecture: compiled data is NOT stored (compiled client-side).
-        // Validate the seat_key is a well-formed UUID — the client already verified
-        // the key belongs to a seat it compiled from the stored primitives.
+        // Validate the key is a well-formed UUID v4 — the client has already
+        // verified the key belongs to a compiled seat before sending.
         return (bool) preg_match(
             '/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i',
             $seat_key

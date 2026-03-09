@@ -335,21 +335,14 @@
         }
 
         /**
-         * Process candidates in batches of 5 with a progress modal.
-         * Each batch updates DB status AND sends emails atomically.
+         * Process candidates one at a time with a progress modal.
+         * Each call updates DB status AND sends the email atomically.
          */
         function runBatchProcess(allIds, status) {
-            var BATCH_SIZE = 1;
             var total      = allIds.length;
             var processed  = 0;
             var totalSent  = 0;
             var totalFailed = [];
-            var batches    = [];
-
-            // Chunk IDs into groups of BATCH_SIZE.
-            for (var i = 0; i < total; i += BATCH_SIZE) {
-                batches.push(allIds.slice(i, i + BATCH_SIZE));
-            }
 
             // Build progress modal.
             var $overlay = $('<div class="aioemp-modal-overlay"></div>');
@@ -359,7 +352,7 @@
                         '<h3>Processing Candidates</h3>' +
                     '</div>' +
                     '<div class="aioemp-modal__body">' +
-                        '<p class="batch-status-text">Preparing batch 1 of ' + batches.length + '…</p>' +
+                        '<p class="batch-status-text">Processing 1 of ' + total + '…</p>' +
                         '<div class="aioemp-progress">' +
                             '<div class="aioemp-progress__bar" style="width:0%"></div>' +
                         '</div>' +
@@ -376,7 +369,7 @@
             var $detail = $modal.find('.batch-detail-text');
 
             function processBatch(index) {
-                if (index >= batches.length) {
+                if (index >= total) {
                     // Done — show summary.
                     var pct = 100;
                     $bar.css('width', pct + '%');
@@ -409,11 +402,10 @@
                     return;
                 }
 
-                var batch = batches[index];
-                $status.text('Processing batch ' + (index + 1) + ' of ' + batches.length + '…');
+                $status.text('Processing ' + (index + 1) + ' of ' + total + '…');
 
                 api.post('events/' + ctx.detailEventId + '/attenders/batch-process', {
-                    ids: batch,
+                    ids: [allIds[index]],
                     status: status,
                 })
                 .then(function (res) {
@@ -431,8 +423,8 @@
                     processBatch(index + 1);
                 })
                 .catch(function (err) {
-                    // On error, still continue with remaining batches.
-                    $detail.text('Batch ' + (index + 1) + ' error: ' + (err.message || 'Unknown') + '. Continuing…');
+                    // On error, still continue with remaining candidates.
+                    $detail.text('Error on ' + (index + 1) + ': ' + (err.message || 'Unknown') + '. Continuing…');
                     processBatch(index + 1);
                 });
             }

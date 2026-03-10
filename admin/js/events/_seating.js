@@ -14,8 +14,22 @@
     var api = ctx.api;
     var esc = ctx.esc;
     var ss  = ctx.seatingState;
+    var modal = window.aioemp_modal;
 
     function renderSeatingTab($tc) {
+        if (window.innerWidth < 1024 || window.innerHeight < 768) {
+            $tc.html(
+                '<div class="aioemp-screen-gate">' +
+                    '<div class="aioemp-screen-gate__icon"><span class="dashicons dashicons-desktop"></span></div>' +
+                    '<h2 class="aioemp-screen-gate__title">Screen Too Small</h2>' +
+                    '<p class="aioemp-screen-gate__msg">The Seat Assignment tool requires a minimum screen size of <strong>1024 × 768</strong> pixels.<br>' +
+                        'Your current screen is <strong>' + window.innerWidth + ' × ' + window.innerHeight + '</strong> pixels.</p>' +
+                    '<button class="aioemp-btn aioemp-btn--primary aioemp-screen-gate__btn" onclick="location.hash=\'#events\'">← Back to Dashboard</button>' +
+                '</div>'
+            );
+            return;
+        }
+
         var d = ctx.detailEvent;
 
         // Reset selection state on every tab entry.
@@ -922,16 +936,20 @@
                     var a2 = ss.assignMap[seatKey];
                     var name1 = a1 ? ((a1.first_name || '') + ' ' + (a1.last_name || '')).trim() || '(unnamed)' : '?';
                     var name2 = a2 ? ((a2.first_name || '') + ' ' + (a2.last_name || '')).trim() || '(unnamed)' : '?';
-                    if (!confirm('Swap seats?\n\n' +
-                        name1 + ' (Seat ' + seatLabel(ss.swapFirst) + ')\n↔\n' +
-                        name2 + ' (Seat ' + seatLabel(seatKey) + ')\n\nThis action cannot be undone.')) {
+                    var swapFirst = ss.swapFirst;
+                    modal.confirm(
+                        name1 + ' (Seat ' + seatLabel(swapFirst) + ')  ↔  ' + name2 + ' (Seat ' + seatLabel(seatKey) + ')',
+                        { title: 'Swap Seats?', variant: 'warning', confirmText: 'Swap', detail: 'This action cannot be undone.' }
+                    ).then(function (ok) {
+                        if (!ok) {
+                            ss.swapFirst = null;
+                            highlightSeat(swapFirst, false);
+                            showSeatToast('Swap cancelled.', 'info');
+                            return;
+                        }
+                        doSwap(swapFirst, seatKey, snapshot);
                         ss.swapFirst = null;
-                        highlightSeat(ss.swapFirst, false);
-                        showSeatToast('Swap cancelled.', 'info');
-                        return;
-                    }
-                    doSwap(ss.swapFirst, seatKey, snapshot);
-                    ss.swapFirst = null;
+                    });
                 }
                 break;
 
@@ -1439,11 +1457,20 @@
         });
         if (checkedInNames.length) {
             var msg = 'The following candidate(s) are already checked in:\n\n' +
-                      checkedInNames.join('\n') +
+                      checkedInNames.join(', ') +
                       '\n\nAre you sure you want to reassign their seat(s)?';
-            if (!confirm(msg)) return;
+            modal.confirm(msg, { title: 'Reassign Checked-In Candidates?', variant: 'warning', confirmText: 'Reassign' })
+                .then(function (ok) {
+                    if (!ok) return;
+                    executeBatchAssign(pending, candidates, snapshot);
+                });
+            return;
         }
 
+        executeBatchAssign(pending, candidates, snapshot);
+    }
+
+    function executeBatchAssign(pending, candidates, snapshot) {
         var pairs = [];
         for (var i = 0; i < Math.min(pending.length, candidates.length); i++) {
             pairs.push({ attender_id: candidates[i].id, seat_key: pending[i], seat_label: seatLabel(pending[i]) });

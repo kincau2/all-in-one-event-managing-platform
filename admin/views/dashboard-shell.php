@@ -44,7 +44,7 @@ $avatar_initial = esc_html( mb_strtoupper( mb_substr( $display_name, 0, 1 ) ) );
                     </a>
                 </li>
                 <?php endif; ?>
-                <?php if ( current_user_can( AIOEMP_Security::CAPS['view_seatmaps'] ) ) : ?>
+                <?php if ( current_user_can( AIOEMP_Security::CAPS['manage_seatmaps'] ) ) : ?>
                 <li>
                     <a href="#seatmaps" class="aioemp-nav-link" data-route="seatmaps">
                         <span class="dashicons dashicons-layout"></span>
@@ -93,10 +93,12 @@ $avatar_initial = esc_html( mb_strtoupper( mb_substr( $display_name, 0, 1 ) ) );
                 <h1 id="aioemp-page-title" class="aioemp-topbar__title"></h1>
             </div>
             <div class="aioemp-topbar__right">
+                <?php if ( current_user_can( 'manage_options' ) ) : ?>
                 <a href="<?php echo esc_url( admin_url() ); ?>" class="aioemp-topbar__btn-back">
                     <span class="dashicons dashicons-arrow-left-alt"></span>
                     <?php echo esc_html__( 'WP Dashboard', 'aioemp' ); ?>
                 </a>
+                <?php endif; ?>
                 <div class="aioemp-topbar__account">
                     <div class="aioemp-topbar__user">
                         <span class="aioemp-topbar__avatar"><?php echo $avatar_initial; // Already escaped. ?></span>

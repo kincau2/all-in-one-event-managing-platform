@@ -64,10 +64,13 @@
         post(endpoint, body) { return this.request(endpoint, { method: 'POST', body: JSON.stringify(body) }); },
         put(endpoint, body) { return this.request(endpoint, { method: 'PUT', body: JSON.stringify(body) }); },
         del(endpoint) { return this.request(endpoint, { method: 'DELETE' }); },
+        /** Build a full REST URL for a given endpoint (for native fetch usage). */
+        buildUrl(endpoint) { return cfg.rest_url + endpoint; },
     };
 
     // Expose for other modules.
     window.aioemp_api = api;
+    window.aioemp_rest_nonce = cfg.nonce;
 
     /**
      * Shared HTML-escape utility — use instead of per-module copies.
@@ -77,6 +80,126 @@
         el.textContent = str == null ? '' : String(str);
         return el.innerHTML;
     };
+
+    /* --------------------------------------------------------------------- *
+     * Custom modal popups (replaces native confirm / alert)
+     * --------------------------------------------------------------------- */
+    window.aioemp_modal = (function () {
+        var esc = window.aioemp_esc;
+
+        function buildOverlay() {
+            var $overlay = $('<div class="aioemp-popup-overlay"></div>');
+            $('body').append($overlay);
+            // Animate in.
+            requestAnimationFrame(function () { $overlay.addClass('is-visible'); });
+            return $overlay;
+        }
+
+        function removeOverlay($overlay) {
+            $overlay.removeClass('is-visible');
+            setTimeout(function () { $overlay.remove(); }, 200);
+        }
+
+        /**
+         * Show an alert popup (informational).
+         * @param {string} message  Plain-text or pre-escaped HTML message.
+         * @param {object} [opts]   { title, variant: 'info'|'success'|'warning'|'danger' }
+         * @returns {Promise<void>}
+         */
+        function showAlert(message, opts) {
+            opts = opts || {};
+            var variant = opts.variant || 'info';
+            var title   = opts.title   || 'Notice';
+            var icon    = iconForVariant(variant);
+
+            return new Promise(function (resolve) {
+                var $overlay = buildOverlay();
+                var $popup = $(
+                    '<div class="aioemp-popup aioemp-popup--' + variant + '">' +
+                        '<div class="aioemp-popup__icon">' + icon + '</div>' +
+                        '<h3 class="aioemp-popup__title">' + esc(title) + '</h3>' +
+                        '<div class="aioemp-popup__message">' + esc(message) + '</div>' +
+                        '<div class="aioemp-popup__actions">' +
+                            '<button class="aioemp-btn aioemp-btn--primary aioemp-popup__btn-ok">OK</button>' +
+                        '</div>' +
+                    '</div>'
+                );
+                $overlay.append($popup);
+
+                function close() {
+                    removeOverlay($overlay);
+                    resolve();
+                }
+
+                $popup.find('.aioemp-popup__btn-ok').on('click', close);
+                $overlay.on('click', function (e) { if (e.target === this) close(); });
+                $(document).one('keydown.aioemp-popup', function (e) { if (e.key === 'Escape') close(); });
+                $popup.find('.aioemp-popup__btn-ok').focus();
+            });
+        }
+
+        /**
+         * Show a confirm popup.
+         * @param {string} message  Plain-text message.
+         * @param {object} [opts]   { title, variant, confirmText, cancelText, detail }
+         * @returns {Promise<boolean>}  true = confirmed, false = cancelled.
+         */
+        function showConfirm(message, opts) {
+            opts = opts || {};
+            var variant     = opts.variant     || 'warning';
+            var title       = opts.title       || 'Confirm';
+            var confirmText = opts.confirmText || 'Confirm';
+            var cancelText  = opts.cancelText  || 'Cancel';
+            var detail      = opts.detail      || '';
+            var icon        = iconForVariant(variant);
+            var btnClass    = variant === 'danger'
+                ? 'aioemp-btn--danger'
+                : 'aioemp-btn--primary';
+
+            return new Promise(function (resolve) {
+                var $overlay = buildOverlay();
+                var $popup = $(
+                    '<div class="aioemp-popup aioemp-popup--' + variant + '">' +
+                        '<div class="aioemp-popup__icon">' + icon + '</div>' +
+                        '<h3 class="aioemp-popup__title">' + esc(title) + '</h3>' +
+                        '<div class="aioemp-popup__message">' + esc(message) + '</div>' +
+                        (detail ? '<div class="aioemp-popup__detail">' + esc(detail) + '</div>' : '') +
+                        '<div class="aioemp-popup__actions">' +
+                            '<button class="aioemp-btn aioemp-btn--outline aioemp-popup__btn-cancel">' + esc(cancelText) + '</button>' +
+                            '<button class="aioemp-btn ' + btnClass + ' aioemp-popup__btn-confirm">' + esc(confirmText) + '</button>' +
+                        '</div>' +
+                    '</div>'
+                );
+                $overlay.append($popup);
+
+                var resolved = false;
+                function finish(val) {
+                    if (resolved) return;
+                    resolved = true;
+                    $(document).off('keydown.aioemp-popup');
+                    removeOverlay($overlay);
+                    resolve(val);
+                }
+
+                $popup.find('.aioemp-popup__btn-confirm').on('click', function () { finish(true); });
+                $popup.find('.aioemp-popup__btn-cancel').on('click', function () { finish(false); });
+                $overlay.on('click', function (e) { if (e.target === this) finish(false); });
+                $(document).on('keydown.aioemp-popup', function (e) { if (e.key === 'Escape') finish(false); });
+                $popup.find('.aioemp-popup__btn-confirm').focus();
+            });
+        }
+
+        function iconForVariant(v) {
+            switch (v) {
+                case 'danger':  return '<span class="dashicons dashicons-warning" style="color:var(--sa-danger)"></span>';
+                case 'warning': return '<span class="dashicons dashicons-warning" style="color:var(--sa-warning)"></span>';
+                case 'success': return '<span class="dashicons dashicons-yes-alt" style="color:var(--sa-success)"></span>';
+                default:        return '<span class="dashicons dashicons-info" style="color:var(--sa-info)"></span>';
+            }
+        }
+
+        return { alert: showAlert, confirm: showConfirm };
+    })();
 
     /* --------------------------------------------------------------------- *
      * Full-screen overlay setup

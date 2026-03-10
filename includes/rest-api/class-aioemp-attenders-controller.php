@@ -181,6 +181,20 @@ class AIOEMP_Attenders_Controller extends AIOEMP_REST_Controller {
             'callback'            => array( $this, 'resend_email' ),
             'permission_callback' => array( $this, 'manage_permission' ),
         ) );
+
+        // CSV export — download all candidates as CSV.
+        register_rest_route( $this->namespace, '/' . $this->rest_base . '/export-csv', array(
+            'methods'             => \WP_REST_Server::READABLE,
+            'callback'            => array( $this, 'export_csv' ),
+            'permission_callback' => array( $this, 'manage_permission' ),
+        ) );
+
+        // CSV import — upload CSV to create or update candidates.
+        register_rest_route( $this->namespace, '/' . $this->rest_base . '/import-csv', array(
+            'methods'             => \WP_REST_Server::CREATABLE,
+            'callback'            => array( $this, 'import_csv' ),
+            'permission_callback' => array( $this, 'manage_permission' ),
+        ) );
     }
 
     /*--------------------------------------------------------------
@@ -453,8 +467,10 @@ class AIOEMP_Attenders_Controller extends AIOEMP_REST_Controller {
             return $venue_err;
         }
 
-        // Cap at 10 per call as a safety measure.
-        $ids = array_slice( $ids, 0, 10 );
+        // Cap per call — respect the configured batch size (max 50).
+        $batch_limit = (int) AIOEMP_Settings_Service::get( 'email_batch_size' );
+        $batch_limit = max( 1, min( $batch_limit, 50 ) );
+        $ids = array_slice( $ids, 0, $batch_limit );
 
         // Update status in DB.
         $updated = $this->model->bulk_update_status( $event_id, $ids, $new_status );
@@ -905,5 +921,220 @@ class AIOEMP_Attenders_Controller extends AIOEMP_REST_Controller {
         }
 
         return $variables;
+    }
+
+    /*--------------------------------------------------------------
+     * CSV Export / Import
+     *------------------------------------------------------------*/
+
+    /**
+     * CSV column headers used for export (no status — status is not managed via CSV).
+     */
+    private const CSV_COLUMNS = array( 'id', 'title', 'first_name', 'last_name', 'email', 'company' );
+
+    /**
+     * GET /events/<event_id>/attenders/export-csv — download all candidates as CSV.
+     */
+    public function export_csv( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
+        $event_id = absint( $request->get_param( 'event_id' ) );
+        $event    = $this->events->find( $event_id );
+        if ( ! $event ) {
+            return $this->error( 'event_not_found', __( 'Event not found.', 'aioemp' ), 404 );
+        }
+
+        // Fetch all candidates (no pagination limit).
+        $result = $this->model->list_for_event( $event_id, array(
+            'per_page' => 100000,
+            'page'     => 1,
+        ) );
+
+        $handle = fopen( 'php://temp', 'r+' );
+        fputcsv( $handle, self::CSV_COLUMNS );
+
+        foreach ( $result->items as $row ) {
+            $line = array();
+            foreach ( self::CSV_COLUMNS as $col ) {
+                $line[] = $row->$col ?? '';
+            }
+            fputcsv( $handle, $line );
+        }
+
+        rewind( $handle );
+        $csv = stream_get_contents( $handle );
+        fclose( $handle );
+
+        $response = new \WP_REST_Response( $csv );
+        $response->header( 'Content-Type', 'text/csv; charset=utf-8' );
+        $response->header( 'Content-Disposition', 'attachment; filename="candidates-event-' . $event_id . '.csv"' );
+        return $response;
+    }
+
+    /**
+     * POST /events/<event_id>/attenders/import-csv — import candidates from CSV.
+     *
+     * Accepts multipart form: file (CSV), mode ('new' or 'update').
+     * - new:    ignore id column, create all rows as new candidates. Returns created_ids.
+     * - update: match rows by id within this event; unmatched IDs are skipped (not created).
+     */
+    public function import_csv( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
+        $event_id = absint( $request->get_param( 'event_id' ) );
+        $event    = $this->events->find( $event_id );
+        if ( ! $event ) {
+            return $this->error( 'event_not_found', __( 'Event not found.', 'aioemp' ), 404 );
+        }
+
+        $mode = $this->text_param( $request, 'mode' );
+        if ( ! in_array( $mode, array( 'new', 'update' ), true ) ) {
+            return $this->error( 'invalid_mode', __( 'Mode must be "new" or "update".', 'aioemp' ) );
+        }
+
+        $files = $request->get_file_params();
+        if ( empty( $files['file'] ) || empty( $files['file']['tmp_name'] ) ) {
+            return $this->error( 'no_file', __( 'No CSV file uploaded.', 'aioemp' ) );
+        }
+
+        $file = $files['file'];
+
+        // Validate MIME type — allow text/csv and related.
+        $finfo = finfo_open( FILEINFO_MIME_TYPE );
+        $mime  = finfo_file( $finfo, $file['tmp_name'] );
+        finfo_close( $finfo );
+
+        $allowed_mimes = array( 'text/csv', 'text/plain', 'application/csv', 'application/vnd.ms-excel' );
+        if ( ! in_array( $mime, $allowed_mimes, true ) ) {
+            return $this->error( 'invalid_mime', __( 'File must be a CSV.', 'aioemp' ) );
+        }
+
+        // 5 MB limit.
+        if ( $file['size'] > 5 * 1024 * 1024 ) {
+            return $this->error( 'file_too_large', __( 'CSV file must be under 5 MB.', 'aioemp' ) );
+        }
+
+        $handle = fopen( $file['tmp_name'], 'r' );
+        if ( ! $handle ) {
+            return $this->error( 'open_failed', __( 'Could not read CSV file.', 'aioemp' ), 500 );
+        }
+
+        // Read & validate header row.
+        $header = fgetcsv( $handle );
+        if ( ! $header ) {
+            fclose( $handle );
+            return $this->error( 'empty_csv', __( 'CSV file is empty.', 'aioemp' ) );
+        }
+
+        // Normalize header (trim, lowercase).
+        $header = array_map( function ( $h ) {
+            return strtolower( trim( $h ) );
+        }, $header );
+
+        // Must contain at least first_name or last_name.
+        if ( ! in_array( 'first_name', $header, true ) && ! in_array( 'last_name', $header, true ) ) {
+            fclose( $handle );
+            return $this->error( 'missing_name_column', __( 'CSV must contain a first_name or last_name column.', 'aioemp' ) );
+        }
+
+        // New mode must NOT contain an id column (prevents accidental re-import).
+        if ( $mode === 'new' && in_array( 'id', $header, true ) ) {
+            fclose( $handle );
+            return $this->error( 'id_column_not_allowed', __( 'CSV must not contain an ID column when adding new candidates. Remove the ID column and try again.', 'aioemp' ) );
+        }
+
+        $allowed_fields = array( 'title', 'first_name', 'last_name', 'email', 'company', 'status' );
+        $id_col_index   = array_search( 'id', $header, true );
+
+        $created     = 0;
+        $updated     = 0;
+        $skipped     = 0;
+        $errors      = array();
+        $created_ids = array();
+        $row_num     = 1; // 1 = header, data starts at 2.
+
+        while ( ( $row = fgetcsv( $handle ) ) !== false ) {
+            $row_num++;
+
+            // Skip empty rows.
+            if ( empty( array_filter( $row, function ( $v ) { return trim( $v ) !== ''; } ) ) ) {
+                continue;
+            }
+
+            // Map row to associative array using header.
+            $record = array();
+            foreach ( $header as $i => $col ) {
+                $record[ $col ] = isset( $row[ $i ] ) ? trim( $row[ $i ] ) : '';
+            }
+
+            // Build data for insert/update.
+            $data = array();
+            foreach ( $allowed_fields as $field ) {
+                if ( isset( $record[ $field ] ) && $record[ $field ] !== '' ) {
+                    if ( $field === 'email' ) {
+                        $data[ $field ] = sanitize_email( $record[ $field ] );
+                    } elseif ( $field === 'status' ) {
+                        if ( in_array( $record[ $field ], AIOEMP_Attender_Model::STATUSES, true ) ) {
+                            $data[ $field ] = $record[ $field ];
+                        }
+                    } elseif ( $field === 'title' ) {
+                        $data[ $field ] = AIOEMP_Security::sanitize_text( $record[ $field ] );
+                    } else {
+                        $data[ $field ] = AIOEMP_Security::sanitize_text( $record[ $field ] );
+                    }
+                }
+            }
+
+            // Must have a name.
+            if ( empty( $data['first_name'] ) && empty( $data['last_name'] ) ) {
+                $skipped++;
+                $errors[] = sprintf( 'Row %d: missing name, skipped.', $row_num );
+                continue;
+            }
+
+            // Update mode: match by ID — unmatched rows are skipped (not created).
+            if ( $mode === 'update' ) {
+                if ( $id_col_index === false || empty( $record['id'] ) ) {
+                    $skipped++;
+                    $errors[] = sprintf( 'Row %d: no ID provided, skipped.', $row_num );
+                    continue;
+                }
+
+                $existing_id = absint( $record['id'] );
+                $existing    = $this->model->find( $existing_id );
+
+                if ( $existing && (int) $existing->event_id === $event_id ) {
+                    $this->model->update( $existing_id, $data );
+                    $updated++;
+                } else {
+                    $skipped++;
+                    $errors[] = sprintf( 'Row %d: Candidate ID %d not found in this event.', $row_num, $existing_id );
+                }
+                continue;
+            }
+
+            // New mode: create candidate.
+            $data['event_id'] = $event_id;
+            $id = $this->model->create( $data );
+            if ( $id ) {
+                $created++;
+                $created_ids[] = (int) $id;
+            } else {
+                $skipped++;
+                $errors[] = sprintf( 'Row %d: insert failed.', $row_num );
+            }
+        }
+
+        fclose( $handle );
+
+        $result = array(
+            'created' => $created,
+            'updated' => $updated,
+            'skipped' => $skipped,
+            'errors'  => array_slice( $errors, 0, 50 ), // cap error list
+        );
+
+        // In 'new' mode, return created IDs so the frontend can trigger registration emails.
+        if ( $mode === 'new' && ! empty( $created_ids ) ) {
+            $result['created_ids'] = $created_ids;
+        }
+
+        return $this->success( $result );
     }
 }

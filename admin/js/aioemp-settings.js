@@ -124,6 +124,18 @@
                         '<input type="number" id="aioemp-default-capacity" class="aioemp-input" min="1" max="100000">' +
                     '</div>' +
                 '</div>' +
+                '<div class="aioemp-form-row">' +
+                    '<div class="aioemp-form-group aioemp-form-group--half">' +
+                        '<label class="aioemp-label" for="aioemp-email-batch-size">Email Batch Size</label>' +
+                        '<input type="number" id="aioemp-email-batch-size" class="aioemp-input" min="1" max="50" placeholder="1">' +
+                        '<p class="aioemp-help">Number of emails sent per cycle when bulk-processing candidates (1–50).</p>' +
+                    '</div>' +
+                    '<div class="aioemp-form-group aioemp-form-group--half">' +
+                        '<label class="aioemp-label" for="aioemp-email-batch-wait">Wait Between Cycles (ms)</label>' +
+                        '<input type="number" id="aioemp-email-batch-wait" class="aioemp-input" min="0" max="60000" step="100" placeholder="0">' +
+                        '<p class="aioemp-help">Milliseconds to pause between each batch cycle (0–60000).</p>' +
+                    '</div>' +
+                '</div>' +
             '</div>' +
 
             /* ---- Ticket / Check-In card ---- */
@@ -192,6 +204,8 @@
         // Behaviour.
         $('#aioemp-default-venue-mode').val(data.default_venue_mode);
         $('#aioemp-default-capacity').val(data.default_capacity);
+        $('#aioemp-email-batch-size').val(data.email_batch_size || 1);
+        $('#aioemp-email-batch-wait').val(data.email_batch_wait_ms || 0);
 
         // Ticket.
         $('#aioemp-ticket-slug').val(data.ticket_page_slug || 'e-ticket');
@@ -266,6 +280,8 @@
             captcha_site_key:   $('#aioemp-captcha-site-key').val(),
             default_venue_mode: $('#aioemp-default-venue-mode').val(),
             default_capacity:   parseInt($('#aioemp-default-capacity').val(), 10) || 100,
+            email_batch_size:   parseInt($('#aioemp-email-batch-size').val(), 10) || 1,
+            email_batch_wait_ms: parseInt($('#aioemp-email-batch-wait').val(), 10) || 0,
             ticket_page_slug:   $.trim($('#aioemp-ticket-slug').val()) || 'e-ticket',
         };
 

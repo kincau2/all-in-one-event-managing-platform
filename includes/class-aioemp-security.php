@@ -42,6 +42,25 @@ class AIOEMP_Security {
     );
 
     /**
+     * Human-readable labels for each capability key.
+     */
+    public const CAP_LABELS = array(
+        'access_plugin'     => 'Access Plugin',
+        'view_events'       => 'View Events',
+        'manage_events'     => 'Manage Events',
+        'view_candidates'   => 'View Candidates',
+        'manage_candidates' => 'Manage Candidates',
+        'view_attendance'   => 'View Attendance',
+        'manage_attendance' => 'Manage Attendance',
+        'manage_seating'    => 'Manage Seating',
+        'view_seatmaps'     => 'View Seatmaps',
+        'manage_seatmaps'   => 'Manage Seatmaps',
+        'manage_settings'   => 'Manage Settings',
+        'scan_attendance'   => 'Scan Attendance',
+        'view_reports'      => 'View Reports',
+    );
+
+    /**
      * Custom AIOEMP roles and the capability keys each one receives.
      *
      * Keys   = role slug (prefixed with 'aioemp_').
@@ -68,7 +87,7 @@ class AIOEMP_Security {
                 'view_candidates', 'manage_candidates',
                 'view_attendance', 'manage_attendance',
                 'manage_seating',
-                'view_seatmaps', 'view_reports',
+                'view_seatmaps', 'scan_attendance', 'view_reports',
             ),
         ),
         'aioemp_seating_coordinator' => array(
@@ -77,7 +96,6 @@ class AIOEMP_Security {
                 'access_plugin', 'view_events',
                 'view_candidates',
                 'manage_seating',
-                'view_seatmaps',
             ),
         ),
         'aioemp_seatmap_designer' => array(

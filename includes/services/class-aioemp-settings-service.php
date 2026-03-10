@@ -46,6 +46,10 @@ class AIOEMP_Settings_Service {
         'default_venue_mode' => 'onsite', // onsite | online | mixed
         'default_capacity'   => 100,
 
+        // Email batch processing.
+        'email_batch_size'    => 1,    // candidates per API call
+        'email_batch_wait_ms' => 0,    // ms to wait between batch cycles
+
         // Ticket / check-in.
         'ticket_page_slug'   => 'e-ticket',
     );
@@ -169,6 +173,14 @@ class AIOEMP_Settings_Service {
             case 'default_capacity':
                 $int = absint( $value );
                 return max( 1, min( $int, 100000 ) ); // Clamp 1–100 000.
+
+            case 'email_batch_size':
+                $int = absint( $value );
+                return max( 1, min( $int, 50 ) ); // Clamp 1–50.
+
+            case 'email_batch_wait_ms':
+                $int = absint( $value );
+                return min( $int, 60000 ); // Max 60 seconds.
 
             case 'ticket_page_slug':
                 $slug = sanitize_title( (string) $value );

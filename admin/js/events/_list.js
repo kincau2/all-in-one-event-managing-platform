@@ -114,13 +114,25 @@
             });
     }
 
+    var modal = window.aioemp_modal;
+
     function deleteEvent(id) {
-        if (!confirm('Delete this event? This cannot be undone.')) return;
-        api.del('events/' + id)
-            .then(function () { loadEventList(); })
-            .catch(function (err) {
-                alert('Failed to delete: ' + (err.message || 'Unknown error'));
-            });
+        modal.confirm(
+            'Are you sure you want to permanently delete this event?',
+            {
+                title: 'Delete Event',
+                variant: 'danger',
+                confirmText: 'Delete Permanently',
+                detail: 'All data associated with this event will be permanently deleted, including: candidates, attendance records, seating assignments, blocked seats, and event history. This action cannot be undone.'
+            }
+        ).then(function (ok) {
+            if (!ok) return;
+            api.del('events/' + id)
+                .then(function () { loadEventList(); })
+                .catch(function (err) {
+                    modal.alert(err.message || 'Failed to delete event.', { title: 'Error', variant: 'danger' });
+                });
+        });
     }
 
     function renderEventsList($el) {

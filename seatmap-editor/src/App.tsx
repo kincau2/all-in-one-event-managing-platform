@@ -110,13 +110,16 @@ export const App: React.FC<AppProps> = ({ seatmapId, onClose }) => {
   const handleSave = useCallback(async (status?: 'draft' | 'publish') => {
     const result = await save(status);
     if (!result.ok && result.error) {
-      window.alert(result.error);
+      window.aioemp_modal.alert(result.error, { title: 'Save Failed', variant: 'danger' });
     }
     return result;
   }, [save]);
 
-  const handleClose = useCallback(() => {
-    if (isDirty && !window.confirm('You have unsaved changes. Discard?')) return;
+  const handleClose = useCallback(async () => {
+    if (isDirty) {
+      const ok = await window.aioemp_modal.confirm('You have unsaved changes. Discard?', { title: 'Unsaved Changes', variant: 'warning', confirmText: 'Discard' });
+      if (!ok) return;
+    }
     onClose();
   }, [isDirty, onClose]);
 

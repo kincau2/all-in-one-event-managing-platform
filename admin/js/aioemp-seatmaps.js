@@ -13,6 +13,7 @@
 
     const api = window.aioemp_api;
     const userCan = window.aioemp_userCan;
+    const modal = window.aioemp_modal;
 
     /* ── HTML builders ── */
 
@@ -119,7 +120,7 @@
             }
         })
         .catch(function (err) {
-            alert('Failed to create seatmap: ' + (err.message || 'Unknown error'));
+            modal.alert(err.message || 'Failed to create seatmap.', { title: 'Error', variant: 'danger' });
         });
     }
 
@@ -136,17 +137,42 @@
             })
             .then(function () { loadList(); })
             .catch(function (err) {
-                alert('Failed to duplicate: ' + (err.message || 'Unknown error'));
+                modal.alert(err.message || 'Failed to duplicate.', { title: 'Error', variant: 'danger' });
             });
     }
 
     function deleteSeatmap(id) {
-        if (!confirm('Delete this seatmap? This cannot be undone.')) return;
-        api.del('seatmaps/' + id)
-            .then(function () { loadList(); })
-            .catch(function (err) {
-                alert('Failed to delete: ' + (err.message || 'Unknown error'));
+        modal.confirm('Delete this seatmap? This cannot be undone.', { title: 'Delete Seatmap', variant: 'danger', confirmText: 'Delete' })
+            .then(function (ok) {
+                if (!ok) return;
+                api.del('seatmaps/' + id)
+                    .then(function () { loadList(); })
+                    .catch(function (err) {
+                        modal.alert(err.message || 'Failed to delete.', { title: 'Error', variant: 'danger' });
+                    });
             });
+    }
+
+    /* ── Screen-size gate ── */
+
+    function showScreenTooSmall() {
+        var $content = $('#aioemp-content');
+        $content.empty();
+        $content.html(
+            '<div class="aioemp-screen-gate">' +
+                '<div class="aioemp-screen-gate__icon"><span class="dashicons dashicons-desktop"></span></div>' +
+                '<h2 class="aioemp-screen-gate__title">Screen Too Small</h2>' +
+                '<p class="aioemp-screen-gate__msg">The Seatmap Editor requires a minimum screen size of <strong>1024 × 768</strong> pixels.<br>' +
+                    'Your current screen is <strong>' + window.innerWidth + ' × ' + window.innerHeight + '</strong> pixels.</p>' +
+                '<button class="aioemp-btn aioemp-btn--primary aioemp-screen-gate__btn">← Back to Seatmaps</button>' +
+            '</div>'
+        );
+        $content.find('.aioemp-screen-gate__btn').on('click', function () {
+            $content.empty();
+            $('#aioemp-page-title').text('Seatmaps');
+            render($content);
+            history.replaceState(null, '', '#seatmaps');
+        });
     }
 
     /* ── Editor bridge ── */
@@ -155,6 +181,11 @@
      * Open the React seatmap editor inside the admin content area.
      */
     function openEditor(seatmapId) {
+        if (window.innerWidth < 1024 || window.innerHeight < 768) {
+            showScreenTooSmall();
+            return;
+        }
+
         var $content = $('#aioemp-content');
         $content.empty();
 

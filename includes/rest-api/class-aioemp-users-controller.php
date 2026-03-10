@@ -117,12 +117,19 @@ class AIOEMP_Users_Controller extends AIOEMP_REST_Controller {
      * GET /users/roles — return the available AIOEMP role definitions.
      */
     public function list_roles(): \WP_REST_Response {
-        $roles = array();
+        $labels = AIOEMP_Security::CAP_LABELS;
+        $roles  = array();
         foreach ( AIOEMP_Security::ROLES as $slug => $def ) {
             $roles[] = array(
                 'slug'  => $slug,
                 'label' => $def['label'],
                 'caps'  => $def['caps'],
+                'cap_labels' => array_map(
+                    function ( $key ) use ( $labels ) {
+                        return $labels[ $key ] ?? $key;
+                    },
+                    $def['caps']
+                ),
             );
         }
         return $this->success( $roles );

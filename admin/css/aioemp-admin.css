@@ -451,6 +451,42 @@ body.aioemp-active {
 .aioemp-badge--closed    { background: rgba(245,54,92,.12); color: var(--sa-danger); }
 
 /* ===================================================================
+   7b. Screen-size gate (seatmap editor / seat assignment)
+   =================================================================== */
+.aioemp-screen-gate {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 60px 24px;
+    min-height: 50vh;
+}
+.aioemp-screen-gate__icon .dashicons {
+    font-size: 48px;
+    width: 48px;
+    height: 48px;
+    color: var(--sa-muted);
+    margin-bottom: 12px;
+}
+.aioemp-screen-gate__title {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--sa-text);
+    margin: 0 0 8px;
+}
+.aioemp-screen-gate__msg {
+    font-size: 14px;
+    color: var(--sa-muted);
+    max-width: 420px;
+    line-height: 1.6;
+    margin-bottom: 20px;
+}
+.aioemp-screen-gate__btn {
+    margin-top: 8px;
+}
+
+/* ===================================================================
    8. Responsive (≤ 782px — WP mobile breakpoint)
    =================================================================== */
 @media (max-width: 782px) {
@@ -883,6 +919,120 @@ body.aioemp-active {
     border-radius: 6px;
     transition: width 0.35s ease;
     min-width: 0;
+}
+
+/* ===================================================================
+   20b. Custom popup (replaces native confirm / alert)
+   =================================================================== */
+.aioemp-popup-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100010;
+    transition: background 0.2s ease;
+    padding: 16px;
+}
+.aioemp-popup-overlay.is-visible {
+    background: rgba(0, 0, 0, 0.5);
+}
+.aioemp-popup {
+    background: var(--sa-card-bg);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+    width: 100%;
+    max-width: 420px;
+    text-align: center;
+    padding: 32px 28px 24px;
+    animation: aioemp-popup-in 0.22s ease-out;
+}
+@keyframes aioemp-popup-in {
+    from { opacity: 0; transform: scale(0.92) translateY(8px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+.aioemp-popup__icon {
+    margin-bottom: 12px;
+}
+.aioemp-popup__icon .dashicons {
+    font-size: 40px;
+    width: 40px;
+    height: 40px;
+    line-height: 40px;
+}
+.aioemp-popup__title {
+    margin: 0 0 8px;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--sa-text);
+}
+.aioemp-popup__message {
+    font-size: 14px;
+    color: var(--sa-muted);
+    line-height: 1.55;
+    margin-bottom: 8px;
+    white-space: pre-line;
+    word-break: break-word;
+}
+.aioemp-popup__detail {
+    font-size: 12.5px;
+    color: var(--sa-danger);
+    background: rgba(245, 54, 92, 0.07);
+    border: 1px solid rgba(245, 54, 92, 0.18);
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin: 12px 0 4px;
+    line-height: 1.55;
+    text-align: left;
+    white-space: pre-line;
+}
+.aioemp-popup--danger .aioemp-popup__title {
+    color: var(--sa-danger);
+}
+.aioemp-popup__actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 20px;
+}
+.aioemp-popup__actions .aioemp-btn {
+    min-width: 100px;
+    padding: 8px 20px;
+    font-size: 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background 0.15s, box-shadow 0.15s;
+}
+.aioemp-btn--danger {
+    background: var(--sa-danger);
+    color: #fff;
+    border: none;
+}
+.aioemp-btn--danger:hover {
+    background: #d62d4f;
+    box-shadow: 0 2px 8px rgba(245, 54, 92, 0.3);
+}
+
+/* Responsive: stack buttons on very small screens */
+@media (max-width: 400px) {
+    .aioemp-popup {
+        padding: 24px 18px 20px;
+        max-width: 100%;
+    }
+    .aioemp-popup__actions {
+        flex-direction: column-reverse;
+    }
+    .aioemp-popup__actions .aioemp-btn {
+        width: 100%;
+    }
+    .aioemp-popup__icon .dashicons {
+        font-size: 32px;
+        width: 32px;
+        height: 32px;
+        line-height: 32px;
+    }
 }
 
 /* ===================================================================
@@ -1695,7 +1845,7 @@ body.aioemp-active {
     border-radius: 12px;
     padding: 24px 28px;
     min-width: 380px;
-    max-width: 480px;
+    max-width: 640px;
     box-shadow: 0 8px 24px rgba(0,0,0,.18);
 }
 .aioemp-role-editor h4 {
@@ -1729,6 +1879,56 @@ body.aioemp-active {
     display: flex;
     gap: 8px;
     justify-content: flex-end;
+}
+
+/* Capability matrix help button & panel */
+.aioemp-cap-matrix-btn {
+    background: none;
+    border: 2px solid var(--aioemp-border, #e2e8f0);
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    cursor: pointer;
+    vertical-align: middle;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--aioemp-text-muted, #94a3b8);
+    transition: color .15s, border-color .15s;
+}
+.aioemp-cap-matrix-btn:hover {
+    color: var(--aioemp-primary, #6366f1);
+    border-color: var(--aioemp-primary, #6366f1);
+}
+.aioemp-cap-matrix-btn .dashicons {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+}
+.aioemp-cap-matrix-panel {
+    margin: 8px 0 12px;
+    max-height: 320px;
+    overflow: auto;
+    border: 1px solid var(--aioemp-border, #e2e8f0);
+    border-radius: 6px;
+    background: #fafbfc;
+}
+.aioemp-cap-matrix {
+    font-size: 12px;
+    width: 100%;
+}
+.aioemp-cap-matrix th,
+.aioemp-cap-matrix td {
+    padding: 4px 8px;
+    white-space: nowrap;
+}
+.aioemp-cap-matrix__role-header {
+    text-align: center;
+    font-size: 11px;
+}
+.aioemp-cap-matrix__cell {
+    text-align: center;
 }
 
 /* Create-user modal */
@@ -2464,4 +2664,157 @@ body.aioemp-active {
     display: flex;
     justify-content: flex-end;
     padding: 8px 0;
+}
+
+/* ===================================================================
+   MOBILE RESPONSIVE — min 375px
+   =================================================================== */
+@media (max-width: 600px) {
+
+    /* ── Top bar: compact ── */
+    .aioemp-topbar {
+        padding: 0 12px;
+        gap: 8px;
+    }
+    .aioemp-topbar__left {
+        gap: 8px;
+        min-width: 0;
+    }
+    .aioemp-topbar__title {
+        font-size: 14px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 120px;
+    }
+    .aioemp-topbar__right {
+        gap: 8px;
+        flex-shrink: 0;
+    }
+    /* Hide "WP Dashboard" text — keep only the icon */
+    .aioemp-topbar__btn-back {
+        font-size: 0;
+        padding: 6px;
+        gap: 0;
+    }
+    .aioemp-topbar__btn-back .dashicons {
+        font-size: 18px;
+        width: 18px;
+        height: 18px;
+    }
+    /* Hide display-name text, keep avatar */
+    .aioemp-topbar__user > span:not(.aioemp-topbar__avatar):not(.aioemp-topbar__caret) {
+        display: none;
+    }
+    .aioemp-topbar__caret {
+        display: none;
+    }
+    .aioemp-topbar__user {
+        gap: 0;
+        padding: 4px;
+    }
+
+    /* ── Content area: prevent horiz overflow ── */
+    .aioemp-content {
+        padding: 16px 12px;
+        overflow-x: hidden;
+    }
+
+    /* ── Tables: horizontal scroll ── */
+    .aioemp-card {
+        padding: 16px 12px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    .aioemp-table {
+        min-width: 500px;
+    }
+
+    /* ── Event detail tabs: horizontal scroll ── */
+    .aioemp-tabs {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        flex-wrap: nowrap;
+        scrollbar-width: none;           /* Firefox */
+        -ms-overflow-style: none;        /* IE/Edge */
+    }
+    .aioemp-tabs::-webkit-scrollbar {
+        display: none;                   /* Chrome/Safari */
+    }
+    .aioemp-tab {
+        white-space: nowrap;
+        flex-shrink: 0;
+        padding: 10px 14px;
+        font-size: 12px;
+    }
+
+    /* ── Card header: wrap action buttons ── */
+    .aioemp-card__header {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    /* ── Event detail header ── */
+    .aioemp-detail-title {
+        font-size: 18px;
+        word-break: break-word;
+    }
+    .aioemp-detail-meta {
+        font-size: 12px;
+    }
+
+    /* ── Detail grid: stack on mobile ── */
+    .aioemp-detail-grid {
+        grid-template-columns: 1fr;
+    }
+    .aioemp-detail-row__label {
+        border-bottom: none;
+        padding-bottom: 2px;
+    }
+    .aioemp-detail-row__value {
+        padding-top: 0;
+    }
+
+    /* ── Stat cards: two-column grid ── */
+    .aioemp-stat-cards {
+        gap: 8px;
+    }
+    .aioemp-stat-card {
+        flex: 1 1 calc(50% - 8px);
+        padding: 12px 8px;
+    }
+    .aioemp-stat-card__value {
+        font-size: 22px;
+    }
+
+    /* ── Toolbar: stack search and filters ── */
+    .aioemp-toolbar {
+        gap: 8px;
+    }
+
+    /* ── Pagination compact ── */
+    .aioemp-pagination {
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+
+    /* ── Modals: full-width on mobile ── */
+    .aioemp-modal {
+        width: 95%;
+    }
+
+    /* ── Users page table ── */
+    .aioemp-users-table {
+        min-width: 400px;
+    }
+
+    /* ── Buttons: smaller on mobile ── */
+    .aioemp-btn {
+        padding: 7px 14px;
+        font-size: 12px;
+    }
+    .aioemp-btn--sm {
+        padding: 5px 10px;
+        font-size: 11px;
+    }
 }

@@ -70,12 +70,13 @@ class AIOEMP_Attendance_Controller extends AIOEMP_REST_Controller {
         register_rest_route( $this->namespace, '/' . $this->rest_base . '/(?P<event_id>\d+)/attendance', array(
             'methods'             => \WP_REST_Server::READABLE,
             'callback'            => array( $this, 'list_attendance' ),
-            'permission_callback' => array( $this, 'view_permissions' ),
+            'permission_callback' => array( $this, 'view_or_scan_permissions' ),
             'args'                => array(
                 'event_id' => array( 'type' => 'integer', 'required' => true ),
                 'page'     => array( 'type' => 'integer', 'default'  => 1 ),
                 'per_page' => array( 'type' => 'integer', 'default'  => 50 ),
                 'search'   => array( 'type' => 'string',  'default'  => '' ),
+                'mine'     => array( 'type' => 'boolean', 'default'  => false ),
             ),
         ) );
 
@@ -83,7 +84,7 @@ class AIOEMP_Attendance_Controller extends AIOEMP_REST_Controller {
         register_rest_route( $this->namespace, '/' . $this->rest_base . '/(?P<event_id>\d+)/attendance/stats', array(
             'methods'             => \WP_REST_Server::READABLE,
             'callback'            => array( $this, 'attendance_stats' ),
-            'permission_callback' => array( $this, 'view_permissions' ),
+            'permission_callback' => array( $this, 'view_or_scan_permissions' ),
             'args'                => array(
                 'event_id' => array( 'type' => 'integer', 'required' => true ),
             ),
@@ -110,6 +111,21 @@ class AIOEMP_Attendance_Controller extends AIOEMP_REST_Controller {
 
     public function view_permissions(): bool|\WP_Error {
         return $this->check_permission( AIOEMP_Security::CAPS['view_attendance'] );
+    }
+
+    /**
+     * Stats and recent scans are needed by both attendance-tab viewers
+     * AND check-in (scanner) users.
+     */
+    public function view_or_scan_permissions(): bool|\WP_Error {
+        if ( ! is_user_logged_in() ) {
+            return new \WP_Error( 'rest_not_logged_in', __( 'You must be logged in.', 'aioemp' ), array( 'status' => 401 ) );
+        }
+        if ( current_user_can( AIOEMP_Security::CAPS['view_attendance'] ) ||
+             current_user_can( AIOEMP_Security::CAPS['scan_attendance'] ) ) {
+            return true;
+        }
+        return new \WP_Error( 'rest_forbidden', __( 'Sorry, you are not allowed to perform this action.', 'aioemp' ), array( 'status' => 403 ) );
     }
 
     /*--------------------------------------------------------------
@@ -294,12 +310,18 @@ class AIOEMP_Attendance_Controller extends AIOEMP_REST_Controller {
         $page     = max( 1, absint( $request->get_param( 'page' ) ?: 1 ) );
         $per_page = min( max( absint( $request->get_param( 'per_page' ) ?: 50 ), 1 ), 100 );
         $search   = sanitize_text_field( $request->get_param( 'search' ) ?? '' );
+        $mine     = (bool) $request->get_param( 'mine' );
 
-        $result = $this->attendance->list_for_event( $event_id, array(
+        $args = array(
             'per_page' => $per_page,
             'page'     => $page,
             'search'   => $search,
-        ) );
+        );
+        if ( $mine ) {
+            $args['scanned_by'] = get_current_user_id();
+        }
+
+        $result = $this->attendance->list_for_event( $event_id, $args );
 
         $response = $this->success( $result->items );
         return $this->add_pagination_headers( $response, $result->total, $per_page );

@@ -101,9 +101,10 @@ class AIOEMP_Attendance_Model extends AIOEMP_Model {
         global $wpdb;
 
         $defaults = array(
-            'per_page' => 50,
-            'page'     => 1,
-            'search'   => '',
+            'per_page'   => 50,
+            'page'       => 1,
+            'search'     => '',
+            'scanned_by' => 0,
         );
         $args = wp_parse_args( $args, $defaults );
 
@@ -112,6 +113,11 @@ class AIOEMP_Attendance_Model extends AIOEMP_Model {
 
         $where  = array( 'a.event_id = %d' );
         $values = array( $event_id );
+
+        if ( ! empty( $args['scanned_by'] ) ) {
+            $where[]  = 'a.scanned_by = %d';
+            $values[] = (int) $args['scanned_by'];
+        }
 
         if ( '' !== $args['search'] ) {
             $like     = '%' . $this->db->esc_like( $args['search'] ) . '%';

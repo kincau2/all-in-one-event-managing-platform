@@ -12,6 +12,7 @@
     'use strict';
 
     const rest = window.aioemp_api;
+    const modal = window.aioemp_modal;
 
     /* ------------------------------------------------------------------ *
      * State
@@ -256,8 +257,11 @@
 
         // Reset to default.
         $('#aioemp-email-reset').off('click').on('click', function () {
-            if (!confirm('Reset this template to the default? Any customisations will be lost.')) return;
-            resetTemplate(type);
+            modal.confirm('Reset this template to the default? Any customisations will be lost.', { title: 'Reset Template', variant: 'warning', confirmText: 'Reset' })
+                .then(function (ok) {
+                    if (!ok) return;
+                    resetTemplate(type);
+                });
         });
 
         // Send test email.

@@ -12,6 +12,7 @@
     var api     = ctx.api;
     var esc     = ctx.esc;
     var userCan = window.aioemp_userCan;
+    var modal   = window.aioemp_modal;
 
     var PER_PAGE = 50;
 
@@ -205,7 +206,7 @@
                     $btn.prop('disabled', false).find('.dashicons').removeClass('dashicons-update').addClass('dashicons-download');
                 })
                 .catch(function (err) {
-                    alert('Export failed: ' + (err.message || 'Unknown error'));
+                    modal.alert(err.message || 'Export failed.', { title: 'Error', variant: 'danger' });
                     $btn.prop('disabled', false).find('.dashicons').removeClass('dashicons-update').addClass('dashicons-download');
                 });
         });

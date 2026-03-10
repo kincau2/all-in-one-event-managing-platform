@@ -110,7 +110,7 @@ class AIOEMP_Attender_Model extends AIOEMP_Model {
 
         // LEFT JOIN seat_assignment to include checked_in flag for candidates.
         $sa_table = $this->db->prefix . 'aioemp_seat_assignment';
-        $select   = "SELECT t.*, sa.checked_in";
+        $select   = "SELECT t.*, sa.checked_in, sa.seat_key, sa.seat_label";
         $from     = "FROM {$this->table} t LEFT JOIN {$sa_table} sa ON sa.attender_id = t.id AND sa.event_id = t.event_id";
 
         // When filtering by IDs, skip pagination — return all matches.

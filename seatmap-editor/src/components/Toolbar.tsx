@@ -357,7 +357,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onClose, onSave }) => {
             </button>
             <button
               className="sme-toolbar__btn sme-toolbar__btn--link"
-              onClick={() => { if (window.confirm('Switch this seatmap back to draft? It will no longer be available for events.')) onSave('draft'); }}
+              onClick={async () => { if (await window.aioemp_modal.confirm('Switch this seatmap back to draft? It will no longer be available for events.', { title: 'Switch to Draft', variant: 'warning', confirmText: 'Switch' })) onSave('draft'); }}
               disabled={isLocked || saveStatus === 'saving'}
               style={{ opacity: isLocked ? 0.5 : 1 }}
             >

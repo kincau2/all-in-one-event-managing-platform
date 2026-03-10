@@ -683,7 +683,7 @@
         var $pag  = $('#checkin-recent-pagination');
         $feed.html('<p class="aioemp-loading">Loading…</p>');
 
-        var qs = '?page=' + recentPage + '&per_page=' + RECENT_PER_PAGE;
+        var qs = '?page=' + recentPage + '&per_page=' + RECENT_PER_PAGE + '&mine=1';
 
         api.get('events/' + ctx.detailEventId + '/attendance' + qs)
             .then(function (items) {

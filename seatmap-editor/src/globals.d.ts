@@ -22,6 +22,10 @@ declare global {
       mount(container: HTMLElement, seatmapId: number): void;
       unmount(): void;
     };
+    aioemp_modal: {
+      alert(message: string, opts?: { title?: string; variant?: 'info' | 'success' | 'warning' | 'danger' }): Promise<void>;
+      confirm(message: string, opts?: { title?: string; variant?: 'info' | 'success' | 'warning' | 'danger'; confirmText?: string; cancelText?: string; detail?: string }): Promise<boolean>;
+    };
   }
 }
 

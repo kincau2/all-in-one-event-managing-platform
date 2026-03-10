@@ -12,6 +12,7 @@
     'use strict';
 
     const rest = window.aioemp_api;
+    const modal = window.aioemp_modal;
 
     /* ------------------------------------------------------------------ *
      * Data cache
@@ -187,8 +188,11 @@
             var userId = parseInt($(this).data('user-id'), 10);
             var user = users.find(function (u) { return u.id === userId; });
             if (!user) return;
-            if (!confirm('Remove all AIOEMP roles from ' + user.display_name + '?')) return;
-            removeUser(userId);
+            modal.confirm('Remove all AIOEMP roles from ' + user.display_name + '?', { title: 'Remove User Roles', variant: 'danger', confirmText: 'Remove' })
+                .then(function (ok) {
+                    if (!ok) return;
+                    removeUser(userId);
+                });
         });
 
         // Create new user button.
@@ -267,13 +271,20 @@
         var html =
             '<div class="aioemp-role-editor-overlay" id="aioemp-role-editor">' +
                 '<div class="aioemp-role-editor">' +
-                    '<h4>' + escHtml(user.display_name) + ' — Assign Roles</h4>' +
+                    '<h4>' + escHtml(user.display_name) + ' — Assign Roles ' +
+                        '<button type="button" class="aioemp-cap-matrix-btn" id="aioemp-cap-matrix-toggle" title="View capability matrix">' +
+                            '<span class="dashicons dashicons-editor-help"></span>' +
+                        '</button>' +
+                    '</h4>' +
+                    '<div id="aioemp-cap-matrix-panel" class="aioemp-cap-matrix-panel" style="display:none">' +
+                        buildCapabilityMatrix() +
+                    '</div>' +
                     '<div class="aioemp-role-checkboxes">';
 
         for (var i = 0; i < roles.length; i++) {
             var r = roles[i];
             var checked = currentRoles.indexOf(r.slug) >= 0 ? ' checked' : '';
-            var capsDesc = r.caps.join(', ');
+            var capsDesc = (r.cap_labels || r.caps).join(', ');
             html +=
                 '<label class="aioemp-role-checkbox-label">' +
                     '<input type="checkbox" name="aioemp_role" value="' + escHtml(r.slug) + '"' + checked + '>' +
@@ -293,6 +304,12 @@
 
         $('body').append(html);
 
+        // Toggle capability matrix.
+        $('#aioemp-cap-matrix-toggle').on('click', function (e) {
+            e.stopPropagation();
+            $('#aioemp-cap-matrix-panel').slideToggle(200);
+        });
+
         // Cancel.
         $('#aioemp-role-cancel-btn, .aioemp-role-editor-overlay').on('click', function (e) {
             if (e.target === this) $('#aioemp-role-editor').remove();
@@ -306,6 +323,44 @@
             });
             saveUserRoles(userId, selectedRoles);
         });
+    }
+
+    /**
+     * Build a capability-vs-role matrix table.
+     */
+    function buildCapabilityMatrix() {
+        // Collect all unique capabilities across all roles.
+        var allCaps = [];
+        var allCapLabels = {};
+        for (var i = 0; i < roles.length; i++) {
+            var r = roles[i];
+            for (var j = 0; j < r.caps.length; j++) {
+                var cap = r.caps[j];
+                if (allCaps.indexOf(cap) < 0) {
+                    allCaps.push(cap);
+                    allCapLabels[cap] = (r.cap_labels && r.cap_labels[j]) || cap;
+                }
+            }
+        }
+
+        var html = '<table class="aioemp-table aioemp-table--compact aioemp-cap-matrix">';
+        html += '<thead><tr><th>Capability</th>';
+        for (var i = 0; i < roles.length; i++) {
+            html += '<th class="aioemp-cap-matrix__role-header">' + escHtml(roles[i].label.replace('AIOEMP ', '')) + '</th>';
+        }
+        html += '</tr></thead><tbody>';
+
+        for (var c = 0; c < allCaps.length; c++) {
+            html += '<tr><td>' + escHtml(allCapLabels[allCaps[c]]) + '</td>';
+            for (var i = 0; i < roles.length; i++) {
+                var has = roles[i].caps.indexOf(allCaps[c]) >= 0;
+                html += '<td class="aioemp-cap-matrix__cell">' + (has ? '<span class="dashicons dashicons-yes" style="color:#46b450"></span>' : '') + '</td>';
+            }
+            html += '</tr>';
+        }
+
+        html += '</tbody></table>';
+        return html;
     }
 
     function saveUserRoles(userId, selectedRoles) {
@@ -331,7 +386,7 @@
             bindEvents();
         }).catch(function (err) {
             $btn.prop('disabled', false).text('Save Roles');
-            alert((err && err.message) ? err.message : 'Failed to save roles.');
+            modal.alert((err && err.message) ? err.message : 'Failed to save roles.', { title: 'Error', variant: 'danger' });
         });
     }
 
@@ -341,7 +396,7 @@
             renderUsersTable();
             bindEvents();
         }).catch(function (err) {
-            alert((err && err.message) ? err.message : 'Failed to remove user roles.');
+            modal.alert((err && err.message) ? err.message : 'Failed to remove user roles.', { title: 'Error', variant: 'danger' });
         });
     }
 
@@ -387,7 +442,7 @@
 
         for (var i = 0; i < roles.length; i++) {
             var r = roles[i];
-            var capsDesc = r.caps.join(', ');
+            var capsDesc = (r.cap_labels || r.caps).join(', ');
             html +=
                 '<label class="aioemp-role-checkbox-label">' +
                     '<input type="checkbox" name="aioemp_new_role" value="' + escHtml(r.slug) + '">' +

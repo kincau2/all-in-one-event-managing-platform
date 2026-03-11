@@ -17,15 +17,21 @@
     /* ------------------------------------------------------------------ *
      * State
      * ------------------------------------------------------------------ */
-    let templates  = {};   // { type: { subject, body, label, placeholders } }
-    let activeType = null; // currently edited template type
+    let templates      = {};   // { type: { subject, body, label, placeholders, has_custom } }
+    let activeType     = null; // currently edited template type
+    let availableLangs = {};   // { locale: label }
+    let enabledLangs   = [];   // ordered array of locale strings
+    let currentLocale  = null; // null = main language
 
     /* ------------------------------------------------------------------ *
      * Render — called by the SPA router
      * ------------------------------------------------------------------ */
     function render($el) {
         $el.html(buildSkeleton());
-        loadTemplates();
+        loadLanguages().then(function () {
+            renderLangSelector();
+            loadTemplates();
+        });
     }
 
     /* ------------------------------------------------------------------ *
@@ -40,6 +46,7 @@
                     '<div class="aioemp-emails__sidebar">' +
                         '<div class="aioemp-card">' +
                             '<h3 class="aioemp-card__title">Templates</h3>' +
+                            '<div id="aioemp-email-lang-selector" style="margin-bottom:12px;"></div>' +
                             '<ul class="aioemp-emails__list" id="aioemp-email-list"></ul>' +
                         '</div>' +
                     '</div>' +
@@ -60,15 +67,82 @@
     }
 
     /* ------------------------------------------------------------------ *
+     * Language helpers
+     * ------------------------------------------------------------------ */
+    function loadLanguages() {
+        return rest.get('settings').then(function (data) {
+            enabledLangs   = data.languages || ['en_US'];
+            availableLangs = data.available_languages || {};
+            currentLocale  = null; // always start on main
+        }).catch(function () {
+            enabledLangs = ['en_US'];
+            availableLangs = { en_US: 'English (US)' };
+        });
+    }
+
+    function renderLangSelector() {
+        var $wrap = $('#aioemp-email-lang-selector');
+        if (enabledLangs.length <= 1) {
+            $wrap.empty();
+            return;
+        }
+
+        var options = enabledLangs.map(function (loc, idx) {
+            var label = availableLangs[loc] || loc;
+            if (idx === 0) label += ' (Main)';
+            var selected = (idx === 0 && !currentLocale) || currentLocale === loc ? ' selected' : '';
+            var value = idx === 0 ? '' : loc;
+            return '<option value="' + escAttr(value) + '"' + selected + '>' + escHtml(label) + '</option>';
+        }).join('');
+
+        $wrap.html(
+            '<select id="aioemp-email-lang" class="aioemp-input" style="width:100%;">' +
+                options +
+            '</select>'
+        );
+
+        $('#aioemp-email-lang').off('change').on('change', function () {
+            var val = $(this).val();
+            currentLocale = val || null;
+            activeType = null;
+            loadTemplates();
+        });
+    }
+
+    /**
+     * Build the API endpoint with optional ?lang= query string.
+     */
+    function tplEndpoint(path) {
+        var base = 'email-templates';
+        if (path) base += '/' + path;
+        if (currentLocale) base += (base.indexOf('?') === -1 ? '?' : '&') + 'lang=' + encodeURIComponent(currentLocale);
+        return base;
+    }
+
+    /* ------------------------------------------------------------------ *
      * Load templates from REST API
      * ------------------------------------------------------------------ */
     function loadTemplates() {
-        rest.get('email-templates').then(function (data) {
+        rest.get(tplEndpoint()).then(function (data) {
             templates = {};
             data.forEach(function (t) {
                 templates[t.type] = t;
             });
             renderList();
+
+            // Reset editor panel.
+            if (activeType && templates[activeType]) {
+                renderEditor(activeType);
+            } else {
+                $('#aioemp-email-editor').html(
+                    '<div class="aioemp-card">' +
+                        '<p class="aioemp-help" style="text-align:center;padding:32px 0;">' +
+                            '<span class="dashicons dashicons-email-alt" style="font-size:48px;width:48px;height:48px;color:#ccc;display:block;margin:0 auto 12px;"></span>' +
+                            'Select a template to edit' +
+                        '</p>' +
+                    '</div>'
+                );
+            }
         }).catch(function (err) {
             showToast('Failed to load email templates.', 'error');
             console.error('[AIOEMP Emails]', err);
@@ -86,10 +160,17 @@
         types.forEach(function (type) {
             var t = templates[type];
             var activeClass = type === activeType ? ' is-active' : '';
+            var customBadge = '';
+            if (currentLocale && t.has_custom) {
+                customBadge = '<span class="aioemp-emails__custom-badge" title="Custom translation">●</span>';
+            } else if (currentLocale && !t.has_custom) {
+                customBadge = '<span class="aioemp-emails__fallback-badge" title="Using main language default">○</span>';
+            }
             $list.append(
                 '<li class="aioemp-emails__item' + activeClass + '" data-type="' + type + '">' +
                     '<span class="dashicons dashicons-email"></span>' +
                     '<span class="aioemp-emails__item-label">' + escHtml(t.label) + '</span>' +
+                    customBadge +
                 '</li>'
             );
         });
@@ -121,7 +202,9 @@
         var html =
             '<div class="aioemp-card">' +
                 '<div class="aioemp-emails__editor-header">' +
-                    '<h3 class="aioemp-card__title">' + escHtml(t.label) + '</h3>' +
+                    '<h3 class="aioemp-card__title">' + escHtml(t.label) +
+                        (currentLocale ? ' <small style="font-weight:normal;color:#888;">(' + escHtml(availableLangs[currentLocale] || currentLocale) + ')</small>' : '') +
+                    '</h3>' +
                     '<div class="aioemp-emails__editor-actions">' +
                         '<button type="button" class="aioemp-btn aioemp-btn--outline aioemp-btn--sm" id="aioemp-email-reset">' +
                             '<span class="dashicons dashicons-image-rotate"></span> Reset to Default' +
@@ -281,7 +364,7 @@
         var $btn = $('#aioemp-email-save');
         $btn.prop('disabled', true).html('<span class="dashicons dashicons-update spin"></span> Saving…');
 
-        rest.put('email-templates/' + type, { subject: subject, body: body })
+        rest.put(tplEndpoint(type), { subject: subject, body: body })
             .then(function (data) {
                 // Update local cache.
                 templates[type].subject = data.subject;
@@ -297,7 +380,7 @@
     }
 
     function resetTemplate(type) {
-        rest.post('email-templates/' + type + '/reset', {})
+        rest.post(tplEndpoint(type + '/reset'), {})
             .then(function (data) {
                 templates[type].subject = data.subject;
                 templates[type].body    = data.body;
@@ -316,7 +399,7 @@
         var $btn = $('#aioemp-email-preview');
         $btn.prop('disabled', true).html('<span class="dashicons dashicons-update spin"></span> Sending…');
 
-        rest.post('email-templates/' + type + '/preview', { to: email.trim() })
+        rest.post(tplEndpoint(type + '/preview'), { to: email.trim() })
             .then(function () {
                 showToast('Test email sent to ' + email.trim());
             })

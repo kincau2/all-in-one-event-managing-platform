@@ -2098,6 +2098,80 @@ body.aioemp-active {
     border: 1px solid rgba(220, 53, 69, .2);
 }
 
+/* ============================================================
+ * Languages list (Settings page)
+ * ============================================================ */
+
+.aioemp-lang-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.aioemp-lang-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    cursor: grab;
+    user-select: none;
+    transition: box-shadow .15s, border-color .15s;
+}
+
+.aioemp-lang-item:hover {
+    border-color: #3b82f6;
+}
+
+.aioemp-lang-item.is-dragging {
+    opacity: 0.5;
+    box-shadow: 0 4px 12px rgba(0,0,0,.12);
+}
+
+.aioemp-lang-item.drag-over {
+    border-color: #3b82f6;
+    background: #eff6ff;
+}
+
+.aioemp-lang-item__handle {
+    color: #9ca3af;
+    cursor: grab;
+}
+
+.aioemp-lang-item__label {
+    flex: 1;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.aioemp-lang-item__remove {
+    background: none;
+    border: none;
+    color: #9ca3af;
+    cursor: pointer;
+    font-size: 18px;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    padding: 0;
+    transition: color .15s, background .15s;
+}
+
+.aioemp-lang-item__remove:hover {
+    color: #ef4444;
+    background: rgba(239, 68, 68, .08);
+}
+
+.aioemp-lang-item__remove:disabled {
+    cursor: not-allowed;
+}
+
 @media (max-width: 600px) {
     .aioemp-profile__row {
         grid-template-columns: 1fr;
@@ -2620,6 +2694,18 @@ body.aioemp-active {
 .aioemp-emails__item-label {
     flex: 1;
     line-height: 1.3;
+}
+.aioemp-emails__custom-badge {
+    color: #4caf50;
+    font-size: 14px;
+    margin-left: 4px;
+    flex-shrink: 0;
+}
+.aioemp-emails__fallback-badge {
+    color: #ccc;
+    font-size: 14px;
+    margin-left: 4px;
+    flex-shrink: 0;
 }
 .aioemp-emails__editor-header {
     display: flex;

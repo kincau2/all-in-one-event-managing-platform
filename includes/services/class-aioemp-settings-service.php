@@ -52,6 +52,9 @@ class AIOEMP_Settings_Service {
 
         // Ticket / check-in.
         'ticket_page_slug'   => 'e-ticket',
+
+        // Languages — ordered list of enabled locales (first = main language).
+        'languages'          => array( 'en_US' ),
     );
 
     /**
@@ -186,6 +189,20 @@ class AIOEMP_Settings_Service {
                 $slug = sanitize_title( (string) $value );
                 return '' !== $slug ? $slug : 'e-ticket';
 
+            case 'languages':
+                if ( ! is_array( $value ) ) {
+                    return array( 'en_US' );
+                }
+                // Sanitise each locale: allow only a-z, A-Z, 0-9, underscore, hyphen.
+                $clean = array();
+                foreach ( $value as $locale ) {
+                    $loc = preg_replace( '/[^a-zA-Z0-9_\-]/', '', (string) $locale );
+                    if ( '' !== $loc && ! in_array( $loc, $clean, true ) ) {
+                        $clean[] = $loc;
+                    }
+                }
+                return ! empty( $clean ) ? $clean : array( 'en_US' );
+
             default:
                 return sanitize_text_field( (string) $value );
         }
@@ -216,5 +233,47 @@ class AIOEMP_Settings_Service {
         $all['captcha_secret_key'] = '' !== $all['captcha_secret_key'] ? '••••••••' : '';
 
         return $all;
+    }
+
+    /**
+     * Built-in language catalogue — label → locale.
+     *
+     * Provides a curated list of languages for the admin Settings UI.
+     * Order: English first, then alphabetical by label.
+     *
+     * @return array<string, string>  locale => label
+     */
+    public static function get_available_languages(): array {
+        return array(
+            'en_US' => 'English (US)',
+            'en_GB' => 'English (UK)',
+            'zh_TW' => '繁體中文 (Traditional Chinese)',
+            'zh_CN' => '简体中文 (Simplified Chinese)',
+            'ja'    => '日本語 (Japanese)',
+            'ko'    => '한국어 (Korean)',
+            'fr_FR' => 'Français (French)',
+            'de_DE' => 'Deutsch (German)',
+            'es_ES' => 'Español (Spanish)',
+            'pt_BR' => 'Português (Brazilian)',
+            'it_IT' => 'Italiano (Italian)',
+            'nl_NL' => 'Nederlands (Dutch)',
+            'ru_RU' => 'Русский (Russian)',
+            'ar'    => 'العربية (Arabic)',
+            'hi_IN' => 'हिन्दी (Hindi)',
+            'th'    => 'ไทย (Thai)',
+            'vi'    => 'Tiếng Việt (Vietnamese)',
+            'id_ID' => 'Bahasa Indonesia',
+            'ms_MY' => 'Bahasa Melayu (Malay)',
+        );
+    }
+
+    /**
+     * Get the main (first) language locale.
+     *
+     * @return string
+     */
+    public static function get_main_language(): string {
+        $languages = self::get( 'languages' );
+        return is_array( $languages ) && ! empty( $languages ) ? $languages[0] : 'en_US';
     }
 }

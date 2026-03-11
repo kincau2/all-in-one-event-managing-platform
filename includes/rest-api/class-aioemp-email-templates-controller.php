@@ -105,20 +105,37 @@ class AIOEMP_Email_Templates_Controller extends AIOEMP_REST_Controller {
      *------------------------------------------------------------*/
 
     /**
+     * Extract and sanitize the optional ?lang query parameter.
+     */
+    private function get_locale( \WP_REST_Request $request ): ?string {
+        $lang = $request->get_param( 'lang' );
+        if ( empty( $lang ) ) {
+            return null;
+        }
+        $lang = preg_replace( '/[^a-zA-Z0-9_\-]/', '', $lang );
+        return $lang ?: null;
+    }
+
+    /**
      * GET /email-templates — list all templates with labels and placeholders.
      */
-    public function list_templates(): \WP_REST_Response {
-        $templates = AIOEMP_Email_Service::get_all();
+    public function list_templates( \WP_REST_Request $request ): \WP_REST_Response {
+        $locale    = $this->get_locale( $request );
+        $templates = AIOEMP_Email_Service::get_all( $locale );
         $result    = array();
 
         foreach ( $templates as $type => $tpl ) {
-            $result[] = array(
+            $item = array(
                 'type'         => $type,
                 'label'        => AIOEMP_Email_Service::TEMPLATE_LABELS[ $type ] ?? $type,
                 'subject'      => $tpl['subject'],
                 'body'         => $tpl['body'],
                 'placeholders' => AIOEMP_Email_Service::get_placeholders( $type ),
             );
+            if ( $locale ) {
+                $item['has_custom'] = AIOEMP_Email_Service::has_locale_template( $type, $locale );
+            }
+            $result[] = $item;
         }
 
         return $this->success( $result );
@@ -128,21 +145,26 @@ class AIOEMP_Email_Templates_Controller extends AIOEMP_REST_Controller {
      * GET /email-templates/<type> — get a single template.
      */
     public function get_template( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
-        $type = $request->get_param( 'type' );
+        $type   = $request->get_param( 'type' );
+        $locale = $this->get_locale( $request );
 
         if ( ! in_array( $type, AIOEMP_Email_Service::TEMPLATE_TYPES, true ) ) {
             return $this->error( 'invalid_type', __( 'Unknown email template type.', 'aioemp' ), 404 );
         }
 
-        $tpl = AIOEMP_Email_Service::get( $type );
-
-        return $this->success( array(
+        $tpl  = AIOEMP_Email_Service::get( $type, $locale );
+        $data = array(
             'type'         => $type,
             'label'        => AIOEMP_Email_Service::TEMPLATE_LABELS[ $type ] ?? $type,
             'subject'      => $tpl['subject'],
             'body'         => $tpl['body'],
             'placeholders' => AIOEMP_Email_Service::get_placeholders( $type ),
-        ) );
+        );
+        if ( $locale ) {
+            $data['has_custom'] = AIOEMP_Email_Service::has_locale_template( $type, $locale );
+        }
+
+        return $this->success( $data );
     }
 
     /**
@@ -152,6 +174,7 @@ class AIOEMP_Email_Templates_Controller extends AIOEMP_REST_Controller {
         $type    = $request->get_param( 'type' );
         $subject = $request->get_param( 'subject' );
         $body    = $request->get_param( 'body' );
+        $locale  = $this->get_locale( $request );
 
         if ( ! in_array( $type, AIOEMP_Email_Service::TEMPLATE_TYPES, true ) ) {
             return $this->error( 'invalid_type', __( 'Unknown email template type.', 'aioemp' ), 404 );
@@ -164,9 +187,9 @@ class AIOEMP_Email_Templates_Controller extends AIOEMP_REST_Controller {
             return $this->error( 'empty_body', __( 'Email body cannot be empty.', 'aioemp' ) );
         }
 
-        AIOEMP_Email_Service::update_template( $type, $subject, $body );
+        AIOEMP_Email_Service::update_template( $type, $subject, $body, $locale );
 
-        $tpl = AIOEMP_Email_Service::get( $type );
+        $tpl = AIOEMP_Email_Service::get( $type, $locale );
 
         return $this->success( array(
             'type'         => $type,
@@ -181,15 +204,16 @@ class AIOEMP_Email_Templates_Controller extends AIOEMP_REST_Controller {
      * POST /email-templates/<type>/reset — reset a template to its default.
      */
     public function reset_template( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
-        $type = $request->get_param( 'type' );
+        $type   = $request->get_param( 'type' );
+        $locale = $this->get_locale( $request );
 
         if ( ! in_array( $type, AIOEMP_Email_Service::TEMPLATE_TYPES, true ) ) {
             return $this->error( 'invalid_type', __( 'Unknown email template type.', 'aioemp' ), 404 );
         }
 
-        AIOEMP_Email_Service::reset_template( $type );
+        AIOEMP_Email_Service::reset_template( $type, $locale );
 
-        $tpl = AIOEMP_Email_Service::get( $type );
+        $tpl = AIOEMP_Email_Service::get( $type, $locale );
 
         return $this->success( array(
             'type'         => $type,
@@ -220,8 +244,9 @@ class AIOEMP_Email_Templates_Controller extends AIOEMP_REST_Controller {
 
         // Build sample data for placeholders.
         $sample = self::get_sample_variables( $type );
+        $locale = $this->get_locale( $request );
 
-        $sent = AIOEMP_Email_Service::send( $type, $to, $sample );
+        $sent = AIOEMP_Email_Service::send( $type, $to, $sample, $locale );
 
         if ( ! $sent ) {
             return $this->error( 'send_failed', __( 'Failed to send the preview email. Check your server\'s mail configuration.', 'aioemp' ), 500 );

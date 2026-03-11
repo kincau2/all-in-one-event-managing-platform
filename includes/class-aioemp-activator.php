@@ -123,6 +123,7 @@ class AIOEMP_Activator {
             last_name varchar(100) DEFAULT NULL,
             company varchar(190) DEFAULT NULL,
             email varchar(190) DEFAULT NULL,
+            preferred_language varchar(10) DEFAULT NULL,
             qrcode_hash char(64) NOT NULL,
             created_at_gmt datetime NOT NULL,
             status varchar(32) NOT NULL DEFAULT 'registered',
@@ -311,6 +312,16 @@ class AIOEMP_Activator {
                 if ( empty( $col ) ) {
                     $wpdb->query( "ALTER TABLE `{$events_table}` {$alter_sql}" );
                 }
+            }
+        }
+
+        // ── Attender table migrations (v1.6.0) ──
+        $att_table = $prefix . 'attender';
+        $exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $att_table ) );
+        if ( $exists ) {
+            $col = $wpdb->get_results( "SHOW COLUMNS FROM `{$att_table}` LIKE 'preferred_language'" );
+            if ( empty( $col ) ) {
+                $wpdb->query( "ALTER TABLE `{$att_table}` ADD COLUMN `preferred_language` varchar(10) DEFAULT NULL AFTER `email`" );
             }
         }
     }

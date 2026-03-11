@@ -908,7 +908,7 @@
                         '<button class="aioemp-modal__close">&times;</button>' +
                     '</div>' +
                     '<div class="aioemp-modal__body" id="cand-modal-body">' +
-                        (candidateId ? '<p class="aioemp-loading">Loading…</p>' : buildCandidateFields({})) +
+                        '<p class="aioemp-loading">Loading…</p>' +
                     '</div>' +
                 '</div>' +
             '</div>'
@@ -922,27 +922,54 @@
             if ($(e.target).hasClass('aioemp-modal-overlay')) overlay.remove();
         });
 
-        if (candidateId) {
-            api.get('events/' + ctx.detailEventId + '/attenders/' + candidateId)
-                .then(function (data) {
-                    $('#cand-modal-body').html(buildCandidateFields(data));
-                    bindCandidateFormEvents(overlay, candidateId);
-                })
-                .catch(function (err) {
-                    console.error('Failed to load candidate', candidateId, err);
-                    var msg = (err && err.message) ? err.message : 'Unknown error';
-                    $('#cand-modal-body').html('<p class="aioemp-error">Failed to load candidate: ' + ctx.esc(msg) + '</p>');
-                });
-        } else {
-            bindCandidateFormEvents(overlay, null);
-        }
+        // Load languages, then candidate data if editing.
+        getLanguages().then(function (langData) {
+            if (candidateId) {
+                return api.get('events/' + ctx.detailEventId + '/attenders/' + candidateId)
+                    .then(function (data) {
+                        $('#cand-modal-body').html(buildCandidateFields(data, langData));
+                        bindCandidateFormEvents(overlay, candidateId);
+                    });
+            } else {
+                $('#cand-modal-body').html(buildCandidateFields({}, langData));
+                bindCandidateFormEvents(overlay, null);
+            }
+        }).catch(function (err) {
+            console.error('Failed to load candidate form', err);
+            var msg = (err && err.message) ? err.message : 'Unknown error';
+            $('#cand-modal-body').html('<p class="aioemp-error">Failed to load: ' + ctx.esc(msg) + '</p>');
+        });
     }
 
-    function buildCandidateFields(data) {
+    /* ── Cached language settings for candidate form ── */
+    var cachedLanguages = null;
+
+    function getLanguages() {
+        if (cachedLanguages) return Promise.resolve(cachedLanguages);
+        return api.get('settings').then(function (s) {
+            cachedLanguages = {
+                enabled: Array.isArray(s.languages) ? s.languages : ['en_US'],
+                available: s.available_languages || {},
+            };
+            return cachedLanguages;
+        });
+    }
+
+    function buildCandidateFields(data, langData) {
         var vm = (ctx.detailEvent && ctx.detailEvent.venue_mode) || 'mixed';
         var presetTitles = ['', 'Mr', 'Ms', 'Mrs', 'Dr'];
         var titleVal = data.title || '';
         var isFreeText = titleVal !== '' && presetTitles.indexOf(titleVal) === -1;
+
+        // Build language options from enabled languages.
+        var enabledLangs = (langData && langData.enabled) || ['en_US'];
+        var availLangs = (langData && langData.available) || {};
+        var candLang = data.preferred_language || enabledLangs[0] || 'en_US';
+        var langOptions = enabledLangs.map(function (loc) {
+            var label = availLangs[loc] || loc;
+            return '<option value="' + loc + '"' + (candLang === loc ? ' selected' : '') + '>' + esc(label) + '</option>';
+        }).join('');
+
         return (
             '<div class="aioemp-form-row">' +
                 '<div class="aioemp-form-group aioemp-form-group--half">' +
@@ -990,6 +1017,15 @@
                 '</div>' +
             '</div>' +
 
+            '<div class="aioemp-form-row">' +
+                '<div class="aioemp-form-group aioemp-form-group--half">' +
+                    '<label class="aioemp-label">Preferred Language</label>' +
+                    '<select id="cand-f-lang" class="aioemp-select">' +
+                        langOptions +
+                    '</select>' +
+                '</div>' +
+            '</div>' +
+
             '<div class="aioemp-form-actions">' +
                 '<button id="cand-f-save" class="aioemp-btn aioemp-btn--primary">' +
                     (data.id ? 'Update' : 'Add Candidate') +
@@ -1023,12 +1059,13 @@
             var titleVal = titleSel === '__freetext' ? $('#cand-f-title-text').val().trim() : titleSel;
 
             var body = {
-                title:      titleVal,
-                first_name: $('#cand-f-fname').val().trim(),
-                last_name:  $('#cand-f-lname').val().trim(),
-                email:      $('#cand-f-email').val().trim(),
-                company:    $('#cand-f-company').val().trim(),
-                status:     $('#cand-f-status').val(),
+                title:              titleVal,
+                first_name:         $('#cand-f-fname').val().trim(),
+                last_name:          $('#cand-f-lname').val().trim(),
+                email:              $('#cand-f-email').val().trim(),
+                company:            $('#cand-f-company').val().trim(),
+                status:             $('#cand-f-status').val(),
+                preferred_language: $('#cand-f-lang').val(),
             };
 
             if (!body.first_name && !body.last_name) {

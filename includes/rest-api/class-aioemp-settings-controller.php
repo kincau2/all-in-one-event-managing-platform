@@ -65,7 +65,9 @@ class AIOEMP_Settings_Controller extends AIOEMP_REST_Controller {
      * GET /settings — return all settings (secret key masked).
      */
     public function get_settings(): \WP_REST_Response {
-        return $this->success( AIOEMP_Settings_Service::get_public() );
+        $data = AIOEMP_Settings_Service::get_public();
+        $data['available_languages'] = AIOEMP_Settings_Service::get_available_languages();
+        return $this->success( $data );
     }
 
     /**

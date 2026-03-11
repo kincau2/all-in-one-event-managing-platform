@@ -24,7 +24,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Constants
  *------------------------------------------------------------*/
 define( 'AIOEMP_VERSION', '0.1.0' );
-define( 'AIOEMP_DB_VERSION', '1.5.0' );
+define( 'AIOEMP_DB_VERSION', '1.6.0' );
 define( 'AIOEMP_PLUGIN_FILE', __FILE__ );
 define( 'AIOEMP_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'AIOEMP_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -60,6 +60,11 @@ function aioemp(): AIOEMP_Loader {
 // Auto-upgrade DB schema when plugin code is updated (no reactivation needed).
 // Uses plugins_loaded so it fires on ALL requests including REST API.
 add_action( 'plugins_loaded', array( 'AIOEMP_Activator', 'create_tables' ) );
+
+// Load text domain for translations.
+add_action( 'plugins_loaded', function () {
+    load_plugin_textdomain( 'aioemp', false, dirname( AIOEMP_PLUGIN_BASENAME ) . '/languages' );
+} );
 
 // Kick off.
 aioemp()->run();

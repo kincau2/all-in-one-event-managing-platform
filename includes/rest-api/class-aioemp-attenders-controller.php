@@ -493,7 +493,7 @@ class AIOEMP_Attenders_Controller extends AIOEMP_REST_Controller {
 
                 $template_type = self::STATUS_EMAIL_MAP[ $new_status ];
                 $variables     = $this->build_email_variables( $att, $event, $template_type );
-                $ok            = AIOEMP_Email_Service::send( $template_type, $email, $variables );
+                $ok            = AIOEMP_Email_Service::send( $template_type, $email, $variables, $att->preferred_language ?? null );
 
                 if ( $ok ) {
                     $sent++;
@@ -577,7 +577,7 @@ class AIOEMP_Attenders_Controller extends AIOEMP_REST_Controller {
 
             $template_type = self::CREATE_EMAIL_MAP[ $status ];
             $variables     = $this->build_email_variables( $att, $event, $template_type );
-            $ok            = AIOEMP_Email_Service::send( $template_type, $email, $variables );
+            $ok            = AIOEMP_Email_Service::send( $template_type, $email, $variables, $att->preferred_language ?? null );
 
             if ( $ok ) {
                 $sent++;
@@ -652,6 +652,12 @@ class AIOEMP_Attenders_Controller extends AIOEMP_REST_Controller {
             $data['email'] = $email;
         }
 
+        // Preferred language.
+        $lang = $request->get_param( 'preferred_language' );
+        if ( null !== $lang ) {
+            $data['preferred_language'] = preg_replace( '/[^a-zA-Z0-9_\-]/', '', (string) $lang );
+        }
+
         // Status.
         $status = $this->text_param( $request, 'status' );
         if ( '' !== $status ) {
@@ -717,11 +723,12 @@ class AIOEMP_Attenders_Controller extends AIOEMP_REST_Controller {
                 'required'          => true,
                 'sanitize_callback' => 'absint',
             ),
-            'first_name' => array( 'type' => 'string' ),
-            'last_name'  => array( 'type' => 'string' ),
-            'email'      => array( 'type' => 'string' ),
-            'title'      => array( 'type' => 'string' ),
-            'company'    => array( 'type' => 'string' ),
+            'first_name'         => array( 'type' => 'string' ),
+            'last_name'          => array( 'type' => 'string' ),
+            'email'              => array( 'type' => 'string' ),
+            'title'              => array( 'type' => 'string' ),
+            'company'            => array( 'type' => 'string' ),
+            'preferred_language' => array( 'type' => 'string' ),
             'status'     => array(
                 'type' => 'string',
                 'enum' => AIOEMP_Attender_Model::STATUSES,
@@ -784,7 +791,7 @@ class AIOEMP_Attenders_Controller extends AIOEMP_REST_Controller {
 
         $template_type = self::CREATE_EMAIL_MAP[ $status ];
         $variables     = $this->build_email_variables( $attender, $event, $template_type );
-        $sent          = AIOEMP_Email_Service::send( $template_type, $email, $variables );
+        $sent          = AIOEMP_Email_Service::send( $template_type, $email, $variables, $attender->preferred_language ?? null );
 
         if ( ! $sent ) {
             return $this->error( 'send_failed', __( 'Failed to send email.', 'aioemp' ), 500 );
@@ -830,7 +837,7 @@ class AIOEMP_Attenders_Controller extends AIOEMP_REST_Controller {
         $variables = $this->build_email_variables( $attender, $event, $template_type );
 
         error_log( '[AIOEMP] Sending ' . $template_type . ' email to ' . $email . ' (attender #' . $attender->id . ')' );
-        $sent = AIOEMP_Email_Service::send( $template_type, $email, $variables );
+        $sent = AIOEMP_Email_Service::send( $template_type, $email, $variables, $attender->preferred_language ?? null );
         if ( ! $sent ) {
             error_log( '[AIOEMP] FAILED to send ' . $template_type . ' email to ' . $email );
         }
@@ -864,7 +871,7 @@ class AIOEMP_Attenders_Controller extends AIOEMP_REST_Controller {
 
         $variables = $this->build_email_variables( $attender, $event, $template_type );
 
-        AIOEMP_Email_Service::send( $template_type, $email, $variables );
+        AIOEMP_Email_Service::send( $template_type, $email, $variables, $attender->preferred_language ?? null );
     }
 
     /**
@@ -930,7 +937,7 @@ class AIOEMP_Attenders_Controller extends AIOEMP_REST_Controller {
     /**
      * CSV column headers used for export (no status — status is not managed via CSV).
      */
-    private const CSV_COLUMNS = array( 'id', 'title', 'first_name', 'last_name', 'email', 'company' );
+    private const CSV_COLUMNS = array( 'id', 'title', 'first_name', 'last_name', 'email', 'company', 'preferred_language' );
 
     /**
      * GET /events/<event_id>/attenders/export-csv — download all candidates as CSV.
@@ -1039,7 +1046,7 @@ class AIOEMP_Attenders_Controller extends AIOEMP_REST_Controller {
             return $this->error( 'id_column_not_allowed', __( 'CSV must not contain an ID column when adding new candidates. Remove the ID column and try again.', 'aioemp' ) );
         }
 
-        $allowed_fields = array( 'title', 'first_name', 'last_name', 'email', 'company', 'status' );
+        $allowed_fields = array( 'title', 'first_name', 'last_name', 'email', 'company', 'status', 'preferred_language' );
         $id_col_index   = array_search( 'id', $header, true );
 
         $created     = 0;
@@ -1073,6 +1080,8 @@ class AIOEMP_Attenders_Controller extends AIOEMP_REST_Controller {
                         if ( in_array( $record[ $field ], AIOEMP_Attender_Model::STATUSES, true ) ) {
                             $data[ $field ] = $record[ $field ];
                         }
+                    } elseif ( $field === 'preferred_language' ) {
+                        $data[ $field ] = preg_replace( '/[^a-zA-Z0-9_\\-]/', '', $record[ $field ] );
                     } elseif ( $field === 'title' ) {
                         $data[ $field ] = AIOEMP_Security::sanitize_text( $record[ $field ] );
                     } else {

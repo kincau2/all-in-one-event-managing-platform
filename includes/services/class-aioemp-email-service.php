@@ -24,6 +24,28 @@ class AIOEMP_Email_Service {
     public const OPTION_KEY = 'aioemp_email_templates';
 
     /**
+     * Get the wp_options key for a specific locale's templates.
+     *
+     * Main language (or null) uses the base OPTION_KEY.
+     * Other locales get a suffixed key: aioemp_email_templates_{locale}.
+     *
+     * @param string|null $locale Locale code, or null for main language.
+     * @return string
+     */
+    private static function option_key_for_locale( ?string $locale ): string {
+        if ( ! $locale ) {
+            return self::OPTION_KEY;
+        }
+        $main = AIOEMP_Settings_Service::get_main_language();
+        if ( $locale === $main ) {
+            return self::OPTION_KEY;
+        }
+        // Sanitise locale for use in option key.
+        $safe = preg_replace( '/[^a-zA-Z0-9_]/', '_', $locale );
+        return self::OPTION_KEY . '_' . $safe;
+    }
+
+    /**
      * Available template types.
      */
     public const TEMPLATE_TYPES = array(
@@ -169,10 +191,12 @@ class AIOEMP_Email_Service {
     /**
      * Get all templates, merged with defaults.
      *
+     * @param string $locale Optional locale code. Null = main language.
      * @return array<string, array{subject: string, body: string}>
      */
-    public static function get_all(): array {
-        $stored = get_option( self::OPTION_KEY, array() );
+    public static function get_all( ?string $locale = null ): array {
+        $option_key = self::option_key_for_locale( $locale );
+        $stored = get_option( $option_key, array() );
         if ( ! is_array( $stored ) ) {
             $stored = array();
         }
@@ -196,56 +220,74 @@ class AIOEMP_Email_Service {
     /**
      * Get a single template.
      *
-     * @param string $type Template type key.
+     * @param string      $type   Template type key.
+     * @param string|null $locale Optional locale code.
      * @return array{subject: string, body: string}|null
      */
-    public static function get( string $type ): ?array {
+    public static function get( string $type, ?string $locale = null ): ?array {
         if ( ! in_array( $type, self::TEMPLATE_TYPES, true ) ) {
             return null;
         }
-        $all = self::get_all();
+        $all = self::get_all( $locale );
         return $all[ $type ] ?? null;
     }
 
     /**
      * Update a single template.
      *
-     * @param string $type    Template type key.
-     * @param string $subject Email subject line.
-     * @param string $body    Email body (HTML).
+     * @param string      $type    Template type key.
+     * @param string      $subject Email subject line.
+     * @param string      $body    Email body (HTML).
+     * @param string|null $locale  Optional locale code.
      * @return bool
      */
-    public static function update_template( string $type, string $subject, string $body ): bool {
+    public static function update_template( string $type, string $subject, string $body, ?string $locale = null ): bool {
         if ( ! in_array( $type, self::TEMPLATE_TYPES, true ) ) {
             return false;
         }
 
-        $all = self::get_all();
+        $option_key = self::option_key_for_locale( $locale );
+        $all = self::get_all( $locale );
         $all[ $type ] = array(
             'subject' => sanitize_text_field( $subject ),
             'body'    => wp_kses_post( $body ),
         );
 
-        return update_option( self::OPTION_KEY, $all );
+        return update_option( $option_key, $all );
     }
 
     /**
      * Reset a template to its default.
      *
-     * @param string $type Template type key.
+     * @param string      $type   Template type key.
+     * @param string|null $locale Optional locale code.
      * @return bool
      */
-    public static function reset_template( string $type ): bool {
+    public static function reset_template( string $type, ?string $locale = null ): bool {
         if ( ! in_array( $type, self::TEMPLATE_TYPES, true ) ) {
             return false;
         }
 
-        $all      = self::get_all();
-        $defaults = self::get_defaults();
+        $option_key = self::option_key_for_locale( $locale );
+        $all        = self::get_all( $locale );
+        $defaults   = self::get_defaults();
 
         $all[ $type ] = $defaults[ $type ];
 
-        return update_option( self::OPTION_KEY, $all );
+        return update_option( $option_key, $all );
+    }
+
+    /**
+     * Check if a locale has a customised template stored.
+     *
+     * @param string $type   Template type key.
+     * @param string $locale Locale code.
+     * @return bool
+     */
+    public static function has_locale_template( string $type, string $locale ): bool {
+        $option_key = self::option_key_for_locale( $locale );
+        $stored = get_option( $option_key, array() );
+        return is_array( $stored ) && isset( $stored[ $type ] );
     }
 
     /**
@@ -266,18 +308,33 @@ class AIOEMP_Email_Service {
     /**
      * Send an email using a stored template.
      *
-     * @param string $type       Template type key.
-     * @param string $to         Recipient email.
-     * @param array  $variables  Key-value pairs for placeholder resolution.
-     *                           Keys should NOT include {{ }} braces.
+     * @param string      $type       Template type key.
+     * @param string      $to         Recipient email.
+     * @param array       $variables  Key-value pairs for placeholder resolution.
+     *                                Keys should NOT include {{ }} braces.
+     * @param string|null $locale     Preferred locale of the recipient.
      * @return bool Whether the email was sent successfully.
      */
-    public static function send( string $type, string $to, array $variables ): bool {
-        $template = self::get( $type );
+    public static function send( string $type, string $to, array $variables, ?string $locale = null ): bool {
+        // Resolve locale: try candidate's preferred language, fall back to main.
+        $main_lang = AIOEMP_Settings_Service::get_main_language();
+        $use_locale = null;
+
+        if ( $locale && $locale !== $main_lang ) {
+            // Check if a localised template exists; fall back to main.
+            if ( self::has_locale_template( $type, $locale ) ) {
+                $use_locale = $locale;
+            }
+        }
+
+        $template = self::get( $type, $use_locale );
         if ( ! $template ) {
             error_log( '[AIOEMP] Email send failed: unknown template type "' . $type . '"' );
             return false;
         }
+
+        // Determine HTML lang attribute.
+        $html_lang = $use_locale ? str_replace( '_', '-', $use_locale ) : str_replace( '_', '-', $main_lang );
 
         // Merge common variables from settings.
         $settings = AIOEMP_Settings_Service::get_all();
@@ -297,7 +354,7 @@ class AIOEMP_Email_Service {
         $body    = self::resolve_placeholders( $template['body'], $all_vars );
 
         // Wrap in HTML email layout.
-        $html = self::wrap_html( $body, $settings );
+        $html = self::wrap_html( $body, $settings, $html_lang );
 
         // Set content type to HTML.
         $headers = array(
@@ -367,9 +424,10 @@ class AIOEMP_Email_Service {
      *
      * @param string $body_html The email body content (already HTML).
      * @param array  $settings  Settings array for logo, company info.
+     * @param string $lang      BCP 47 language tag for the HTML lang attribute.
      * @return string Full HTML email.
      */
-    private static function wrap_html( string $body_html, array $settings ): string {
+    private static function wrap_html( string $body_html, array $settings, string $lang = 'en' ): string {
         $s = self::get_styles();
 
         $logo_url        = esc_url( $settings['logo_url'] ?? '' );
@@ -406,7 +464,7 @@ class AIOEMP_Email_Service {
         $footer_html = implode( '<br>', $footer_parts );
 
         return '<!DOCTYPE html>' .
-            '<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">' .
+            '<html lang="' . esc_attr( $lang ) . '"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">' .
             '<title>Email</title></head><body style="' . ( $s['body'] ?? '' ) . '">' .
             '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="' . ( $s['outer_table'] ?? '' ) . '">' .
             '<tr><td align="center" style="' . ( $s['outer_td'] ?? '' ) . '">' .

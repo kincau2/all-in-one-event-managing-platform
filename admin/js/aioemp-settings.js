@@ -151,6 +151,19 @@
                 '</div>' +
             '</div>' +
 
+            /* ---- Languages card ---- */
+            '<div class="aioemp-card">' +
+                '<h3 class="aioemp-card__title">Languages</h3>' +
+                '<p class="aioemp-help" style="margin-bottom:12px;">Select the languages your event supports. The first language is the <strong>main language</strong>. Drag to reorder.</p>' +
+                '<div class="aioemp-form-group">' +
+                    '<label class="aioemp-label">Add Language</label>' +
+                    '<select id="aioemp-lang-picker" class="aioemp-select" style="max-width:320px">' +
+                        '<option value="">— Select a language to add —</option>' +
+                    '</select>' +
+                '</div>' +
+                '<div id="aioemp-lang-list" class="aioemp-lang-list"></div>' +
+            '</div>' +
+
             /* ---- Save bar ---- */
             '<div class="aioemp-settings__actions">' +
                 '<button type="button" class="aioemp-btn aioemp-btn--primary" id="aioemp-settings-save">' +
@@ -209,6 +222,100 @@
 
         // Ticket.
         $('#aioemp-ticket-slug').val(data.ticket_page_slug || 'e-ticket');
+
+        // Languages.
+        renderLanguages(data);
+    }
+
+    /* ---- Language helpers ---- */
+
+    var availableLangs = {};
+    var enabledLangs   = [];
+
+    function renderLanguages(data) {
+        availableLangs = data.available_languages || {};
+        enabledLangs   = Array.isArray(data.languages) && data.languages.length
+            ? data.languages.slice()
+            : ['en_US'];
+        rebuildLangPicker();
+        rebuildLangList();
+    }
+
+    function rebuildLangPicker() {
+        var $picker = $('#aioemp-lang-picker');
+        $picker.find('option:not(:first)').remove();
+        Object.keys(availableLangs).forEach(function (locale) {
+            if (enabledLangs.indexOf(locale) === -1) {
+                $picker.append('<option value="' + locale + '">' + escHtml(availableLangs[locale]) + '</option>');
+            }
+        });
+    }
+
+    function rebuildLangList() {
+        var $list = $('#aioemp-lang-list');
+        $list.empty();
+        enabledLangs.forEach(function (locale, idx) {
+            var label = availableLangs[locale] || locale;
+            var isMain = idx === 0;
+            $list.append(
+                '<div class="aioemp-lang-item" draggable="true" data-locale="' + locale + '">' +
+                    '<span class="aioemp-lang-item__handle dashicons dashicons-menu"></span>' +
+                    '<span class="aioemp-lang-item__label">' + escHtml(label) + '</span>' +
+                    (isMain ? '<span class="aioemp-badge aioemp-badge--info" style="margin-left:8px;font-size:11px;">Main</span>' : '') +
+                    '<button type="button" class="aioemp-lang-item__remove dashicons dashicons-no-alt" data-locale="' + locale + '" title="Remove"' +
+                        (enabledLangs.length <= 1 ? ' disabled style="opacity:0.3"' : '') +
+                    '></button>' +
+                '</div>'
+            );
+        });
+        initLangDragDrop();
+    }
+
+    function initLangDragDrop() {
+        var $list = $('#aioemp-lang-list');
+        var dragSrc = null;
+
+        $list.off('dragstart.lang dragover.lang drop.lang dragend.lang click.langremove');
+
+        $list.on('dragstart.lang', '.aioemp-lang-item', function (e) {
+            dragSrc = this;
+            $(this).addClass('is-dragging');
+            e.originalEvent.dataTransfer.effectAllowed = 'move';
+            e.originalEvent.dataTransfer.setData('text/plain', $(this).data('locale'));
+        });
+
+        $list.on('dragover.lang', '.aioemp-lang-item', function (e) {
+            e.preventDefault();
+            e.originalEvent.dataTransfer.dropEffect = 'move';
+            var $target = $(this);
+            $list.find('.aioemp-lang-item').removeClass('drag-over');
+            $target.addClass('drag-over');
+        });
+
+        $list.on('drop.lang', '.aioemp-lang-item', function (e) {
+            e.preventDefault();
+            if (dragSrc === this) return;
+            var srcLocale = $(dragSrc).data('locale');
+            var dstLocale = $(this).data('locale');
+            var srcIdx = enabledLangs.indexOf(srcLocale);
+            var dstIdx = enabledLangs.indexOf(dstLocale);
+            if (srcIdx === -1 || dstIdx === -1) return;
+            enabledLangs.splice(srcIdx, 1);
+            enabledLangs.splice(dstIdx, 0, srcLocale);
+            rebuildLangList();
+        });
+
+        $list.on('dragend.lang', '.aioemp-lang-item', function () {
+            $list.find('.aioemp-lang-item').removeClass('is-dragging drag-over');
+        });
+
+        $list.on('click.langremove', '.aioemp-lang-item__remove', function () {
+            if (enabledLangs.length <= 1) return;
+            var locale = $(this).data('locale');
+            enabledLangs = enabledLangs.filter(function (l) { return l !== locale; });
+            rebuildLangPicker();
+            rebuildLangList();
+        });
     }
 
     function renderLogoPreview(url) {
@@ -259,6 +366,16 @@
         $('#aioemp-settings-save').off('click').on('click', function () {
             saveSettings();
         });
+
+        // Language picker — add language.
+        $('#aioemp-lang-picker').off('change').on('change', function () {
+            var locale = $(this).val();
+            if (!locale || enabledLangs.indexOf(locale) !== -1) return;
+            enabledLangs.push(locale);
+            $(this).val('');
+            rebuildLangPicker();
+            rebuildLangList();
+        });
     }
 
     /* ------------------------------------------------------------------ *
@@ -283,6 +400,7 @@
             email_batch_size:   parseInt($('#aioemp-email-batch-size').val(), 10) || 1,
             email_batch_wait_ms: parseInt($('#aioemp-email-batch-wait').val(), 10) || 0,
             ticket_page_slug:   $.trim($('#aioemp-ticket-slug').val()) || 'e-ticket',
+            languages:          enabledLangs.slice(),
         };
 
         // Only include secret key if user actually typed a new one.

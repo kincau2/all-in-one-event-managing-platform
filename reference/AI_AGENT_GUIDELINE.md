@@ -1,7 +1,7 @@
 # AIOEMP — AI Agent Development Guideline
 
 **All-in-One Event Managing Platform (AIOEMP)**
-Version 1.4 | 5 Mar 2026
+Version 1.5 | 11 Mar 2026
 
 ---
 
@@ -31,7 +31,7 @@ Version 1.4 | 5 Mar 2026
 18. [Non-Functional & Compliance Requirements](#18-non-functional--compliance-requirements)
 19. [Build Milestones (Recommended Order)](#19-build-milestones-recommended-order)
 20. [Reference Documents](#20-reference-documents)
-21. [Implementation Progress (as of 5 Mar 2026)](#21-implementation-progress-as-of-5-mar-2026)
+21. [Implementation Progress (as of 11 Mar 2026)](#21-implementation-progress-as-of-11-mar-2026)
 
 ---
 
@@ -251,7 +251,7 @@ All custom tables use the WordPress table prefix + `aioemp_`. No WordPress core 
 | `aioemp_events` | Event records with status, capacity, venue mode, seatmap snapshot, lock fields |
 | `aioemp_event_meta` | Flexible key-value metadata for events |
 | `aioemp_event_log` | Audit log for event-related actions |
-| `aioemp_attender` | Candidate/registrant records per event |
+| `aioemp_attender` | Candidate/registrant records per event (includes `preferred_language`) |
 | `aioemp_attendance` | Append-only check-in/out log |
 | `aioemp_seatmap` | Reusable seatmap templates (status, layout JSON, integrity flag, lock fields, timestamps) |
 | `aioemp_seatmap_meta` | Flexible key-value metadata for seatmaps |
@@ -325,6 +325,7 @@ All custom tables use the WordPress table prefix + `aioemp_`. No WordPress core 
 | last_name | VARCHAR(100) NULL | |
 | company | VARCHAR(190) NULL | |
 | email | VARCHAR(190) NULL | |
+| preferred_language | VARCHAR(10) NULL | Locale code (e.g. `en_US`, `zh_TW`) for multi-language email templates |
 | qrcode_hash | CHAR(64) NOT NULL | SHA-256 hex |
 | created_at_gmt | DATETIME NOT NULL | Registration timestamp (UTC) |
 | status | VARCHAR(32) NOT NULL | Default `'registered'` |
@@ -424,8 +425,10 @@ All custom tables use the WordPress table prefix + `aioemp_`. No WordPress core 
 ### 4.3 Database Installation Rules
 
 - Use `dbDelta()` via WordPress's `$wpdb` for table creation on plugin activation.
-- Store a DB version number in `wp_options` (`aioemp_db_version`) and run migrations on version mismatch. Current: `AIOEMP_DB_VERSION = '1.4.0'`.
-- **Explicit `ALTER TABLE` migrations** in `AIOEMP_Activator::run_migrations()` handle columns that `dbDelta()` may fail to add on existing tables (e.g., `checked_in`, `integrity_pass`, `description`, `created_by`). These run on every `plugins_loaded`, before the version check, to ensure columns exist regardless of how the schema was updated.
+- Store a DB version number in `wp_options` (`aioemp_db_version`) and run migrations on version mismatch. Current: `AIOEMP_DB_VERSION = '1.6.0'`.
+- **Explicit `ALTER TABLE` migrations** in `AIOEMP_Activator::run_migrations()` handle columns that `dbDelta()` may fail to add on existing tables (e.g., `checked_in`, `integrity_pass`, `description`, `created_by`, `preferred_language`). These run on every `plugins_loaded`, before the version check, to ensure columns exist regardless of how the schema was updated.
+
+> **DB ALERT (v1.6.0):** Added `preferred_language VARCHAR(10) DEFAULT NULL` column to `aioemp_attender` table (after `email`). Migration auto-runs on `plugins_loaded`. If deploying to an environment where the plugin was already active, the `run_migrations()` method will `ALTER TABLE ADD COLUMN` if missing.
 - Use `$wpdb->prefix` for table name prefixing.
 - All tables must use `$charset_collate = $wpdb->get_charset_collate()`.
 
@@ -455,7 +458,7 @@ all-in-one-event-managing-platform/
 │   ├── password-setup.php                   # Password setup form + success page (175 lines)
 │   └── password-setup-error.php             # Password setup error page (90 lines)
 ├── includes/
-│   ├── class-aioemp-activator.php           # DB installer (dbDelta, 10 tables, explicit migrations)
+│   ├── class-aioemp-activator.php           # DB installer (dbDelta, 10 tables, explicit migrations) (328 lines)
 │   ├── class-aioemp-deactivator.php         # Capability revocation, role removal
 │   ├── class-aioemp-loader.php              # Singleton, wires all hooks (249 lines)
 │   ├── class-aioemp-security.php            # Capabilities (13), roles (5), nonces, sanitisation, rate limiting (463 lines)
@@ -465,16 +468,16 @@ all-in-one-event-managing-platform/
 │   ├── rest-api/
 │   │   ├── class-aioemp-rest-controller.php       # Abstract base controller (212 lines)
 │   │   ├── class-aioemp-events-controller.php     # CRUD /events (536 lines)
-│   │   ├── class-aioemp-attenders-controller.php  # Candidates CRUD /events/{id}/attenders (500+ lines)
+│   │   ├── class-aioemp-attenders-controller.php  # Candidates CRUD /events/{id}/attenders (1149 lines)
 │   │   ├── class-aioemp-seating-controller.php    # Seating allocation /events/{id}/seating (754 lines)
 │   │   ├── class-aioemp-attendance-controller.php # Check-in/out, logs, stats, CSV export (368 lines)
 │   │   ├── class-aioemp-seatmaps-controller.php   # CRUD /seatmaps (347 lines)
 │   │   ├── class-aioemp-seatmap-upload-controller.php  # BG image upload (157 lines)
 │   │   ├── class-aioemp-locking-controller.php    # Lock acquire/heartbeat/release/takeover (178 lines)
-│   │   ├── class-aioemp-settings-controller.php   # Settings CRUD + logo upload (152 lines)
+│   │   ├── class-aioemp-settings-controller.php   # Settings CRUD + logo upload + available_languages (154 lines)
 │   │   ├── class-aioemp-users-controller.php      # User/role management + welcome email (400+ lines)
 │   │   ├── class-aioemp-profile-controller.php    # Current user profile (144 lines)
-│   │   └── class-aioemp-email-templates-controller.php # Email template CRUD + preview (270 lines)
+│   │   └── class-aioemp-email-templates-controller.php # Email template CRUD + preview + locale support (293 lines)
 │   ├── models/
 │   │   ├── class-aioemp-model.php                 # Abstract base model ($wpdb wrapper)
 │   │   ├── class-aioemp-events-model.php          # Events CRUD + search/pagination (116 lines)
@@ -485,21 +488,28 @@ all-in-one-event-managing-platform/
 │   │   ├── class-aioemp-seat-assignment-log-model.php # Seat operation audit trail (140 lines)
 │   │   ├── class-aioemp-event-log-model.php       # Append-only event audit log (65 lines)
 │   │   └── class-aioemp-seatmap-model.php         # Seatmap CRUD + search/pagination (112 lines)
+│   ├── email/                                     # Default email template files (PHP, return array{subject,body})
+│   │   ├── accepted-online.php
+│   │   ├── accepted-onsite.php
+│   │   ├── email-style.php
+│   │   ├── new-user-welcome.php
+│   │   ├── registration-confirmation.php
+│   │   └── rejected.php
 │   └── services/
 │       ├── class-aioemp-locking-service.php       # Atomic SQL locking (TTL 90s) (322 lines)
-│       ├── class-aioemp-settings-service.php      # Single wp_options key, typed defaults (200+ lines)
-│       └── class-aioemp-email-service.php         # Email templates CRUD, send, HTML wrapper (471 lines)
+│       ├── class-aioemp-settings-service.php      # Single wp_options key, typed defaults, language helpers (279 lines)
+│       └── class-aioemp-email-service.php         # Email templates CRUD, locale-aware send, HTML wrapper (531 lines)
 ├── admin/
 │   ├── class-aioemp-admin.php               # Admin hooks, menu entry, script enqueue chain (224 lines)
 │   ├── css/aioemp-admin.css                 # Admin styles (CSS custom properties)
 │   ├── js/
 │   │   ├── aioemp-admin.js                  # Admin SPA shell (jQuery, 290+ lines)
 │   │   ├── aioemp-events.js                 # Events module entry + shared context (112 lines)
-│   │   ├── aioemp-settings.js               # Settings page JS (360+ lines)
+│   │   ├── aioemp-settings.js               # Settings page JS + language picker/drag-drop (480 lines)
 │   │   ├── aioemp-seatmaps.js               # Seatmaps list page JS (252 lines)
 │   │   ├── aioemp-users.js                  # Users/role management page JS (515 lines)
 │   │   ├── aioemp-profile.js                # Profile settings page JS (257 lines)
-│   │   ├── aioemp-emails.js                 # Email templates editor page JS (270 lines)
+│   │   ├── aioemp-emails.js                 # Email templates editor page JS + locale selector (443 lines)
 │   │   ├── seatmap-compiler.js              # Browser IIFE of seatmap-core compile (client-side snapshot compilation)
 │   │   ├── vendor/
 │   │   │   └── html5-qrcode.min.js          # QR scanning vendor library (v2.3.8)
@@ -508,7 +518,7 @@ all-in-one-event-managing-platform/
 │   │   │   ├── _list.js                     # Events list page: table, search, filter, pagination, delete (175 lines)
 │   │   │   ├── _form.js                     # Event create/edit form: all fields + seatmap template select (240 lines)
 │   │   │   ├── _detail.js                   # Event detail page: header + tab container (5 cap-gated tabs) (185 lines)
-│   │   │   ├── _candidates.js               # Candidates tab: list, search, filter, pagination, add/edit modal, bulk status, attendance column (400 lines)
+│   │   │   ├── _candidates.js               # Candidates tab: list, search, filter, pagination, add/edit modal, bulk status, attendance column, preferred language (1097 lines)
 │   │   │   ├── _seating.js                  # Seating tab: full-screen SVG dashboard (1855 lines)
 │   │   │   ├── _checkin.js                  # Check-In tab: QR scanner, manual lookup, candidate popup, scan recording (759 lines)
 │   │   │   └── _attendance.js               # Attendance Log tab: paginated log table, search, CSV export (243 lines)
@@ -731,14 +741,14 @@ Five tabs, each capability-gated:
 - **Attendance column**: Shows a green "Checked In" badge for candidates with `checked_in = 1` (from LEFT JOIN with `seat_assignment`), red "Not In" for assigned candidates who haven't checked in, or "—" otherwise.
 - Search and filters: keyword (name/email/company, 300ms debounce), status dropdown.
 - **Bulk actions:** select-all checkbox, bulk status change (Accept On-site, Accept Online, Reject) via `POST /attenders/bulk-status`.
-- **Add/Edit modal**: overlay modal form with title (Mr/Ms/Mrs/Dr), first name (required), last name, email, company, status dropdown.
+- **Add/Edit modal**: overlay modal form with title (Mr/Ms/Mrs/Dr), first name (required), last name, email, company, preferred language (dropdown from enabled languages), status dropdown.
 - **Delete**: confirmation dialog, `DELETE /attenders/{id}`.
 - Pagination: prev/next, 20 per page.
 
 ### 8.2 Candidate Status Flow
 
 - Statuses: `registered`, `accepted_onsite`, `accepted_online`, `rejected`.
-- Status change triggers automated email _(not yet implemented)_.
+- Status change triggers automated email (locale-aware — uses candidate's `preferred_language` to resolve template).
 - QR email is sent to accepted candidates (configurable: send on acceptance vs on registration) _(not yet implemented)_.
 
 ### 8.3 Critical Rules
@@ -1188,10 +1198,12 @@ Public-facing attendee ticket display — no login required.
 
 ### 16.1 Architecture
 
-- **Service class:** `includes/services/class-aioemp-email-service.php`
-- **REST controller:** `includes/rest-api/class-aioemp-email-templates-controller.php`
-- **Storage:** `wp_options` key `aioemp_email_templates` (serialised array)
-- **Admin UI:** `admin/js/aioemp-emails.js` — "Emails" tab in the SPA dashboard
+- **Service class:** `includes/services/class-aioemp-email-service.php` (531 lines)
+- **REST controller:** `includes/rest-api/class-aioemp-email-templates-controller.php` (293 lines)
+- **Storage:** Main language templates in `wp_options` key `aioemp_email_templates`; other locales stored in `aioemp_email_templates_{locale}` (one wp_option per locale)
+- **Admin UI:** `admin/js/aioemp-emails.js` (443 lines) — "Emails" tab in the SPA dashboard
+- **Text domain:** `aioemp` — registered via `load_plugin_textdomain()` on `plugins_loaded`
+- **Default template files:** `includes/email/*.php` — each returns `array{subject, body}`
 
 ### 16.2 Template Types
 
@@ -1221,24 +1233,51 @@ Each template has **type-specific placeholders** plus **common placeholders** av
 - Wraps body in a responsive HTML email layout with logo, company info footer.
 - `From` header set from company email/name in Settings (falls back to WP admin email).
 - Placeholders resolved via simple `str_replace()` at send time.
+- `<html lang="">` attribute set dynamically from candidate's resolved locale.
 
-### 16.5 REST API Endpoints
+### 16.5 Multi-Language Email Support (i18n)
+
+**Locale resolution on send:**
+1. If candidate has `preferred_language` and it differs from main language, check if a custom template exists for that locale.
+2. If custom locale template exists → use it; otherwise → fall back to main language template.
+3. `<html lang="">` attribute is set to the resolved locale (e.g., `zh-TW`, `en-US`).
+
+**Storage strategy:**
+- Main language templates: `aioemp_email_templates` (original wp_option key — backward compatible).
+- Other locales: `aioemp_email_templates_{safe_locale}` (e.g., `aioemp_email_templates_zh_TW`).
+- `option_key_for_locale(?string $locale)` helper resolves the correct key.
+- `has_locale_template(string $type, string $locale)` checks if a specific locale has a customised template.
+
+**Admin UI language selector:**
+- Language dropdown appears in the email templates sidebar when 2+ languages are enabled.
+- Switching language reloads templates for that locale.
+- Green dot (●) indicates custom translation exists; hollow dot (○) indicates fallback to main language default.
+- Editor header shows current language name.
+- Save, reset, and preview all pass `?lang=XX` query param to the REST API.
+
+**REST API locale support:**
+- All email template endpoints accept optional `?lang=XX` query parameter.
+- When `lang` is provided, templates are read/written from the locale-specific wp_option.
+- Preview emails use the specified locale.
+
+### 16.6 REST API Endpoints
 
 | Method | Endpoint                            | Permission        | Description                          |
 |--------|-------------------------------------|--------------------|--------------------------------------|
-| GET    | `/email-templates`                  | `manage_settings`  | List all templates + labels/placeholders |
-| GET    | `/email-templates/{type}`           | `manage_settings`  | Get single template                  |
-| PUT    | `/email-templates/{type}`           | `manage_settings`  | Update subject & body                |
-| POST   | `/email-templates/{type}/reset`     | `manage_settings`  | Reset to default                     |
-| POST   | `/email-templates/{type}/preview`   | `manage_settings`  | Send test email to specified address |
+| GET    | `/email-templates`                  | `manage_settings`  | List all templates + labels/placeholders (supports `?lang=XX`) |
+| GET    | `/email-templates/{type}`           | `manage_settings`  | Get single template (supports `?lang=XX`)                |
+| PUT    | `/email-templates/{type}`           | `manage_settings`  | Update subject & body (supports `?lang=XX`)              |
+| POST   | `/email-templates/{type}/reset`     | `manage_settings`  | Reset to default (supports `?lang=XX`)                   |
+| POST   | `/email-templates/{type}/preview`   | `manage_settings`  | Send test email (supports `?lang=XX`)                    |
 
-### 16.6 Email Triggers (Automatic)
+### 16.7 Email Triggers (Automatic)
 
-- **Attender status change (individual):** `update_item()` in Attenders controller — sends email matching new status.
-- **Attender bulk status change:** `bulk_status()` in Attenders controller — sends email to each affected attender.
+- **Attender status change (individual):** `update_item()` in Attenders controller — sends locale-aware email matching new status (passes `$attender->preferred_language`).
+- **Attender bulk status change:** `bulk_status()` and `batch_process()` in Attenders controller — sends locale-aware email to each affected attender.
+- **Attender creation email:** `maybe_send_create_email()` — sends email based on initial status (passes `$attender->preferred_language`).
 - **New user creation:** `create_user()` in Users controller — sends welcome email with password setup link.
 
-### 16.7 Password Setup Virtual Endpoint
+### 16.8 Password Setup Virtual Endpoint
 
 - **File:** `includes/class-aioemp-password-setup-endpoint.php`
 - **URL pattern:** `/setup-password/{64-char-hex-token}`
@@ -1252,7 +1291,7 @@ Each template has **type-specific placeholders** plus **common placeholders** av
 - **Templates:** `templates/password-setup.php` (form + success), `templates/password-setup-error.php` (invalid/expired token).
 - **Design:** Matches the login form overlay layout (same branding/logo).
 
-### 16.8 Company Details in Settings
+### 16.9 Company Details in Settings
 
 Four new settings fields added to the Settings module:
 - `company_name` — text, used in email From header and templates
@@ -1260,12 +1299,14 @@ Four new settings fields added to the Settings module:
 - `company_tel` — phone (regex validated), used in email footer
 - `company_address` — textarea, used in email footer
 
-### 16.9 Admin UI — Email Templates Tab
+### 16.10 Admin UI — Email Templates Tab
 
 - New sidebar nav item: "Emails" with `dashicons-email-alt`
 - Route: `#emails` (requires `manage_settings` capability)
 - Two-panel layout: template list (left) + editor (right)
+- Language selector dropdown in sidebar (when 2+ languages enabled) — switches template locale
 - Editor features: subject input, HTML body textarea, clickable placeholder chips (insert at cursor), save, reset to default, send test email
+- Custom translation indicators: green dot (●) = custom translation exists, hollow dot (○) = using main language default
 
 ---
 
@@ -1274,13 +1315,53 @@ Four new settings fields added to the Settings module:
 - **Company logo upload** (used in admin shell header, login form, ticket page, email layout).
 - **Company details** — `company_name`, `company_email`, `company_tel`, `company_address` (used in email templates and footer).
 - **Ticket page slug** (configurable, default: `e-ticket`).
-- **Email templates** — editable via the Emails admin tab (subject + body with placeholders).
+- **Languages** — ordered array of enabled locale codes (first = main language). Configurable via drag-and-drop reorderable list with 19 built-in locales.
+- **Email templates** — editable via the Emails admin tab (subject + body with placeholders); per-language customisation via locale selector.
 - **Behavior toggles:**
   - Send QR on acceptance vs on registration.
   - Default venue mode.
   - Default capacity.
   - Device naming for scanners.
 - **CAPTCHA configuration** (provider, site key, secret key) _(not yet implemented)_.
+
+### 17.1 Language Configuration
+
+**Settings key:** `languages` (array of locale strings, default: `['en_US']`)
+
+**Available locales** (19 built-in, defined in `AIOEMP_Settings_Service::get_available_languages()`):
+
+| Locale | Label |
+|---|---|
+| `en_US` | English (US) |
+| `en_GB` | English (UK) |
+| `zh_TW` | 繁體中文 (Traditional Chinese) |
+| `zh_CN` | 简体中文 (Simplified Chinese) |
+| `ja` | 日本語 (Japanese) |
+| `ko` | 한국어 (Korean) |
+| `fr_FR` | Français (French) |
+| `de_DE` | Deutsch (German) |
+| `es_ES` | Español (Spanish) |
+| `pt_BR` | Português (Brazilian Portuguese) |
+| `it_IT` | Italiano (Italian) |
+| `nl_NL` | Nederlands (Dutch) |
+| `ru_RU` | Русский (Russian) |
+| `ar` | العربية (Arabic) |
+| `hi_IN` | हिन्दी (Hindi) |
+| `th` | ไทย (Thai) |
+| `vi` | Tiếng Việt (Vietnamese) |
+| `id_ID` | Bahasa Indonesia |
+| `ms_MY` | Bahasa Melayu (Malay) |
+
+**Admin UI:**
+- "Languages" card in Settings page with dropdown picker and sortable list.
+- HTML5 drag-and-drop reordering (no jQuery UI dependency). First language = main language, shown with "Main" badge.
+- Remove button per language (disabled when only 1 language remains).
+- Saved as part of the settings PUT payload.
+
+**Helpers:**
+- `AIOEMP_Settings_Service::get_main_language()` — returns first element of `languages` array (or `'en_US'`).
+- `AIOEMP_Settings_Service::get_available_languages()` — returns locale → label map.
+- Settings controller GET response includes `available_languages` for the UI.
 
 ---
 
@@ -1318,7 +1399,7 @@ Four new settings fields added to the Settings module:
 | 7 | **Core Events + Candidates CRUD:** Events list/create/edit pages, Candidates tab (list, status change, bulk actions, candidate detail), event Overview tab metrics | **DONE** |
 | 8 | **Attendance + Users/Roles + Login + Ticket Page:** QR token generation, scan + confirm IN/OUT flow, sequence validation with force override, attendance log tab, CSV export, `checked_in` denormalised flag, device detection, user/role management, login shortcode, virtual ticket page | **DONE** |
 | 9 | **Public registration:** Shortcode/block form, CAPTCHA/Turnstile integration, acknowledgement email, external REST registration endpoint with rate limiting and CORS allowlist | NOT STARTED |
-| 10 | **Email automation:** Status-change emails (accept/reject), QR delivery, new user welcome email with password setup link, editable templates UI, company details in settings, virtual password-setup endpoint | **DONE** |
+| 10 | **Email automation + i18n:** Status-change emails (accept/reject), QR delivery, new user welcome email with password setup link, editable templates UI, company details in settings, virtual password-setup endpoint, multi-language support (text domain, language settings, candidate preferred language, locale-aware email templates with per-language editing UI) | **DONE** |
 
 > **Important:** Security controls are NOT a separate phase — they must be integrated into every phase from the start.
 
@@ -1345,7 +1426,7 @@ The following files in the `reference/` folder are the authoritative sources for
 
 ---
 
-## 21. Implementation Progress (as of 5 Mar 2026)
+## 21. Implementation Progress (as of 11 Mar 2026)
 
 > **CRITICAL: Read this section carefully.** It documents what has been built, what works, and known patterns/pitfalls from previous development sessions.
 
@@ -1450,11 +1531,13 @@ Zustand 5 + Immer middleware. Key design decisions:
 
 #### Plugin Bootstrap (`all-in-one-event-managing-platform.php`)
 
-Constants: `AIOEMP_VERSION = '0.1.0'`, `AIOEMP_DB_VERSION = '1.4.0'`. Auto-creates tables on every `plugins_loaded` (version check in `AIOEMP_Activator::create_tables()`).
+Constants: `AIOEMP_VERSION = '0.1.0'`, `AIOEMP_DB_VERSION = '1.6.0'`. Auto-creates tables on every `plugins_loaded` (version check in `AIOEMP_Activator::create_tables()`). Registers text domain `aioemp` via `load_plugin_textdomain()` on `plugins_loaded`.
 
 #### Database (10 tables)
 
-All created via `dbDelta()` in `class-aioemp-activator.php`. Explicit `ALTER TABLE` migrations in `run_migrations()` for: `checked_in` (v1.4.0), `integrity_pass` (v1.2.0), `status`/`updated_at_gmt` on seatmap (v1.1.0), event columns (v1.3.0).
+All created via `dbDelta()` in `class-aioemp-activator.php`. Explicit `ALTER TABLE` migrations in `run_migrations()` for: `preferred_language` (v1.6.0), `checked_in` (v1.4.0), `integrity_pass` (v1.2.0), `status`/`updated_at_gmt` on seatmap (v1.1.0), event columns (v1.3.0).
+
+> **DB ALERT:** v1.6.0 added `preferred_language` column to `aioemp_attender`. Migration auto-runs on `plugins_loaded`.
 
 #### REST API (namespace: `aioemp/v1`)
 
@@ -1462,7 +1545,7 @@ All created via `dbDelta()` in `class-aioemp-activator.php`. Explicit `ALTER TAB
 |---|---|---|
 | `class-aioemp-rest-controller.php` | Abstract base | DONE |
 | `class-aioemp-events-controller.php` | GET/POST/PUT/DELETE `/events` | DONE (536 lines) |
-| `class-aioemp-attenders-controller.php` | `/events/{id}/attenders` CRUD + counts + bulk-status | DONE (434 lines) |
+| `class-aioemp-attenders-controller.php` | `/events/{id}/attenders` CRUD + counts + bulk-status + CSV import/export + preferred_language | DONE (1149 lines) |
 | `class-aioemp-seating-controller.php` | `/events/{id}/seating` assign/unassign/swap/block + batch + finalize + logs | DONE (754 lines) |
 | `class-aioemp-attendance-controller.php` | `/events/{id}/resolve-ticket`, `/checkin`, `/attendance` + stats + export | DONE (368 lines) |
 | `class-aioemp-seatmaps-controller.php` | GET/POST/PUT/DELETE `/seatmaps` | DONE (347 lines) |
@@ -1475,7 +1558,8 @@ All created via `dbDelta()` in `class-aioemp-activator.php`. Explicit `ALTER TAB
 #### Services
 
 - **Locking service** (322 lines): Atomic SQL for race-free lock acquisition. TTL 90s.
-- **Settings service** (188 lines): Single `wp_options` key, field-level sanitisation, typed defaults.
+- **Settings service** (279 lines): Single `wp_options` key, field-level sanitisation, typed defaults, language helpers (`get_main_language()`, `get_available_languages()`).
+- **Email service** (531 lines): Email templates CRUD with locale-aware storage, `send()` with locale resolution (candidate's `preferred_language` → falls back to main), dynamic `<html lang>`, HTML email wrapper.
 
 #### Admin Script Enqueue Chain (`class-aioemp-admin.php`, 224 lines)
 
@@ -1512,9 +1596,10 @@ The context object (`ctx = window.AIOEMP_Events`) holds:
 #### Event Detail (`_detail.js`, 185 lines)
 - Five capability-gated tabs: Overview, Candidates, Attendance Log, Check In, Seating
 
-#### Candidates (`_candidates.js`, 400 lines)
+#### Candidates (`_candidates.js`, 1097 lines)
 - Table with attendance column (checked_in badge from seat_assignment JOIN)
-- Bulk status, add/edit modal, search/filter/pagination
+- Bulk status, add/edit modal with preferred language field, search/filter/pagination
+- Language field fetches and caches enabled languages from Settings API via `getLanguages()`
 
 ### 21.5 Seat Assignment Model — `checked_in` Behaviour
 
@@ -1592,3 +1677,6 @@ The `konva` package's `lib/Node.d.ts` can become corrupted (0 bytes), causing ~5
 19. **`checked_in` must be preserved** during seat swap and batch reassignment.
 20. **Capability check every endpoint** — use `AIOEMP_Security::CAPS` constants, never hardcode capability strings.
 21. **`user_caps` is passed to JS** — use `window.aioemp_userCan(key)` for UI gating, but NEVER rely on it for security.
+22. **Email templates are locale-aware.** When sending emails, always pass `$attender->preferred_language ?? null` as the 4th argument to `AIOEMP_Email_Service::send()`. The service handles fallback to main language automatically.
+23. **DB version is `1.6.0`** — includes `preferred_language` column on `aioemp_attender`. Migration auto-runs on `plugins_loaded`.
+24. **Locale-specific email option keys** follow the pattern `aioemp_email_templates_{locale}`. If adding a plugin uninstall/cleanup routine, remember to delete these options for all enabled locales.

@@ -124,6 +124,7 @@ class AIOEMP_Activator {
             company varchar(190) DEFAULT NULL,
             email varchar(190) DEFAULT NULL,
             preferred_language varchar(10) DEFAULT NULL,
+            online_url varchar(500) DEFAULT NULL,
             qrcode_hash char(64) NOT NULL,
             created_at_gmt datetime NOT NULL,
             status varchar(32) NOT NULL DEFAULT 'registered',
@@ -322,6 +323,12 @@ class AIOEMP_Activator {
             $col = $wpdb->get_results( "SHOW COLUMNS FROM `{$att_table}` LIKE 'preferred_language'" );
             if ( empty( $col ) ) {
                 $wpdb->query( "ALTER TABLE `{$att_table}` ADD COLUMN `preferred_language` varchar(10) DEFAULT NULL AFTER `email`" );
+            }
+
+            // v1.7.0 — add online_url column.
+            $col = $wpdb->get_results( "SHOW COLUMNS FROM `{$att_table}` LIKE 'online_url'" );
+            if ( empty( $col ) ) {
+                $wpdb->query( "ALTER TABLE `{$att_table}` ADD COLUMN `online_url` varchar(500) DEFAULT NULL AFTER `preferred_language`" );
             }
         }
     }

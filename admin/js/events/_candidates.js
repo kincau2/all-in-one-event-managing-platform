@@ -562,13 +562,31 @@
                 });
         });
 
-        // Export CSV.
+        // Export CSV — selected candidates or current filter.
         $tc.on('click.cand', '#cand-btn-export', function () {
             var $btn = $(this);
             $btn.prop('disabled', true).text('Exporting…');
 
-            // Build the REST URL manually for a direct download.
+            // Build the REST URL with filters.
             var url = ctx.api.buildUrl('events/' + ctx.detailEventId + '/attenders/export-csv');
+            var params = [];
+
+            // If candidates are selected, export only those.
+            var selectedIds = [];
+            $tc.find('.cand-check:checked').each(function () {
+                selectedIds.push($(this).val());
+            });
+
+            if (selectedIds.length) {
+                params.push('ids=' + encodeURIComponent(selectedIds.join(',')));
+            } else {
+                // No selection — apply current filter/search.
+                if (ctx.candidateState.status) params.push('status=' + encodeURIComponent(ctx.candidateState.status));
+                if (ctx.candidateState.search) params.push('search=' + encodeURIComponent(ctx.candidateState.search));
+            }
+
+            if (params.length) url += (url.indexOf('?') === -1 ? '?' : '&') + params.join('&');
+
             // Use fetch with auth headers so nonce is sent.
             fetch(url, {
                 headers: { 'X-WP-Nonce': window.aioemp_rest_nonce }
@@ -1024,6 +1042,10 @@
                         langOptions +
                     '</select>' +
                 '</div>' +
+                '<div class="aioemp-form-group aioemp-form-group--half">' +
+                    '<label class="aioemp-label">Online URL</label>' +
+                    '<input id="cand-f-online-url" class="aioemp-input" type="url" placeholder="https://zoom.us/j/..." value="' + esc(data.online_url || '') + '">' +
+                '</div>' +
             '</div>' +
 
             '<div class="aioemp-form-actions">' +
@@ -1066,6 +1088,7 @@
                 company:            $('#cand-f-company').val().trim(),
                 status:             $('#cand-f-status').val(),
                 preferred_language: $('#cand-f-lang').val(),
+                online_url:         $('#cand-f-online-url').val().trim(),
             };
 
             if (!body.first_name && !body.last_name) {

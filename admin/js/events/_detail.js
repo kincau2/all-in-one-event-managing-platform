@@ -132,7 +132,6 @@
                     detailRow('End', ctx.fmtDateTime(d.end_date_gmt)) +
                     detailRow('Capacity', d.capacity || '—') +
                     detailRow('Location', (d.location_name || '') + (d.location_address ? ' — ' + d.location_address : '') || '—') +
-                    detailRow('Online URL', d.online_url ? '<a href="' + esc(d.online_url) + '" target="_blank">' + esc(d.online_url) + '</a>' : '—') +
                     detailRow('Seatmap', d.seatmap_id ? esc(d.seatmap_title || 'Template #' + d.seatmap_id) : 'Free seating') +
                     detailRow('Created', ctx.fmtDateTime(d.created_at_gmt)) +
                 '</div>' +

@@ -1,7 +1,7 @@
 # AIOEMP — AI Agent Development Guideline
 
 **All-in-One Event Managing Platform (AIOEMP)**
-Version 1.5 | 11 Mar 2026
+Version 1.6 | 11 Mar 2026
 
 ---
 
@@ -326,6 +326,7 @@ All custom tables use the WordPress table prefix + `aioemp_`. No WordPress core 
 | company | VARCHAR(190) NULL | |
 | email | VARCHAR(190) NULL | |
 | preferred_language | VARCHAR(10) NULL | Locale code (e.g. `en_US`, `zh_TW`) for multi-language email templates |
+| online_url | VARCHAR(500) NULL | Per-candidate online meeting URL (e.g. unique Zoom link) |
 | qrcode_hash | CHAR(64) NOT NULL | SHA-256 hex |
 | created_at_gmt | DATETIME NOT NULL | Registration timestamp (UTC) |
 | status | VARCHAR(32) NOT NULL | Default `'registered'` |
@@ -425,8 +426,10 @@ All custom tables use the WordPress table prefix + `aioemp_`. No WordPress core 
 ### 4.3 Database Installation Rules
 
 - Use `dbDelta()` via WordPress's `$wpdb` for table creation on plugin activation.
-- Store a DB version number in `wp_options` (`aioemp_db_version`) and run migrations on version mismatch. Current: `AIOEMP_DB_VERSION = '1.6.0'`.
-- **Explicit `ALTER TABLE` migrations** in `AIOEMP_Activator::run_migrations()` handle columns that `dbDelta()` may fail to add on existing tables (e.g., `checked_in`, `integrity_pass`, `description`, `created_by`, `preferred_language`). These run on every `plugins_loaded`, before the version check, to ensure columns exist regardless of how the schema was updated.
+- Store a DB version number in `wp_options` (`aioemp_db_version`) and run migrations on version mismatch. Current: `AIOEMP_DB_VERSION = '1.7.0'`.
+- **Explicit `ALTER TABLE` migrations** in `AIOEMP_Activator::run_migrations()` handle columns that `dbDelta()` may fail to add on existing tables (e.g., `checked_in`, `integrity_pass`, `description`, `created_by`, `preferred_language`, `online_url`). These run on every `plugins_loaded`, before the version check, to ensure columns exist regardless of how the schema was updated.
+
+> **DB ALERT (v1.7.0):** Added `online_url VARCHAR(500) DEFAULT NULL` column to `aioemp_attender` table (after `preferred_language`). Each candidate now has their own online meeting URL (e.g. unique Zoom link). The event-level `online_url` field remains in the events table schema but has been removed from the event edit form UI — it is no longer used for email sending.
 
 > **DB ALERT (v1.6.0):** Added `preferred_language VARCHAR(10) DEFAULT NULL` column to `aioemp_attender` table (after `email`). Migration auto-runs on `plugins_loaded`. If deploying to an environment where the plugin was already active, the `run_migrations()` method will `ALTER TABLE ADD COLUMN` if missing.
 - Use `$wpdb->prefix` for table name prefixing.
@@ -1224,7 +1227,7 @@ Each template has **type-specific placeholders** plus **common placeholders** av
 **Type-specific:**
 - **registration_confirmation / rejected:** `{{first_name}}`, `{{last_name}}`, `{{full_name}}`, `{{email}}`, `{{event_title}}`, `{{event_date}}`, `{{event_location}}`
 - **accepted_onsite:** All of the above plus `{{ticket_url}}`, `{{qr_code_url}}`, `{{seat_label}}`
-- **accepted_online:** Common event fields plus `{{online_url}}`
+- **accepted_online:** Common event fields plus `{{online_url}}` (**resolved from the candidate's `online_url` field**, not the event)
 - **new_user_welcome:** `{{display_name}}`, `{{user_login}}`, `{{user_email}}`, `{{setup_url}}`, `{{role_name}}`
 
 ### 16.4 Email Sending
@@ -1400,8 +1403,163 @@ Four new settings fields added to the Settings module:
 | 8 | **Attendance + Users/Roles + Login + Ticket Page:** QR token generation, scan + confirm IN/OUT flow, sequence validation with force override, attendance log tab, CSV export, `checked_in` denormalised flag, device detection, user/role management, login shortcode, virtual ticket page | **DONE** |
 | 9 | **Public registration:** Shortcode/block form, CAPTCHA/Turnstile integration, acknowledgement email, external REST registration endpoint with rate limiting and CORS allowlist | NOT STARTED |
 | 10 | **Email automation + i18n:** Status-change emails (accept/reject), QR delivery, new user welcome email with password setup link, editable templates UI, company details in settings, virtual password-setup endpoint, multi-language support (text domain, language settings, candidate preferred language, locale-aware email templates with per-language editing UI) | **DONE** |
+| 11 | **WooCommerce Ticket Selling** (see §19.7 below for full logic flow) | NOT STARTED |
 
 > **Important:** Security controls are NOT a separate phase — they must be integrated into every phase from the start.
+
+### 19.7 Phase 11 — WooCommerce Ticket Selling (Logic Flow)
+
+> **Status: NOT STARTED.** This section is the design spec for future implementation.
+
+#### Architecture Decision: Dummy Product Approach
+
+Instead of creating a custom WC product type per event, use a **single hidden WC product** as a carrier. Seat availability is owned entirely by AIOEMP's existing locking/assignment logic. WC handles only the cart/checkout/payment flow.
+
+**Trade-off:** WC native analytics and third-party sales analysis plugins will see one product sold many times, which is meaningless for event analytics. A custom sales dashboard (Phase 11.6) is required.
+
+#### 11.1 Event Configuration
+
+- Add `sells_mode` column to `aioemp_events` table: `free` (default) | `woocommerce`
+- Event edit form gets a new select field for sells mode
+- Gate: `sells_mode = woocommerce` requires `venue_mode` of `onsite` or `mixed` (online-only events don't need seat-based tickets)
+- Switching from `woocommerce` → `free` shows a warning: "This will remove all pricing data. Proceed?"
+- Add `ticket_hold_minutes` column to `aioemp_events` (INT, default 15, range 5–60) — configurable reservation time limit
+
+#### 11.2 Dummy Product (One-Time Setup)
+
+- On plugin activation (or first time WC mode is used), auto-create a hidden WC simple product:
+  - Title: "Event Ticket (AIOEMP)"
+  - Price: 0 (overridden at cart time via hook)
+  - Catalog visibility: hidden
+  - Virtual: yes
+  - Stock management: off (AIOEMP handles availability)
+- Store the product ID in `wp_options` as `aioemp_wc_product_id`
+
+#### 11.3 Ticket Pricing Tool (Admin — New Tab)
+
+**Tab:** "Ticket Pricing" — visible only when `sells_mode = woocommerce`. Positioned after Candidates tab, before Seating tab.
+
+**Pricing model:** Section-based (maps to compiled seatmap `group` id). Per-seat pricing is impractical for large venues.
+
+**New table `aioemp_ticket_prices`:**
+
+| Column | Type | Notes |
+|---|---|---|
+| id | BIGINT PK | Auto-increment |
+| event_id | BIGINT FK | |
+| section_id | VARCHAR(100) | Maps to seatmap group id |
+| price | DECIMAL(10,2) | |
+| label | VARCHAR(100) | e.g. "VIP", "Standard", "Balcony" |
+| color | VARCHAR(7) | Hex color for seatmap overlay |
+| photo_url | VARCHAR(500) | Seat-view photo for customer reference |
+| capacity | INT | Optional override — defaults to section seat count |
+| created_at_gmt | DATETIME | |
+
+**UI:**
+- Render compiled seatmap in read-only mode (reuse SVG renderer from seating tab)
+- Sidebar panel: click a section to set price, display label, color overlay, upload seat-view photo
+- Sections with no price → greyed out and unavailable for sale
+- Summary bar: "12 sections configured · 450 seats available · Price range: $50–$200"
+
+#### 11.4 Frontend Shortcode `[aioemp_tickets]`
+
+**Parameters:** `[aioemp_tickets event_id="123"]`
+- No `event_id` → show list of WC-enabled published events
+- Event ended or full → "Sold Out" / "Event Ended" state
+
+**Seat selection UI:**
+- Interactive seatmap (clickable available seats)
+- Color-coded sections by price tier; legend with section label, price, availability count
+- Seat states: **Available** (clickable) | **Sold** (greyed, has accepted_onsite attender) | **Reserved** (orange, in someone else's cart)
+- On seat click → slide-in panel: section name, seat label, price, seat-view photo
+- Attendee fields per seat: First Name\*, Last Name, Email\*, Company, Preferred Language
+- Multiple seat selection supported (buying for a group), running total displayed
+- "Add to Cart" button
+
+**Add to Cart flow:**
+1. REST API call to reserve seat(s) (see §11.5)
+2. If reservation succeeds, add dummy product to WC cart via AJAX with `cart_item_data`:
+   - `event_id, seat_key, seat_label, section_id, section_label, price, attendee_first_name, attendee_last_name, attendee_email, attendee_company, attendee_preferred_language`
+3. Each seat = one cart line item (same product, different meta)
+4. Show "Added ✓" or redirect to cart
+
+**WC hooks for cart/order display:**
+- `woocommerce_before_calculate_totals` → set price from `cart_item_data['price']`
+- `woocommerce_cart_item_name` → display "Event Title — Section — Seat Label"
+- `woocommerce_cart_item_thumbnail` → show seat-view photo if available
+- `woocommerce_cart_item_removed` → release seat reservation
+- `woocommerce_order_item_display_meta_key` → clean up meta key display in emails/admin
+
+#### 11.5 Seat Reservation (Time-Limited Holds)
+
+**New table `aioemp_seat_reservations`:**
+
+| Column | Type | Notes |
+|---|---|---|
+| id | BIGINT PK | Auto-increment |
+| event_id | BIGINT FK | |
+| seat_key | VARCHAR(100) | |
+| session_id | VARCHAR(64) | WC session ID or hashed user identifier |
+| cart_item_key | VARCHAR(32) | WC cart item key for cleanup |
+| expires_at_gmt | DATETIME | `created_at_gmt + ticket_hold_minutes` |
+| created_at_gmt | DATETIME | |
+
+**Reservation logic:**
+- On seat selection: INSERT reservation, return countdown to frontend
+- Frontend shows countdown timer per seat: "Complete purchase within 12:34"
+- Timer hits 0 → auto-remove item from WC cart, release reservation via AJAX
+
+**Expiry cleanup (belt and suspenders):**
+1. **WP Cron** — scheduled every 2 minutes: `DELETE FROM aioemp_seat_reservations WHERE expires_at_gmt < NOW()`
+2. **Runtime check** — `is_seat_available()` always filters `expires_at_gmt > NOW()`, so expired reservations are ignored even before cron fires
+3. **Cart hooks** — `woocommerce_cart_item_removed` and `woocommerce_cart_emptied` → immediately release reservation
+
+#### 11.6 Post-Purchase Flow
+
+**Hook:** `woocommerce_order_status_completed` (also `processing` for digital goods).
+
+For each order line item with `_aioemp_event_id` meta:
+1. Create attender with status `accepted_onsite`
+2. Generate QR code hash (existing flow)
+3. Create seat assignment (seat_key from item meta)
+4. Delete seat reservation
+5. Send `accepted_onsite` email with ticket/QR
+6. Store `order_id` and `order_item_id` on attender record for traceability
+
+**New attender columns:** `order_id` (BIGINT NULL), `order_item_id` (BIGINT NULL) — NULL for free-mode candidates.
+
+**Refund / Cancellation:**
+- Hooks: `woocommerce_order_status_cancelled`, `woocommerce_order_status_refunded`
+- For each AIOEMP line item: remove seat assignment, update attender status → `rejected` (or new `refunded` status), free seat for resale
+
+#### 11.7 Sales Dashboard (Admin — New Tab)
+
+**Tab:** "Sales" — visible only when `sells_mode = woocommerce`. On event detail page.
+
+**Metrics:**
+- Summary cards: Total Revenue, Tickets Sold, Tickets Remaining, Avg. Price
+- By section: table — section label, price, sold count, revenue, remaining
+- Timeline: sales per day (last 30 days)
+- Recent orders: WC order link, date, attendee name, seat, amount
+
+**Data source:** Query attenders where `order_id IS NOT NULL` joined with `wc_orders` for amounts, or query `wc_order_itemmeta` filtered by `_aioemp_event_id`.
+
+#### 11.8 Implementation Sub-Phases
+
+| Sub-Phase | Scope | Dependency |
+|---|---|---|
+| 11.1 | Event config (`sells_mode`, `ticket_hold_minutes`) + dummy product setup | None |
+| 11.2 | Reservation table + WP Cron cleanup | 11.1 |
+| 11.3 | Ticket pricing tool (admin tab) | 11.1, existing seatmap renderer |
+| 11.4 | Frontend shortcode + seat selection UI | 11.1, 11.2, 11.3 |
+| 11.5 | Post-purchase hooks (create attender + assign seat) | 11.4 |
+| 11.6 | Sales dashboard | 11.5 |
+
+#### 11.9 Open Design Questions
+
+1. **General Admission** — support sections without assigned seats (standing area, open seating) where tickets are sold by count rather than specific seat?
+2. **Single-price mode** — simpler mode where entire event has one flat price (no per-section breakdown)?
+3. **Guest checkout** — allow WC guest checkout, or require account creation so attendee has a login to view their ticket?
 
 ---
 
@@ -1531,13 +1689,13 @@ Zustand 5 + Immer middleware. Key design decisions:
 
 #### Plugin Bootstrap (`all-in-one-event-managing-platform.php`)
 
-Constants: `AIOEMP_VERSION = '0.1.0'`, `AIOEMP_DB_VERSION = '1.6.0'`. Auto-creates tables on every `plugins_loaded` (version check in `AIOEMP_Activator::create_tables()`). Registers text domain `aioemp` via `load_plugin_textdomain()` on `plugins_loaded`.
+Constants: `AIOEMP_VERSION = '0.1.0'`, `AIOEMP_DB_VERSION = '1.7.0'`. Auto-creates tables on every `plugins_loaded` (version check in `AIOEMP_Activator::create_tables()`). Registers text domain `aioemp` via `load_plugin_textdomain()` on `plugins_loaded`.
 
 #### Database (10 tables)
 
-All created via `dbDelta()` in `class-aioemp-activator.php`. Explicit `ALTER TABLE` migrations in `run_migrations()` for: `preferred_language` (v1.6.0), `checked_in` (v1.4.0), `integrity_pass` (v1.2.0), `status`/`updated_at_gmt` on seatmap (v1.1.0), event columns (v1.3.0).
+All created via `dbDelta()` in `class-aioemp-activator.php`. Explicit `ALTER TABLE` migrations in `run_migrations()` for: `online_url` on attender (v1.7.0), `preferred_language` (v1.6.0), `checked_in` (v1.4.0), `integrity_pass` (v1.2.0), `status`/`updated_at_gmt` on seatmap (v1.1.0), event columns (v1.3.0).
 
-> **DB ALERT:** v1.6.0 added `preferred_language` column to `aioemp_attender`. Migration auto-runs on `plugins_loaded`.
+> **DB ALERT:** v1.7.0 added `online_url` column to `aioemp_attender` (per-candidate Zoom link). v1.6.0 added `preferred_language`. Migrations auto-run on `plugins_loaded`.
 
 #### REST API (namespace: `aioemp/v1`)
 
@@ -1545,7 +1703,7 @@ All created via `dbDelta()` in `class-aioemp-activator.php`. Explicit `ALTER TAB
 |---|---|---|
 | `class-aioemp-rest-controller.php` | Abstract base | DONE |
 | `class-aioemp-events-controller.php` | GET/POST/PUT/DELETE `/events` | DONE (536 lines) |
-| `class-aioemp-attenders-controller.php` | `/events/{id}/attenders` CRUD + counts + bulk-status + CSV import/export + preferred_language | DONE (1149 lines) |
+| `class-aioemp-attenders-controller.php` | `/events/{id}/attenders` CRUD + counts + bulk-status + CSV import/export + preferred_language + online_url | DONE (1149 lines) |
 | `class-aioemp-seating-controller.php` | `/events/{id}/seating` assign/unassign/swap/block + batch + finalize + logs | DONE (754 lines) |
 | `class-aioemp-attendance-controller.php` | `/events/{id}/resolve-ticket`, `/checkin`, `/attendance` + stats + export | DONE (368 lines) |
 | `class-aioemp-seatmaps-controller.php` | GET/POST/PUT/DELETE `/seatmaps` | DONE (347 lines) |
@@ -1678,5 +1836,6 @@ The `konva` package's `lib/Node.d.ts` can become corrupted (0 bytes), causing ~5
 20. **Capability check every endpoint** — use `AIOEMP_Security::CAPS` constants, never hardcode capability strings.
 21. **`user_caps` is passed to JS** — use `window.aioemp_userCan(key)` for UI gating, but NEVER rely on it for security.
 22. **Email templates are locale-aware.** When sending emails, always pass `$attender->preferred_language ?? null` as the 4th argument to `AIOEMP_Email_Service::send()`. The service handles fallback to main language automatically.
-23. **DB version is `1.6.0`** — includes `preferred_language` column on `aioemp_attender`. Migration auto-runs on `plugins_loaded`.
+23. **DB version is `1.7.0`** — includes `preferred_language` and `online_url` columns on `aioemp_attender`. Migration auto-runs on `plugins_loaded`.
 24. **Locale-specific email option keys** follow the pattern `aioemp_email_templates_{locale}`. If adding a plugin uninstall/cleanup routine, remember to delete these options for all enabled locales.
+25. **`online_url` is per-candidate, not per-event.** The `{{online_url}}` email placeholder resolves from `$attender->online_url`. The event edit form no longer has an Online URL field. Admin assigns individual Zoom links via CSV export → fill in `online_url` column → CSV import (update mode).

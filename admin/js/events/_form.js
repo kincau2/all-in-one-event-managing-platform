@@ -125,10 +125,6 @@
 
             '<div class="aioemp-form-row">' +
                 '<div class="aioemp-form-group aioemp-form-group--half">' +
-                    '<label class="aioemp-label">Online URL</label>' +
-                    '<input id="evt-f-online-url" class="aioemp-input" type="url" value="' + esc(data.online_url || '') + '" placeholder="https://">' +
-                '</div>' +
-                '<div class="aioemp-form-group aioemp-form-group--half">' +
                     '<label class="aioemp-label">Cover Image URL</label>' +
                     '<input id="evt-f-cover" class="aioemp-input" type="url" value="' + esc(data.cover_img_url || '') + '" placeholder="https://">' +
                 '</div>' +
@@ -186,7 +182,6 @@
                 capacity:         parseInt($('#evt-f-capacity').val(), 10) || null,
                 location_name:    $('#evt-f-loc-name').val().trim(),
                 location_address: $('#evt-f-loc-addr').val().trim(),
-                online_url:       $('#evt-f-online-url').val().trim(),
                 cover_img_url:    $('#evt-f-cover').val().trim(),
                 seatmap_id:       $('#evt-f-seatmap').val() || '',
             };

@@ -658,6 +658,12 @@ class AIOEMP_Attenders_Controller extends AIOEMP_REST_Controller {
             $data['preferred_language'] = preg_replace( '/[^a-zA-Z0-9_\-]/', '', (string) $lang );
         }
 
+        // Online URL (per-candidate Zoom link).
+        $online_url = $request->get_param( 'online_url' );
+        if ( null !== $online_url ) {
+            $data['online_url'] = esc_url_raw( (string) $online_url );
+        }
+
         // Status.
         $status = $this->text_param( $request, 'status' );
         if ( '' !== $status ) {
@@ -729,6 +735,7 @@ class AIOEMP_Attenders_Controller extends AIOEMP_REST_Controller {
             'title'              => array( 'type' => 'string' ),
             'company'            => array( 'type' => 'string' ),
             'preferred_language' => array( 'type' => 'string' ),
+            'online_url'         => array( 'type' => 'string' ),
             'status'     => array(
                 'type' => 'string',
                 'enum' => AIOEMP_Attender_Model::STATUSES,
@@ -924,7 +931,7 @@ class AIOEMP_Attenders_Controller extends AIOEMP_REST_Controller {
 
         // Online-specific variables.
         if ( 'accepted_online' === $template_type ) {
-            $variables['online_url'] = $event->online_url ?? '';
+            $variables['online_url'] = $attender->online_url ?? '';
         }
 
         return $variables;
@@ -937,10 +944,16 @@ class AIOEMP_Attenders_Controller extends AIOEMP_REST_Controller {
     /**
      * CSV column headers used for export (no status — status is not managed via CSV).
      */
-    private const CSV_COLUMNS = array( 'id', 'title', 'first_name', 'last_name', 'email', 'company', 'preferred_language' );
+    private const CSV_COLUMNS = array( 'id', 'title', 'first_name', 'last_name', 'email', 'company', 'preferred_language', 'online_url' );
 
     /**
-     * GET /events/<event_id>/attenders/export-csv — download all candidates as CSV.
+     * GET /events/<event_id>/attenders/export-csv — download candidates as CSV.
+     *
+     * Supports optional filters:
+     *  - ids    : comma-separated attender IDs (export only selected)
+     *  - status : filter by status
+     *  - search : filter by name/email search term
+     * If no filters are provided, all candidates are exported.
      */
     public function export_csv( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
         $event_id = absint( $request->get_param( 'event_id' ) );
@@ -949,11 +962,28 @@ class AIOEMP_Attenders_Controller extends AIOEMP_REST_Controller {
             return $this->error( 'event_not_found', __( 'Event not found.', 'aioemp' ), 404 );
         }
 
-        // Fetch all candidates (no pagination limit).
-        $result = $this->model->list_for_event( $event_id, array(
+        // Build query args from optional filters.
+        $args = array(
             'per_page' => 100000,
             'page'     => 1,
-        ) );
+        );
+
+        $ids_raw = $this->text_param( $request, 'ids' );
+        if ( $ids_raw ) {
+            $args['ids'] = array_filter( array_map( 'absint', explode( ',', $ids_raw ) ) );
+        }
+
+        $status = $this->text_param( $request, 'status' );
+        if ( $status ) {
+            $args['status'] = $status;
+        }
+
+        $search = $this->text_param( $request, 'search' );
+        if ( $search ) {
+            $args['search'] = $search;
+        }
+
+        $result = $this->model->list_for_event( $event_id, $args );
 
         $handle = fopen( 'php://temp', 'r+' );
         fputcsv( $handle, self::CSV_COLUMNS );
@@ -1046,7 +1076,7 @@ class AIOEMP_Attenders_Controller extends AIOEMP_REST_Controller {
             return $this->error( 'id_column_not_allowed', __( 'CSV must not contain an ID column when adding new candidates. Remove the ID column and try again.', 'aioemp' ) );
         }
 
-        $allowed_fields = array( 'title', 'first_name', 'last_name', 'email', 'company', 'status', 'preferred_language' );
+        $allowed_fields = array( 'title', 'first_name', 'last_name', 'email', 'company', 'status', 'preferred_language', 'online_url' );
         $id_col_index   = array_search( 'id', $header, true );
 
         $created     = 0;
@@ -1082,6 +1112,8 @@ class AIOEMP_Attenders_Controller extends AIOEMP_REST_Controller {
                         }
                     } elseif ( $field === 'preferred_language' ) {
                         $data[ $field ] = preg_replace( '/[^a-zA-Z0-9_\\-]/', '', $record[ $field ] );
+                    } elseif ( $field === 'online_url' ) {
+                        $data[ $field ] = esc_url_raw( $record[ $field ] );
                     } elseif ( $field === 'title' ) {
                         $data[ $field ] = AIOEMP_Security::sanitize_text( $record[ $field ] );
                     } else {
